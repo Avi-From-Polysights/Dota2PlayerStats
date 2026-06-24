@@ -42,12 +42,23 @@ export async function loadHeroes() {
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 
-export async function loadPlayerMatches(accountId, heroId, limit, significant) {
+export async function loadPlayerMatches(
+  accountId,
+  heroId,
+  limit,
+  significant,
+  patchId = null
+) {
   const params = new URLSearchParams({
     hero_id: String(heroId),
     limit: String(limit),
     significant: significant ? "1" : "0",
   });
+
+  if (patchId != null && patchId !== "") {
+    params.set("patch", String(patchId));
+  }
+
   return fetchJson(`${BASE_URL}/players/${accountId}/matches?${params}`);
 }
 

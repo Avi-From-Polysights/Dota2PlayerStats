@@ -70,6 +70,13 @@
             </label>
 
             <label class="field">
+              <span class="field__label">Patch</span>
+              <select id="patch-filter" name="patch">
+                <option value="">All patches</option>
+              </select>
+            </label>
+
+            <label class="field">
               <span class="field__label">Rolling window</span>
               <input type="number" id="rolling-window" name="rollingWindow" value="20" min="3" max="100" />
             </label>
@@ -132,6 +139,29 @@
             <div id="lane-table" class="lane-table"></div>
           </article>
         </div>
+
+        <article id="patch-breakdown" class="card motion-rise hidden">
+          <div class="section-head">
+            <h2 class="section-title">Win rate by patch</h2>
+            <p class="section-desc">Game win rate grouped by Dota patch, newest first.</p>
+          </div>
+          <div class="table-wrap">
+            <table id="patch-table" class="data-table">
+              <thead>
+                <tr>
+                  <th>Patch</th>
+                  <th>Games</th>
+                  <th>Wins</th>
+                  <th>Losses</th>
+                  <th>Win %</th>
+                  <th>Wilson low</th>
+                  <th>Wilson high</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </article>
 
         <article class="card motion-rise">
           <div class="section-head">

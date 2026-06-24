@@ -4,6 +4,11 @@ import {
   loadPlayerMatches,
 } from "./api.js";
 import {
+  loadPatches,
+  patchLabel,
+  recentPatches,
+} from "./patches.js";
+import {
   renderLaneChart,
   renderLaneVsGameChart,
   renderWinrateChart,
@@ -32,8 +37,12 @@ const laneTable = document.getElementById("lane-table");
 const laneVsGameStats = document.getElementById("lane-vs-game-stats");
 const exportBtn = document.getElementById("export-btn");
 const fetchBtn = document.getElementById("fetch-btn");
+const patchFilter = document.getElementById("patch-filter");
+const patchBreakdown = document.getElementById("patch-breakdown");
+const patchTableBody = document.querySelector("#patch-table tbody");
 
 let heroes = [];
+let patches = [];
 let heroByName = new Map();
 let lastMatchupRows = [];
 let sortState = { key: "games", dir: "desc" };
@@ -76,7 +85,18 @@ function resolveHeroId() {
 
 heroSearch.addEventListener("input", resolveHeroId);
 
-function renderSummary(analysis, heroName, trend, rollingWindow) {
+function populatePatches(list) {
+  patches = list;
+  const options = recentPatches(list)
+    .map(
+      (p) =>
+        `<option value="${p.id}">${p.name}</option>`
+    )
+    .join("");
+  patchFilter.innerHTML = `<option value="">All patches</option>${options}`;
+}
+
+function renderSummary(analysis, heroName, trend, rollingWindow, selectedPatchLabel) {
   const trendLabels = {
     improving: "Trending up",
     declining: "Trending down",
@@ -92,6 +112,10 @@ function renderSummary(analysis, heroName, trend, rollingWindow) {
       ? `${analysis.laneDecided} with lane data · ${analysis.laneUnknown} unknown`
       : "No parsed replay lane data";
 
+  const patchNote = selectedPatchLabel
+    ? `Filtered to ${selectedPatchLabel}`
+    : `${analysis.patchRows.length} patch(es) in sample`;
+
   summaryCards.innerHTML = `
     <div class="summary-card">
       <div class="summary-card__label">Game win rate</div>
@@ -106,7 +130,7 @@ function renderSummary(analysis, heroName, trend, rollingWindow) {
     <div class="summary-card">
       <div class="summary-card__label">Record</div>
       <div class="summary-card__value">${analysis.totalWins}W / ${analysis.totalLosses}L</div>
-      <div class="summary-card__sub">${analysis.totalGames} matches · ${laneDataNote}</div>
+      <div class="summary-card__sub">${analysis.totalGames} matches · ${patchNote}</div>
     </div>
     <div class="summary-card">
       <div class="summary-card__label">Hero</div>
@@ -213,6 +237,24 @@ function renderLaneVsGameStats(analysis) {
   `;
 }
 
+function renderPatchTable(patchRows) {
+  patchTableBody.innerHTML = patchRows
+    .map(
+      (row) => `
+      <tr>
+        <td>${patchLabel(patches, row.patchId)}</td>
+        <td>${row.games}</td>
+        <td>${row.wins}</td>
+        <td>${row.losses}</td>
+        <td class="winrate-cell ${winrateClass(row.winrate)}">${formatPct(row.winrate)}</td>
+        <td>${formatPct(row.wilsonLower)}</td>
+        <td>${formatPct(row.wilsonUpper)}</td>
+      </tr>
+    `
+    )
+    .join("");
+}
+
 function renderLaneTable(laneRows) {
   laneTable.innerHTML = laneRows
     .filter((r) => r.games > 0)
@@ -299,6 +341,9 @@ form.addEventListener("submit", async (event) => {
   const significant = document.getElementById("significant-only").checked;
   const confidence = Number(document.getElementById("confidence-level").value);
   const rollingWindow = Number(document.getElementById("rolling-window").value);
+  const patchValue = patchFilter.value;
+  const patchId = patchValue === "" ? null : Number(patchValue);
+  const selectedPatchLabel = patchId != null ? patchLabel(patches, patchId) : null;
 
   if (!accountId || accountId < 1) {
     showError("Enter a valid account ID.");
@@ -318,10 +363,17 @@ form.addEventListener("submit", async (event) => {
 
   try {
     const heroMap = new Map(heroes.map((h) => [h.id, h.name]));
-    const matchList = await loadPlayerMatches(accountId, heroId, limit, significant);
+    const matchList = await loadPlayerMatches(
+      accountId,
+      heroId,
+      limit,
+      significant,
+      patchId
+    );
 
     if (!matchList.length) {
-      showError("No matches found for that account, hero, and filter combination.");
+      const patchMsg = selectedPatchLabel ? ` on ${selectedPatchLabel}` : "";
+      showError(`No matches found for that account, hero, and filters${patchMsg}.`);
       setProgress(false);
       fetchBtn.disabled = false;
       return;
@@ -342,7 +394,11 @@ form.addEventListener("submit", async (event) => {
 
       try {
         const details = await loadMatchDetails(matchId, signal);
-        detailsList.push(details);
+        if (patchId != null && details?.patch != null && details.patch !== patchId) {
+          detailsList.push(null);
+        } else {
+          detailsList.push(details);
+        }
       } catch {
         detailsList.push(null);
       }
@@ -355,7 +411,7 @@ form.addEventListener("submit", async (event) => {
     const laneVsGameRolling = rollingLaneVsGame(analysis.timeline, rollingWindow);
     const trend = trendDirection(rolling);
 
-    renderSummary(analysis, heroName, trend, rollingWindow);
+    renderSummary(analysis, heroName, trend, rollingWindow, selectedPatchLabel);
     renderLaneVsGameStats(analysis);
     renderLaneVsGameChart(
       document.getElementById("lane-vs-game-chart"),
@@ -370,6 +426,13 @@ form.addEventListener("submit", async (event) => {
     );
     renderLaneChart(document.getElementById("lane-chart"), analysis.laneRows);
     renderLaneTable(analysis.laneRows);
+
+    const showPatchBreakdown =
+      !selectedPatchLabel && analysis.patchRows.length > 0;
+    patchBreakdown.classList.toggle("hidden", !showPatchBreakdown);
+    if (showPatchBreakdown) {
+      renderPatchTable(analysis.patchRows);
+    }
 
     sortState = { key: "games", dir: "desc" };
     updateSortHeaders();
@@ -395,8 +458,9 @@ form.addEventListener("submit", async (event) => {
 
 async function init() {
   try {
-    const list = await loadHeroes();
+    const [list, patchList] = await Promise.all([loadHeroes(), loadPatches()]);
     populateHeroes(list);
+    populatePatches(patchList);
 
     const kez = list.find((h) => h.name === "Kez");
     if (kez) {

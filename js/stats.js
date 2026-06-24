@@ -49,6 +49,7 @@ function gameWinRate(bucket) {
 export function analyzeMatches(matches, accountId, heroNames, confidence) {
   const matchups = new Map();
   const laneStats = new Map();
+  const patchStats = new Map();
   const timeline = [];
 
   let processed = 0;
@@ -86,6 +87,7 @@ export function analyzeMatches(matches, accountId, heroNames, confidence) {
     const lane = me.lane ?? 0;
     const laneOutcome = computeLaneOutcome(me, players);
     const goldAt10 = me.gold_t?.[10] ?? null;
+    const patch = details.patch ?? null;
 
     if (win) totalWins += 1;
     else totalLosses += 1;
@@ -113,6 +115,13 @@ export function analyzeMatches(matches, accountId, heroNames, confidence) {
     if (laneOutcome) laneBucket.laneKnown += 1;
     laneStats.set(lane, laneBucket);
 
+    const patchKey = patch ?? -1;
+    const patchBucket = patchStats.get(patchKey) ?? emptyBucket();
+    patchBucket.games += 1;
+    if (win) patchBucket.wins += 1;
+    else patchBucket.losses += 1;
+    patchStats.set(patchKey, patchBucket);
+
     timeline.push({
       matchId: details.match_id,
       startTime: details.start_time,
@@ -120,6 +129,7 @@ export function analyzeMatches(matches, accountId, heroNames, confidence) {
       lane,
       laneOutcome,
       goldAt10,
+      patch,
       durationMin,
       kills,
       deaths,
@@ -190,6 +200,22 @@ export function analyzeMatches(matches, accountId, heroNames, confidence) {
     })
     .sort((a, b) => b.games - a.games);
 
+  const patchRows = [...patchStats.entries()]
+    .map(([patchKey, s]) => {
+      const patchId = patchKey === -1 ? null : patchKey;
+      const ci = wilsonInterval(s.wins, s.games, confidence);
+      return {
+        patchId,
+        games: s.games,
+        wins: s.wins,
+        losses: s.losses,
+        winrate: s.games ? (s.wins / s.games) * 100 : 0,
+        wilsonLower: ci.lower,
+        wilsonUpper: ci.upper,
+      };
+    })
+    .sort((a, b) => (b.patchId ?? -1) - (a.patchId ?? -1));
+
   timeline.sort((a, b) => a.startTime - b.startTime);
 
   const totalGames = totalWins + totalLosses;
@@ -218,6 +244,7 @@ export function analyzeMatches(matches, accountId, heroNames, confidence) {
     gameWinWhenLaneDraw: laneDraw ? (gameWinsWhenLaneDraw / laneDraw) * 100 : null,
     matchupRows,
     laneRows,
+    patchRows,
     timeline,
   };
 }
