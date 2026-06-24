@@ -56,6 +56,20 @@ export function initConfigUi() {
   parseParallelEnabled?.addEventListener("change", syncParallelFields);
   parseRetry?.addEventListener("change", syncParseRetryFields);
 
+  const stratzFallback = document.getElementById("stratz-fallback");
+  const stratzToken = document.getElementById("stratz-api-token");
+
+  const syncStratzFields = () => {
+    const on = stratzFallback?.checked ?? false;
+    if (stratzToken instanceof HTMLInputElement) {
+      stratzToken.disabled = !on;
+    }
+    stratzToken?.closest(".field")?.classList.toggle("field--disabled", !on);
+  };
+
+  stratzFallback?.addEventListener("change", syncStratzFields);
+  syncStratzFields();
+
   syncParseSection();
 
   initToolParallelToggles();

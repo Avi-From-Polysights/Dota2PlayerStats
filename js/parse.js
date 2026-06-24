@@ -9,7 +9,9 @@ import { PARSE_OUTCOME } from "./parse-failures.js";
 /** Lane stats need gold at minute 10 from a parsed replay. */
 export function isMatchParsedForPlayer(details, accountId) {
   const me = details?.players?.find((p) => p.account_id === accountId);
-  return Array.isArray(me?.gold_t) && me.gold_t.length > 10;
+  if (Array.isArray(me?.gold_t) && me.gold_t.length > 10) return true;
+  if (typeof me?.lane_total_gold === "number") return true;
+  return false;
 }
 
 /** Replay processed on OpenDota (version set) but lane times may still be indexing. */

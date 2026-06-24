@@ -15,6 +15,7 @@ import {
   PARSE_MAX_AGE_DAYS,
   parseAgeSkipMessage,
 } from "./parse-age.js";
+import { enrichMatchFromStratz } from "./stratz.js";
 
 export function createLoadStats() {
   return {
@@ -28,6 +29,8 @@ export function createLoadStats() {
     parseExcluded: 0,
     parseRetries: 0,
     parseSkippedTooOld: 0,
+    stratzEnriched: 0,
+    stratzFailed: 0,
     rateLimited: 0,
     throttlePauses: 0,
     unparsed: 0,
@@ -53,6 +56,8 @@ export function formatLoadStats(loadStats) {
   if (loadStats.parseSkippedTooOld) {
     parts.push(`${loadStats.parseSkippedTooOld} skipped (>${PARSE_MAX_AGE_DAYS}d)`);
   }
+  if (loadStats.stratzEnriched) parts.push(`${loadStats.stratzEnriched} via STRATZ`);
+  if (loadStats.stratzFailed) parts.push(`${loadStats.stratzFailed} STRATZ miss`);
   if (loadStats.parseFailed) parts.push(`${loadStats.parseFailed} parse failed`);
   if (loadStats.throttlePauses) {
     parts.push(`${loadStats.throttlePauses} rate-limit pause(s)`);
@@ -143,6 +148,8 @@ export async function resolveMatchDetails(
     log,
     parseIgnoreAgeLimit = false,
     matchListItem = null,
+    useStratzFallback = false,
+    stratzToken = "",
   }
 ) {
   let details = hasCachedEntry ? cachedDetails : null;
@@ -305,6 +312,29 @@ export async function resolveMatchDetails(
     await cacheMatchProgress(matchId, details, accountId, "complete", 0);
   }
 
+  if (
+    details &&
+    useStratzFallback &&
+    stratzToken &&
+    !isMatchParsedForPlayer(details, accountId)
+  ) {
+    const stratzResult = await enrichMatchFromStratz(
+      details,
+      matchId,
+      accountId,
+      stratzToken,
+      { signal, log }
+    );
+    details = stratzResult.details;
+    if (stratzResult.enriched) {
+      loadStats.stratzEnriched += 1;
+      await cacheMatchProgress(matchId, details, accountId, "complete", 0);
+      await clearParseFailure(accountId, matchId).catch(() => {});
+    } else if (stratzResult.error) {
+      loadStats.stratzFailed += 1;
+    }
+  }
+
   return { details, usedNetwork, excluded, incomplete };
 }
 
@@ -326,6 +356,8 @@ export async function loadMatchDetailsBatch({
   onProgress,
   patchId = null,
   parseIgnoreAgeLimit = false,
+  useStratzFallback = false,
+  stratzToken = "",
 }) {
   const total = matchList.length;
   const slots = effectiveConcurrency(requestParse, concurrency, concurrency);
@@ -353,6 +385,12 @@ export async function loadMatchDetailsBatch({
     multiLog?.info(
       "Parse retries off — timed-out matches stay in sample without lane data (noted in results)"
     );
+  }
+
+  if (useStratzFallback && stratzToken) {
+    multiLog?.info("STRATZ fallback enabled for matches still missing lane data after OpenDota");
+  } else if (useStratzFallback) {
+    multiLog?.warn("STRATZ fallback checked but no API token — add one from stratz.com/api");
   }
 
   const onRateLimitWait = createRateLimitWaitHandler(loadStats, multiLog?.overview());
@@ -385,6 +423,8 @@ export async function loadMatchDetailsBatch({
           log: laneLog,
           parseIgnoreAgeLimit,
           matchListItem: match,
+          useStratzFallback,
+          stratzToken,
         });
 
         completed += 1;

@@ -241,6 +241,25 @@
                   <input type="number" id="parse-max-retries" name="parseMaxRetries" value="2" min="0" max="10" data-parse-field disabled />
                 </label>
               </div>
+
+              <div class="config-subgrid config-subgrid--stratz">
+                <label class="field field--checkbox">
+                  <input type="checkbox" id="stratz-fallback" name="stratzFallback" />
+                  <div class="field__label-row">
+                    <span class="field__label">STRATZ fallback for lane data</span>
+                    <span class="info-tip">
+                      <button type="button" class="info-tip__btn" aria-label="About STRATZ fallback">i</button>
+                      <span class="info-tip__panel" role="tooltip">When OpenDota has no parsed replay, fetch lane gold/LH series from the STRATZ GraphQL API (requires your free API token).</span>
+                    </span>
+                  </div>
+                </label>
+
+                <label class="field field--stratz-token field--disabled">
+                  <span class="field__label">STRATZ API token</span>
+                  <input type="password" id="stratz-api-token" name="stratzToken" autocomplete="off" placeholder="From stratz.com/api" disabled />
+                  <p class="field__hint">Stored locally in your browser only. Never sent anywhere except STRATZ.</p>
+                </label>
+              </div>
             </div>
           </details>
 

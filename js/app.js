@@ -50,6 +50,7 @@ import {
 import { initMainTabs } from "./tabs.js";
 import { initTools } from "./tools.js";
 import { initConfigUi, getParallelConcurrency } from "./config-ui.js";
+import { readStratzSettingsFromDom, initStratzTokenPersistence } from "./stratz-token.js";
 import { parseFailureLabel } from "./parse-failures.js";
 import {
   applyLaneFiltersToDom,
@@ -646,6 +647,7 @@ form.addEventListener("submit", async (event) => {
   const patchId = patchValue === "" ? null : Number(patchValue);
   const selectedPatchLabel = patchId != null ? patchLabel(patches, patchId) : null;
   const laneFilters = readLaneFiltersFromDom();
+  const { enabled: useStratzFallback, token: stratzToken } = readStratzSettingsFromDom();
 
   if (!accountId || accountId < 1) {
     showError("Enter a valid account ID.");
@@ -756,6 +758,8 @@ form.addEventListener("submit", async (event) => {
       multiLog: analyzeMultiLog,
       loadStats,
       patchId,
+      useStratzFallback,
+      stratzToken,
       onProgress: ({ completed, total: matchTotal, matchId, hasCachedEntry, workerId }) => {
         const pct = (completed / matchTotal) * 100;
         const laneSuffix =
@@ -819,6 +823,7 @@ async function init() {
   initFieldTooltips();
   initMainTabs();
   initConfigUi();
+  initStratzTokenPersistence();
   populateLaneFilterSelects();
   initLaneFilterListeners();
   analyzeMultiLog = initMultiActivityLog("activity-log-panel");

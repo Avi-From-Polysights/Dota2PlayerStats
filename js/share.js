@@ -26,6 +26,7 @@ export function readFormParams() {
     turbo: document.getElementById("exclude-turbo").checked ? "0" : "1",
     parse: document.getElementById("request-parse").checked ? "1" : "0",
     parsemax: document.getElementById("parse-max").value,
+    stratz: document.getElementById("stratz-fallback")?.checked ? "1" : "0",
     mylane: laneFilters.myLane,
     myrole: laneFilters.myRole,
     enemylane: laneFilters.enemyLane,
@@ -63,6 +64,7 @@ export function buildShareUrl(params, { autoRun = false } = {}) {
   if (params.myrole) url.searchParams.set("myrole", params.myrole);
   if (params.enemylane) url.searchParams.set("enemylane", params.enemylane);
   if (params.enemyrole) url.searchParams.set("enemyrole", params.enemyrole);
+  if (params.stratz === "1") url.searchParams.set("stratz", "1");
   if (autoRun) url.searchParams.set("run", "1");
 
   return url.toString();
@@ -124,6 +126,12 @@ export function applyUrlParams(heroes) {
   }
   if (params.has("parsemax")) {
     document.getElementById("parse-max").value = params.get("parsemax");
+    hasParams = true;
+  }
+  if (params.has("stratz")) {
+    const el = document.getElementById("stratz-fallback");
+    el.checked = params.get("stratz") === "1";
+    el?.dispatchEvent(new Event("change"));
     hasParams = true;
   }
 

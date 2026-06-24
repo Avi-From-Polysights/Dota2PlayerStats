@@ -12,6 +12,7 @@ import { DEFAULT_PARSE_CONCURRENCY } from "../parse-concurrency.js";
 import { getParallelConcurrency } from "../config-ui.js";
 import { APP_VERSION } from "../version.js";
 import { initMultiActivityLog } from "../multi-activity-log.js";
+import { readStratzSettingsFromDom } from "../stratz-token.js";
 
 function setProgress(progressEl, fillEl, textEl, visible, pct = 0, text = "") {
   progressEl.classList.toggle("hidden", !visible);
@@ -148,6 +149,7 @@ export async function runBatchParseTool({
     }
 
     const parseBudget = { remaining: Infinity };
+    const { enabled: useStratzFallback, token: stratzToken } = readStratzSettingsFromDom();
 
     await loadMatchDetailsBatch({
       matchList: needsParse,
@@ -162,6 +164,8 @@ export async function runBatchParseTool({
       multiLog,
       loadStats,
       parseIgnoreAgeLimit,
+      useStratzFallback,
+      stratzToken,
       onProgress: ({ completed, total, matchId, hasCachedEntry, workerId }) => {
         const pct = 10 + (completed / total) * 90;
         const lane = slots > 1 ? ` · lane ${workerId + 1}` : "";
