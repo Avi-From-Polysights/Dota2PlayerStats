@@ -6,7 +6,7 @@ import {
 import {
   loadPatches,
   patchLabel,
-  recentPatches,
+  selectablePatches,
 } from "./patches.js";
 import {
   renderLaneChart,
@@ -90,7 +90,7 @@ heroSearch.addEventListener("input", resolveHeroId);
 
 function populatePatches(list) {
   patches = list;
-  const options = recentPatches(list)
+  const options = selectablePatches(list)
     .map(
       (p) =>
         `<option value="${p.id}">${p.name}</option>`
@@ -432,8 +432,7 @@ form.addEventListener("submit", async (event) => {
     renderLaneChart(document.getElementById("lane-chart"), analysis.laneRows);
     renderLaneTable(analysis.laneRows);
 
-    const showPatchBreakdown =
-      !selectedPatchLabel && analysis.patchRows.length > 0;
+    const showPatchBreakdown = analysis.patchRows.length > 0;
     patchBreakdown.classList.toggle("hidden", !showPatchBreakdown);
     if (showPatchBreakdown) {
       renderPatchTable(analysis.patchRows);

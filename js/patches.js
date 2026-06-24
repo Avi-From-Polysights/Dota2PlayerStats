@@ -25,6 +25,6 @@ export function patchLabel(patches, patchId) {
   return match?.name ?? `Patch ${patchId}`;
 }
 
-export function recentPatches(patches, count = 18) {
-  return patches.slice(0, count);
+export function selectablePatches(patches, minId = 39) {
+  return patches.filter((p) => p.id >= minId);
 }
