@@ -21,9 +21,6 @@
           <h1 class="display-title">Dota 2 Player Stats</h1>
           <p class="lede">Matchup tables with Wilson confidence intervals, lane win rates, and win-rate trends over time.</p>
         </div>
-        <a class="btn btn--outline" href="https://github.com/Avi-From-Polysights/Dota2PlayerStats" target="_blank" rel="noopener">
-          View on GitHub
-        </a>
       </div>
     </header>
 
@@ -245,11 +242,32 @@
         </article>
       </section>
     </main>
-
-    <footer class="site-footer">
-      <p>Data from <a href="https://www.opendota.com/" target="_blank" rel="noopener">OpenDota</a>. Runs entirely in your browser. No account data is stored.</p>
-      <p class="site-footer__version" id="app-version"></p>
-    </footer>
   </div>
+
+  <footer class="footer-bar">
+    <div class="footer-bar__inner">
+      <p class="footer-bar__note">
+        Data from <a href="https://www.opendota.com/" target="_blank" rel="noopener">OpenDota</a>.
+        Runs in your browser; nothing is stored.
+      </p>
+      <div class="footer-bar__actions">
+        <span class="footer-bar__version" id="app-version"></span>
+        <a
+          class="btn btn--outline btn--footer"
+          href="https://github.com/Avi-From-Polysights/Dota2PlayerStats"
+          target="_blank"
+          rel="noopener"
+        >GitHub</a>
+        <button type="button" id="share-btn" class="btn btn--outline btn--footer">Copy share link</button>
+        <a
+          class="btn btn--outline btn--footer"
+          href="https://github.com/Avi-From-Polysights/Dota2PlayerStats/issues"
+          target="_blank"
+          rel="noopener"
+        >Support</a>
+      </div>
+      <p id="share-toast" class="footer-bar__toast hidden" aria-live="polite"></p>
+    </div>
+  </footer>
 </body>
 </html>

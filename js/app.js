@@ -22,6 +22,11 @@ import {
 import { formatCi, formatPct } from "./wilson.js";
 import { APP_VERSION } from "./version.js";
 import { initFieldTooltips } from "./field-help.js";
+import {
+  applyUrlParams,
+  copyShareLink,
+  syncUrlFromForm,
+} from "./share.js";
 
 const form = document.getElementById("stats-form");
 const heroSearch = document.getElementById("hero-search");
@@ -42,10 +47,13 @@ const fetchBtn = document.getElementById("fetch-btn");
 const patchFilter = document.getElementById("patch-filter");
 const patchBreakdown = document.getElementById("patch-breakdown");
 const patchTableBody = document.querySelector("#patch-table tbody");
+const shareBtn = document.getElementById("share-btn");
+const shareToast = document.getElementById("share-toast");
 
 const ACCOUNT_ID_HINT =
   "Check your Account ID on OpenDota: search your Steam name, open your profile, and copy the number from the URL (opendota.com/players/123456789). Use that ID, not Steam ID64.";
 let patches = [];
+let heroes = [];
 let heroByName = new Map();
 let lastMatchupRows = [];
 let sortState = { key: "games", dir: "desc" };
@@ -329,6 +337,35 @@ exportBtn.addEventListener("click", () => {
   if (lastMatchupRows.length) exportCsv(lastMatchupRows);
 });
 
+let shareToastTimer = null;
+
+function showShareToast(message) {
+  shareToast.textContent = message;
+  shareToast.classList.remove("hidden");
+  if (shareToastTimer) clearTimeout(shareToastTimer);
+  shareToastTimer = setTimeout(() => {
+    shareToast.classList.add("hidden");
+  }, 2800);
+}
+
+shareBtn.addEventListener("click", async () => {
+  if (!resolveHeroId() && heroSearch.value.trim()) {
+    showShareToast("Pick a valid hero before sharing.");
+    return;
+  }
+
+  try {
+    await copyShareLink();
+    showShareToast("Share link copied to clipboard.");
+    shareBtn.textContent = "Copied!";
+    setTimeout(() => {
+      shareBtn.textContent = "Copy share link";
+    }, 2000);
+  } catch {
+    showShareToast("Could not copy link. Copy the URL from your browser bar.");
+  }
+});
+
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
   hideError();
@@ -359,6 +396,7 @@ form.addEventListener("submit", async (event) => {
   }
 
   const heroName = heroSearch.value.trim();
+  syncUrlFromForm();
   fetchBtn.disabled = true;
   exportBtn.disabled = true;
   resultsEl.classList.add("hidden");
@@ -469,10 +507,18 @@ async function init() {
     populateHeroes(list);
     populatePatches(patchList);
 
-    const kez = list.find((h) => h.name === "Kez");
-    if (kez) {
-      heroSearch.value = kez.name;
-      heroIdInput.value = String(kez.id);
+    const { hasParams, shouldAutoRun } = applyUrlParams(list);
+
+    if (!hasParams) {
+      const kez = list.find((h) => h.name === "Kez");
+      if (kez) {
+        heroSearch.value = kez.name;
+        heroIdInput.value = String(kez.id);
+      }
+    }
+
+    if (shouldAutoRun && document.getElementById("account-id").value && resolveHeroId()) {
+      form.requestSubmit();
     }
   } catch (error) {
     showError(`Could not load hero list: ${error.message}`);
