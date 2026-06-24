@@ -1,3 +1,5 @@
+import { readLaneFiltersFromDom, applyLaneFiltersToDom } from "./lane-filters.js";
+
 const DEFAULTS = {
   limit: "100",
   delay: "150",
@@ -11,6 +13,7 @@ const DEFAULTS = {
 };
 
 export function readFormParams() {
+  const laneFilters = readLaneFiltersFromDom();
   return {
     account: document.getElementById("account-id").value.trim(),
     hero: document.getElementById("hero-id").value.trim(),
@@ -23,6 +26,10 @@ export function readFormParams() {
     turbo: document.getElementById("exclude-turbo").checked ? "0" : "1",
     parse: document.getElementById("request-parse").checked ? "1" : "0",
     parsemax: document.getElementById("parse-max").value,
+    mylane: laneFilters.myLane,
+    myrole: laneFilters.myRole,
+    enemylane: laneFilters.enemyLane,
+    enemyrole: laneFilters.enemyRole,
   };
 }
 
@@ -52,6 +59,10 @@ export function buildShareUrl(params, { autoRun = false } = {}) {
   if (params.parsemax && params.parsemax !== DEFAULTS.parsemax) {
     url.searchParams.set("parsemax", params.parsemax);
   }
+  if (params.mylane) url.searchParams.set("mylane", params.mylane);
+  if (params.myrole) url.searchParams.set("myrole", params.myrole);
+  if (params.enemylane) url.searchParams.set("enemylane", params.enemylane);
+  if (params.enemyrole) url.searchParams.set("enemyrole", params.enemyrole);
   if (autoRun) url.searchParams.set("run", "1");
 
   return url.toString();
@@ -113,6 +124,17 @@ export function applyUrlParams(heroes) {
   }
   if (params.has("parsemax")) {
     document.getElementById("parse-max").value = params.get("parsemax");
+    hasParams = true;
+  }
+
+  const laneFromUrl = {
+    myLane: params.get("mylane") ?? "",
+    myRole: params.get("myrole") ?? "",
+    enemyLane: params.get("enemylane") ?? "",
+    enemyRole: params.get("enemyrole") ?? "",
+  };
+  if (params.has("mylane") || params.has("myrole") || params.has("enemylane") || params.has("enemyrole")) {
+    applyLaneFiltersToDom(laneFromUrl);
     hasParams = true;
   }
 

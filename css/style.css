@@ -1284,6 +1284,72 @@ input[type="checkbox"] {
   text-align: right;
 }
 
+/* Lane / role filters */
+.lane-filter-block {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+
+.lane-filter-block__label {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.63px;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+}
+
+.lane-filter-block__hint {
+  margin: 0.35rem 0 0.75rem;
+  font-size: 0.75rem;
+  font-weight: var(--weight-body);
+  color: var(--tertiary);
+  line-height: 1.45;
+  max-width: 65ch;
+}
+
+.lane-filter-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.875rem;
+}
+
+.lane-filter-group {
+  margin: 0;
+  padding: 0.875rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: rgba(0, 0, 0, 0.15);
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.lane-filter-group__legend {
+  padding: 0 0.25rem;
+  font-family: var(--font-display);
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.63px;
+  text-transform: uppercase;
+  color: var(--foreground);
+}
+
+.matchup-filter-note {
+  margin: 0 0 0.75rem;
+  padding: 0.55rem 0.75rem;
+  border-radius: var(--radius-sm);
+  background: var(--primary-dim);
+  border: 1px solid rgba(66, 214, 140, 0.2);
+  font-size: 0.75rem;
+  font-weight: var(--weight-body);
+  color: var(--tertiary);
+  line-height: 1.45;
+}
+
 .lane-bar {
   height: 4px;
   background: var(--popover);
@@ -1356,6 +1422,148 @@ input[type="checkbox"] {
   font-size: 0.6875rem;
   color: var(--primary);
   text-align: right;
+}
+
+@media (max-width: 768px) {
+  .page {
+    padding: 1rem max(1rem, env(safe-area-inset-right)) max(2rem, env(safe-area-inset-bottom))
+      max(1rem, env(safe-area-inset-left));
+  }
+
+  .display-title {
+    font-size: clamp(1.65rem, 8vw, 2.25rem);
+  }
+
+  .lede {
+    font-size: 0.8125rem;
+  }
+
+  .main-tabs__tab {
+    min-height: 2.75rem;
+    padding: 0.65rem 0.75rem;
+    font-size: 0.75rem;
+  }
+
+  .field-group,
+  .field-group--primary {
+    grid-template-columns: 1fr;
+  }
+
+  .config-subgrid {
+    grid-template-columns: 1fr;
+  }
+
+  .field--parse-max {
+    max-width: none;
+  }
+
+  input[type="number"],
+  input[type="text"],
+  select {
+    font-size: 16px;
+    min-height: 2.75rem;
+  }
+
+  .info-tip__btn {
+    width: 1.25rem;
+    height: 1.25rem;
+    font-size: 0.6875rem;
+  }
+
+  .info-tip__panel {
+    left: 0;
+    transform: none;
+    max-width: min(280px, calc(100vw - 2.5rem));
+  }
+
+  .info-tip__panel::after {
+    left: 0.5rem;
+    transform: none;
+  }
+
+  .form-actions {
+    flex-direction: column;
+  }
+
+  .form-actions .btn {
+    width: 100%;
+    min-height: 2.75rem;
+  }
+
+  .summary-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .summary-card__value {
+    font-size: 1.5rem;
+  }
+
+  .summary-card__sub {
+    font-size: 0.6875rem;
+  }
+
+  .compare-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .compare-stat__value {
+    font-size: 1.25rem;
+  }
+
+  .lane-filter-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .chart-wrap {
+    height: 240px;
+  }
+
+  .chart-wrap--short,
+  .chart-wrap--mini {
+    height: 180px;
+  }
+
+  .table-wrap {
+    -webkit-overflow-scrolling: touch;
+    margin-inline: -0.25rem;
+    border-radius: var(--radius-md);
+  }
+
+  .data-table {
+    font-size: 0.8125rem;
+  }
+
+  .data-table th,
+  .data-table td {
+    padding: 0.5rem 0.55rem;
+    white-space: nowrap;
+  }
+
+  .multi-log__tab {
+    min-height: 2rem;
+    padding: 0.45rem 0.65rem;
+    font-size: 0.6875rem;
+  }
+
+  .footer-bar__inner {
+    padding-inline: max(1rem, env(safe-area-inset-left)) max(1rem, env(safe-area-inset-right));
+    padding-bottom: max(0.65rem, env(safe-area-inset-bottom));
+  }
+
+  .footer-bar__actions .btn {
+    min-height: 2.5rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .summary-grid,
+  .compare-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .card {
+    padding: 1rem;
+  }
 }
 
 @media (max-width: 640px) {

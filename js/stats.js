@@ -1,6 +1,7 @@
 import { wilsonInterval } from "./wilson.js";
 import { didPlayerWin, isRadiant } from "./api.js";
 import { computeLaneOutcome, laneLabel, resolvePlayerLane } from "./lane.js";
+import { matchEnemyLaneFilter, matchMyLaneFilter } from "./lane-filters.js";
 import { GAMEMODE_TURBO } from "./game-modes.js";
 
 function emptyBucket() {
@@ -40,8 +41,11 @@ export function analyzeMatches(
   accountId,
   heroNames,
   confidence,
-  { turboSkippedList = 0 } = {}
+  { turboSkippedList = 0, laneFilters = {} } = {}
 ) {
+  const filterMyPosition = Boolean(laneFilters.myLane || laneFilters.myRole);
+  const filterEnemyPosition = Boolean(laneFilters.enemyLane || laneFilters.enemyRole);
+
   const matchups = new Map();
   const laneStats = new Map();
   const patchStats = new Map();
@@ -62,6 +66,7 @@ export function analyzeMatches(
   let gameWinsWhenLaneWon = 0;
   let gameWinsWhenLaneLost = 0;
   let gameWinsWhenLaneDraw = 0;
+  let laneFilterSkipped = 0;
 
   for (const details of matches) {
     if (!details) {
@@ -92,6 +97,12 @@ export function analyzeMatches(
     if (details.game_mode === GAMEMODE_TURBO) {
       skipped += 1;
       turboSkipped += 1;
+      continue;
+    }
+
+    if (filterMyPosition && !matchMyLaneFilter(me, laneFilters)) {
+      skipped += 1;
+      laneFilterSkipped += 1;
       continue;
     }
 
@@ -149,6 +160,7 @@ export function analyzeMatches(
 
     for (const p of players) {
       if (isRadiant(p.player_slot) === mySideRadiant) continue;
+      if (filterEnemyPosition && !matchEnemyLaneFilter(p, laneFilters)) continue;
 
       const enemyId = p.hero_id;
       const enemyName = heroNames.get(enemyId) ?? `hero_${enemyId}`;
@@ -263,6 +275,7 @@ export function analyzeMatches(
     laneRows,
     patchRows,
     timeline,
+    laneFilterSkipped,
   };
 }
 

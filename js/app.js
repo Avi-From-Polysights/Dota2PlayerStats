@@ -51,6 +51,13 @@ import { initMainTabs } from "./tabs.js";
 import { initTools } from "./tools.js";
 import { initConfigUi, getParallelConcurrency } from "./config-ui.js";
 import { parseFailureLabel } from "./parse-failures.js";
+import {
+  applyLaneFiltersToDom,
+  formatLaneFilterSummary,
+  hasActiveLaneFilters,
+  populateLaneFilterSelects,
+  readLaneFiltersFromDom,
+} from "./lane-filters.js";
 
 const form = document.getElementById("stats-form");
 const heroSearch = document.getElementById("hero-search");
@@ -136,7 +143,7 @@ function populatePatches(list) {
   patchFilter.innerHTML = `<option value="">All patches</option>${options}`;
 }
 
-function renderSummary(analysis, heroName, trend, rollingWindow, selectedPatchLabel, loadStats) {
+function renderSummary(analysis, heroName, trend, rollingWindow, selectedPatchLabel, loadStats, laneFilters) {
   const trendLabels = {
     improving: "Trending up",
     declining: "Trending down",
@@ -162,6 +169,13 @@ function renderSummary(analysis, heroName, trend, rollingWindow, selectedPatchLa
     : `${analysis.patchRows.length} patch(es) in sample`;
 
   const loadNote = loadStats ? formatLoadStats(loadStats) : "";
+  const laneFilterNote = hasActiveLaneFilters(laneFilters)
+    ? formatLaneFilterSummary(laneFilters)
+    : "";
+  const laneSkipNote =
+    analysis.laneFilterSkipped > 0
+      ? `${analysis.laneFilterSkipped} excluded by lane/role filter`
+      : "";
 
   summaryCards.innerHTML = `
     <div class="summary-card">
@@ -182,7 +196,7 @@ function renderSummary(analysis, heroName, trend, rollingWindow, selectedPatchLa
     <div class="summary-card">
       <div class="summary-card__label">Hero</div>
       <div class="summary-card__value" style="font-size:1.35rem">${heroName}</div>
-      <div class="summary-card__sub">${analysis.processed} processed · ${analysis.skipped} skipped${analysis.turboSkipped ? ` · ${analysis.turboSkipped} turbo excluded` : ""}${loadNote ? ` · ${loadNote}` : ""}</div>
+      <div class="summary-card__sub">${analysis.processed} processed · ${analysis.skipped} skipped${analysis.turboSkipped ? ` · ${analysis.turboSkipped} turbo excluded` : ""}${laneSkipNote ? ` · ${laneSkipNote}` : ""}${laneFilterNote ? ` · ${laneFilterNote}` : ""}${loadNote ? ` · ${loadNote}` : ""}</div>
     </div>
     <div class="summary-card">
       <div class="summary-card__label">Recent trend</div>
@@ -190,6 +204,18 @@ function renderSummary(analysis, heroName, trend, rollingWindow, selectedPatchLa
       <div class="summary-card__sub">${rollingWindow}-match rolling window</div>
     </div>
   `;
+}
+
+function renderMatchupFilterNote(laneFilters) {
+  const el = document.getElementById("matchup-filter-note");
+  if (!el) return;
+  if (!hasActiveLaneFilters(laneFilters)) {
+    el.textContent = "";
+    el.classList.add("hidden");
+    return;
+  }
+  el.textContent = `Matchups filtered: ${formatLaneFilterSummary(laneFilters)}. Enemy lane/role filters only affect the table below.`;
+  el.classList.remove("hidden");
 }
 
 function winrateClass(value) {
@@ -521,6 +547,7 @@ form.addEventListener("submit", async (event) => {
   const patchValue = patchFilter.value;
   const patchId = patchValue === "" ? null : Number(patchValue);
   const selectedPatchLabel = patchId != null ? patchLabel(patches, patchId) : null;
+  const laneFilters = readLaneFiltersFromDom();
 
   if (!accountId || accountId < 1) {
     showError("Enter a valid account ID.");
@@ -655,13 +682,15 @@ form.addEventListener("submit", async (event) => {
 
     const analysis = analyzeMatches(detailsList, accountId, heroMap, confidence, {
       turboSkippedList: turboSkipped,
+      laneFilters,
     });
     const rolling = rollingWinRate(analysis.timeline, rollingWindow);
     const laneVsGameRolling = rollingLaneVsGame(analysis.timeline, rollingWindow);
     const trend = trendDirection(rolling);
 
-    renderSummary(analysis, heroName, trend, rollingWindow, selectedPatchLabel, loadStats);
+    renderSummary(analysis, heroName, trend, rollingWindow, selectedPatchLabel, loadStats, laneFilters);
     renderParseStatusPanel(loadStats, requestParse);
+    renderMatchupFilterNote(laneFilters);
     renderLaneVsGameStats(analysis);
     renderLaneVsGameChart(
       document.getElementById("lane-vs-game-chart"),
@@ -715,6 +744,7 @@ async function init() {
   initFieldTooltips();
   initMainTabs();
   initConfigUi();
+  populateLaneFilterSelects();
   analyzeMultiLog = initMultiActivityLog("activity-log-panel");
   initTools({
     getAnalyzeAbortSignal: () =>

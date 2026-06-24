@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>Dota 2 Player Stats</title>
   <meta name="description" content="Hero matchup stats, lane win rates, and win rate trends from OpenDota." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -132,9 +132,37 @@
                   </div>
                 </label>
               </div>
+
+              <div class="lane-filter-block">
+                <p class="lane-filter-block__label">Lane &amp; role filters</p>
+                <p class="lane-filter-block__hint">Filter by where you played and where enemies were (e.g. mid vs mid, off vs safe support). Requires parsed replays for lane data.</p>
+                <div class="lane-filter-grid">
+                  <fieldset class="lane-filter-group">
+                    <legend class="lane-filter-group__legend">Your position</legend>
+                    <label class="field">
+                      <span class="field__label">Your lane</span>
+                      <select id="my-lane-filter" name="myLane"></select>
+                    </label>
+                    <label class="field">
+                      <span class="field__label">Your role</span>
+                      <select id="my-role-filter" name="myRole"></select>
+                    </label>
+                  </fieldset>
+                  <fieldset class="lane-filter-group">
+                    <legend class="lane-filter-group__legend">Enemy in matchups</legend>
+                    <label class="field">
+                      <span class="field__label">Enemy lane</span>
+                      <select id="enemy-lane-filter" name="enemyLane"></select>
+                    </label>
+                    <label class="field">
+                      <span class="field__label">Enemy role</span>
+                      <select id="enemy-role-filter" name="enemyRole"></select>
+                    </label>
+                  </fieldset>
+                </div>
+              </div>
             </div>
           </details>
-
           <details class="config-section">
             <summary class="config-section__summary">
               <span class="config-section__title">Charts &amp; statistics</span>
@@ -339,6 +367,7 @@
             <h2 class="section-title">Enemy hero matchups</h2>
             <p class="section-desc">Sorted by games played. Wilson CI shows statistically plausible win-rate range.</p>
           </div>
+          <p id="matchup-filter-note" class="matchup-filter-note hidden" role="status"></p>
           <div class="table-wrap">
             <table id="matchup-table" class="data-table">
               <thead>
