@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dota 2 Player Stats</title>
+  <meta name="description" content="Hero matchup stats, lane win rates, and win rate trends from OpenDota." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,100..900&family=Pragati+Narrow:wght@700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/style.css?v=0.0.20" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js" defer></script>
+  <script type="module" src="js/app.js?v=0.0.20"></script>
+</head>
+<body>
+  <div class="page">
+    <header class="site-header">
+      <div class="site-header__top">
+        <div class="site-header__brand">
+          <span class="badge">OpenDota</span>
+          <h1 class="display-title">Dota 2 Player Stats</h1>
+          <p class="lede">Matchup tables with Wilson confidence intervals, lane win rates, and win-rate trends over time.</p>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <section class="card config-panel">
+        <div class="section-head">
+          <h2 class="section-title">Parameters</h2>
+          <p class="section-desc">Configure your account, hero filter, and analysis settings.</p>
+        </div>
+
+        <form id="stats-form" class="config-grid">
+          <div class="field-group field-group--primary">
+            <label class="field field--with-hint">
+              <div class="field__label-row">
+                <span class="field__label">Account ID</span>
+                <span class="info-tip">
+                  <button type="button" class="info-tip__btn" aria-label="About Account ID">i</button>
+                  <span class="info-tip__panel" role="tooltip">Your OpenDota player ID: the number in your profile URL (opendota.com/players/123456789). This is not your Steam ID64.</span>
+                </span>
+              </div>
+              <input type="number" id="account-id" name="accountId" required placeholder="427824243" min="1" />
+              <p class="field__hint">
+                Find it on your
+                <a href="https://www.opendota.com/" target="_blank" rel="noopener">OpenDota</a>
+                profile: search your Steam name, open your player page, and use the number in the URL
+                (<code>opendota.com/players/<strong>123456789</strong></code>).
+                This is not your Steam ID64.
+              </p>
+              <div id="saved-accounts" class="saved-accounts hidden" aria-live="polite"></div>
+            </label>
+
+            <label class="field">
+              <div class="field__label-row">
+                <span class="field__label">Hero</span>
+                <span class="info-tip">
+                  <button type="button" class="info-tip__btn" aria-label="About Hero">i</button>
+                  <span class="info-tip__panel" role="tooltip">The hero you played in these games. The matchup table shows enemy heroes you faced while on this pick.</span>
+                </span>
+              </div>
+              <input type="text" id="hero-search" list="hero-list" placeholder="Search hero…" autocomplete="off" required />
+              <input type="hidden" id="hero-id" name="heroId" />
+              <datalist id="hero-list"></datalist>
+            </label>
+          </div>
+
+          <div class="field-group">
+            <label class="field">
+              <div class="field__label-row">
+                <span class="field__label">Match limit</span>
+                <span class="info-tip">
+                  <button type="button" class="info-tip__btn" aria-label="About Match limit">i</button>
+                  <span class="info-tip__panel" role="tooltip">How many of your most recent matches on this hero to fetch and analyze. More matches means richer stats, but a longer load time.</span>
+                </span>
+              </div>
+              <input type="number" id="match-limit" name="limit" value="100" min="1" max="500" />
+            </label>
+
+            <label class="field">
+              <div class="field__label-row">
+                <span class="field__label">Request delay (ms)</span>
+                <span class="info-tip">
+                  <button type="button" class="info-tip__btn" aria-label="About Request delay">i</button>
+                  <span class="info-tip__panel" role="tooltip">Extra milliseconds between match fetches. The app also auto-paces to OpenDota's 60 requests/minute limit (parse requests count as 10). Increase this if you still see 429 errors.</span>
+                </span>
+              </div>
+              <input type="number" id="request-delay" name="delay" value="150" min="0" max="2000" step="50" />
+            </label>
+
+            <label class="field">
+              <div class="field__label-row">
+                <span class="field__label">Wilson confidence</span>
+                <span class="info-tip">
+                  <button type="button" class="info-tip__btn" aria-label="About Wilson confidence">i</button>
+                  <span class="info-tip__panel" role="tooltip">Confidence level for Wilson score intervals on win rates. Wilson intervals estimate a plausible true win-rate range when sample size is small (e.g. 3 wins out of 5 games). 95% is a common default.</span>
+                </span>
+              </div>
+              <select id="confidence-level" name="confidence">
+                <option value="0.90">90%</option>
+                <option value="0.95" selected>95%</option>
+                <option value="0.99">99%</option>
+              </select>
+            </label>
+
+            <label class="field">
+              <div class="field__label-row">
+                <span class="field__label">Patch filter</span>
+                <span class="info-tip">
+                  <button type="button" class="info-tip__btn" aria-label="About Patch">i</button>
+                  <span class="info-tip__panel" role="tooltip">Filter to one Dota patch version, or choose All patches to analyze recent games across patches and see the per-patch breakdown table.</span>
+                </span>
+              </div>
+              <select id="patch-filter" name="patch">
+                <option value="">All patches</option>
+              </select>
+            </label>
+
+            <label class="field">
+              <div class="field__label-row">
+                <span class="field__label">Rolling window</span>
+                <span class="info-tip">
+                  <button type="button" class="info-tip__btn" aria-label="About Rolling window">i</button>
+                  <span class="info-tip__panel" role="tooltip">Number of consecutive matches used for each point on the rolling win-rate chart. A larger window smooths noise; a smaller window reacts faster to recent form.</span>
+                </span>
+              </div>
+              <input type="number" id="rolling-window" name="rollingWindow" value="20" min="3" max="100" />
+            </label>
+          </div>
+
+          <label class="field field--checkbox">
+            <input type="checkbox" id="exclude-turbo" name="excludeTurbo" checked />
+            <div class="field__label-row">
+              <span class="field__label">Exclude Turbo</span>
+              <span class="info-tip">
+                <button type="button" class="info-tip__btn" aria-label="About Exclude Turbo">i</button>
+                <span class="info-tip__panel" role="tooltip">Skip Turbo matches (game mode 23) when building your sample. OpenDota scans further back in your history to still reach your match limit.</span>
+              </span>
+            </div>
+          </label>
+
+          <label class="field field--checkbox">
+            <input type="checkbox" id="significant-only" name="significant" />
+            <div class="field__label-row">
+              <span class="field__label">Significant matches only</span>
+              <span class="info-tip">
+                <button type="button" class="info-tip__btn" aria-label="About Significant matches only">i</button>
+                <span class="info-tip__panel" role="tooltip">When enabled, only OpenDota significant matches are included (typically ranked games). Turn off to add casual or low-priority matches.</span>
+              </span>
+            </div>
+          </label>
+
+          <label class="field field--checkbox">
+            <input type="checkbox" id="request-parse" name="requestParse" />
+            <div class="field__label-row">
+              <span class="field__label">Request OpenDota parse</span>
+              <span class="info-tip">
+                <button type="button" class="info-tip__btn" aria-label="About Request OpenDota parse">i</button>
+                <span class="info-tip__panel" role="tooltip">Queue OpenDota replay parses for matches missing lane data. Each parse uses 10 of your 60 requests/minute — large jobs are paced automatically and may take a while. Parsed matches are cached in your browser; re-run later to continue without redoing finished games.</span>
+              </span>
+            </div>
+          </label>
+
+          <label class="field field--parse-max">
+            <div class="field__label-row">
+              <span class="field__label">Max parses per run</span>
+              <span class="info-tip">
+                <button type="button" class="info-tip__btn" aria-label="About Max parses per run">i</button>
+                <span class="info-tip__panel" role="tooltip">Cap how many unparsed matches to queue this run. 0 means no limit (can take a long time on large samples). Already-parsed cached matches never count toward this limit.</span>
+              </span>
+            </div>
+            <input type="number" id="parse-max" name="parseMax" value="0" min="0" max="500" />
+          </label>
+
+          <div class="form-actions">
+            <button type="submit" id="fetch-btn" class="btn btn--primary">Analyze matches</button>
+            <button type="button" id="export-btn" class="btn btn--outline" disabled>Export CSV</button>
+          </div>
+        </form>
+
+        <div id="progress" class="progress hidden" aria-live="polite">
+          <div class="progress__track">
+            <div id="progress-fill" class="progress__fill"></div>
+          </div>
+          <p id="progress-text" class="progress__text">Starting…</p>
+          <details id="activity-log-panel" class="activity-log-panel hidden" open>
+            <summary class="activity-log-panel__summary">Activity log</summary>
+            <pre id="activity-log" class="activity-log-panel__body"></pre>
+          </details>
+        </div>
+      </section>
+
+      <section id="error-banner" class="alert alert--error hidden" role="alert"></section>
+
+      <section id="results" class="results hidden">
+        <div class="summary-grid motion-stagger" id="summary-cards"></div>
+
+        <article class="card card--highlight lane-vs-game-panel motion-rise">
+          <div class="section-head">
+            <h2 class="section-title">Lane win % vs game win %</h2>
+            <p class="section-desc">Lane outcome uses gold at 10 minutes vs your lane opponent on parsed replays. See whether winning lane translates into winning the game.</p>
+          </div>
+          <div id="lane-vs-game-stats" class="compare-grid"></div>
+          <div class="chart-wrap chart-wrap--mini">
+            <canvas id="lane-vs-game-chart"></canvas>
+          </div>
+        </article>
+
+        <div class="charts-row">
+          <article class="card chart-panel motion-rise">
+            <div class="section-head section-head--compact">
+              <h2 class="section-title">Win rate over time</h2>
+              <p class="section-desc">Rolling win rate by match date. A rising line suggests improvement.</p>
+            </div>
+            <div class="chart-wrap">
+              <canvas id="winrate-chart"></canvas>
+            </div>
+          </article>
+
+          <article class="card chart-panel motion-rise">
+            <div class="section-head section-head--compact">
+              <h2 class="section-title">By lane position</h2>
+              <p class="section-desc">Lane win % (10-min gold) vs game win % for each lane you played.</p>
+              <p id="lane-data-note" class="section-desc section-desc--note"></p>
+            </div>
+            <div class="chart-wrap chart-wrap--short">
+              <canvas id="lane-chart"></canvas>
+            </div>
+            <div id="lane-table" class="lane-table"></div>
+          </article>
+        </div>
+
+        <article id="patch-breakdown" class="card motion-rise hidden">
+          <div class="section-head">
+            <h2 class="section-title">Win rate by patch</h2>
+            <p class="section-desc">Game win rate grouped by Dota patch, newest first.</p>
+          </div>
+          <div class="table-wrap">
+            <table id="patch-table" class="data-table">
+              <thead>
+                <tr>
+                  <th>Patch</th>
+                  <th>Games</th>
+                  <th>Wins</th>
+                  <th>Losses</th>
+                  <th>Win %</th>
+                  <th>Wilson low</th>
+                  <th>Wilson high</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </article>
+
+        <article class="card motion-rise">
+          <div class="section-head">
+            <h2 class="section-title">Enemy hero matchups</h2>
+            <p class="section-desc">Sorted by games played. Wilson CI shows statistically plausible win-rate range.</p>
+          </div>
+          <div class="table-wrap">
+            <table id="matchup-table" class="data-table">
+              <thead>
+                <tr>
+                  <th data-sort="hero">Enemy hero</th>
+                  <th data-sort="games">Games</th>
+                  <th data-sort="wins">Wins</th>
+                  <th data-sort="losses">Losses</th>
+                  <th data-sort="winrate">Win %</th>
+                  <th data-sort="wilsonLower">Wilson low</th>
+                  <th data-sort="wilsonUpper">Wilson high</th>
+                  <th data-sort="avgDuration">Avg duration</th>
+                  <th data-sort="avgKills">Avg K</th>
+                  <th data-sort="avgDeaths">Avg D</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </article>
+      </section>
+    </main>
+  </div>
+
+  <footer class="footer-bar">
+    <div class="footer-bar__inner">
+      <p class="footer-bar__note">
+        Data from <a href="https://www.opendota.com/" target="_blank" rel="noopener">OpenDota</a>.
+        Runs in your browser; accounts and match data are cached locally on your device.
+      </p>
+      <div class="footer-bar__actions">
+        <span class="footer-bar__version" id="app-version"></span>
+        <button type="button" id="clear-cache-btn" class="btn btn--outline btn--footer">Clear cache</button>
+        <a
+          class="btn btn--outline btn--footer"
+          href="https://github.com/Avi-From-Polysights/Dota2PlayerStats"
+          target="_blank"
+          rel="noopener"
+        >GitHub</a>
+        <button type="button" id="share-btn" class="btn btn--outline btn--footer">Copy share link</button>
+        <a
+          class="btn btn--outline btn--footer"
+          href="https://github.com/Avi-From-Polysights/Dota2PlayerStats/issues/new/choose"
+          target="_blank"
+          rel="noopener"
+        >Support</a>
+      </div>
+      <p id="share-toast" class="footer-bar__toast hidden" aria-live="polite"></p>
+    </div>
+  </footer>
+</body>
+</html>
