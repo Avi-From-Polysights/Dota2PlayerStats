@@ -57,7 +57,8 @@ export async function fetchJson(url, { signal, onRateLimitWait, quotaCost, label
         throw new Error(`HTTP ${response.status} for ${url}`);
       }
 
-      return response.json();
+      const text = await response.text();
+      return text ? JSON.parse(text) : null;
     } catch (error) {
       if (error.name === "AbortError") throw error;
       lastError = error;
@@ -188,6 +189,14 @@ export async function requestMatchParse(matchId, signal, options = {}) {
     ...options,
     quotaCost: OPENDOTA_PARSE_COST,
     label: "parse-request",
+  });
+}
+
+export async function loadParseJobStatus(jobId, signal, options = {}) {
+  return fetchJson(`${BASE_URL}/request/${jobId}`, {
+    signal,
+    ...options,
+    label: "parse-job",
   });
 }
 

@@ -17,6 +17,7 @@ import {
   rememberAccountFromApi,
 } from "./saved-accounts.js";
 import { ensureMatchParsed, isMatchParsedForPlayer } from "./parse.js";
+import { initActivityLog } from "./activity-log.js";
 import { formatRateLimitWaitMessage } from "./rate-limit.js";
 import {
   loadPatches,
@@ -77,16 +78,35 @@ let lastMatchupRows = [];
 let sortState = { key: "games", dir: "desc" };
 let abortController = null;
 let progressContext = { pct: 0, task: "" };
+let activityLog = null;
 
-function createRateLimitWaitHandler(loadStats) {
+function formatParseProgress(matchIndex, total, matchId, meta = {}) {
+  const label = `${matchIndex + 1}/${total}`;
+  const elapsed = meta.elapsedSec ?? Math.round((meta.elapsedMs ?? 0) / 1000);
+
+  switch (meta.phase) {
+    case "initial-wait":
+      return `OpenDota processing replay ${label} (${elapsed}s, first check soon)…`;
+    case "poll-wait":
+      return `Waiting for parse ${label} — ${elapsed}s elapsed (ID ${matchId})…`;
+    case "poll-error":
+      return `Parse check failed ${label} (${elapsed}s) — retrying…`;
+    case "done":
+      return `Parse complete ${label} in ${elapsed}s (ID ${matchId})`;
+    case "timeout":
+      return `Parse timed out ${label} after ${elapsed}s (ID ${matchId})`;
+    default:
+      return `Waiting for OpenDota parse ${label} — ${elapsed}s (ID ${matchId})…`;
+  }
+}
+
+function createRateLimitWaitHandler(loadStats, log) {
   return (info) => {
     loadStats.throttlePauses += 1;
+    const msg = formatRateLimitWaitMessage(info);
+    log?.wait(msg);
     const suffix = progressContext.task ? ` · ${progressContext.task}` : "";
-    setProgress(
-      true,
-      progressContext.pct,
-      `${formatRateLimitWaitMessage(info)}${suffix}`
-    );
+    setProgress(true, progressContext.pct, `${msg}${suffix}`);
   };
 }
 
@@ -104,6 +124,7 @@ async function resolveMatchDetails(
     onRateLimitWait,
     cachedDetails = null,
     hasCachedEntry = false,
+    log,
   }
 ) {
   let details = hasCachedEntry ? cachedDetails : null;
@@ -111,7 +132,9 @@ async function resolveMatchDetails(
 
   if (hasCachedEntry) {
     loadStats.cacheHits += 1;
+    log?.cache(`Match ${matchId} loaded from local cache`);
   } else {
+    log?.fetch(`Fetching match ${matchId} from OpenDota`);
     details = await loadMatchDetails(matchId, signal, { onRateLimitWait });
     loadStats.fetched += 1;
     usedNetwork = true;
@@ -132,21 +155,17 @@ async function resolveMatchDetails(
     setProgressText(
       `Parsing match ${matchIndex + 1} of ${total} (ID ${matchId}) — OpenDota queue…`
     );
+    log?.parse(`Starting parse for match ${matchId} (${matchIndex + 1}/${total})`);
 
     try {
       details = await ensureMatchParsed(matchId, accountId, {
         signal,
         initialDetails: details,
         onRateLimitWait,
+        onLog: (message) => log?.parse(message),
         onPoll: (_details, meta) => {
-          if (meta?.phase === "poll-error") {
-            setProgressText(
-              `Parse poll ${matchIndex + 1}/${total} (ID ${matchId}) — retrying…`
-            );
-            return;
-          }
           setProgressText(
-            `Waiting for OpenDota parse ${matchIndex + 1}/${total} (ID ${matchId})…`
+            formatParseProgress(matchIndex, total, matchId, meta)
           );
         },
       });
@@ -572,6 +591,10 @@ form.addEventListener("submit", async (event) => {
   fetchBtn.disabled = true;
   exportBtn.disabled = true;
   resultsEl.classList.add("hidden");
+  activityLog = initActivityLog();
+  activityLog?.clear();
+  activityLog?.show();
+  activityLog?.info(`Analysis started (v${APP_VERSION})`);
   setProgress(true, 0, "Loading match list…");
   progressContext = { pct: 0, task: "loading match list" };
 
@@ -589,7 +612,7 @@ form.addEventListener("submit", async (event) => {
       unparsed: 0,
       matchListFromCache: false,
     };
-    const onRateLimitWait = createRateLimitWaitHandler(loadStats);
+    const onRateLimitWait = createRateLimitWaitHandler(loadStats, activityLog);
 
     const matchListKey = buildMatchListCacheKey({
       accountId,
@@ -608,8 +631,10 @@ form.addEventListener("submit", async (event) => {
       matchList = cachedList.matches;
       turboSkipped = cachedList.turboSkipped;
       loadStats.matchListFromCache = true;
+      activityLog?.cache(`Match list from cache (${matchList.length} games)`);
       setProgress(true, 2, `Match list loaded from cache (${matchList.length} games)…`);
     } else {
+      activityLog?.fetch(`Fetching match list from OpenDota (limit ${limit})`);
       const result = await loadPlayerMatchesFiltered(
         accountId,
         heroId,
@@ -642,6 +667,7 @@ form.addEventListener("submit", async (event) => {
     const cachedCount = cachedDetailsMap.size;
 
     if (cachedCount > 0) {
+      activityLog?.cache(`${cachedCount}/${total} match details already cached locally`);
       setProgress(
         true,
         4,
@@ -679,6 +705,7 @@ form.addEventListener("submit", async (event) => {
           onRateLimitWait,
           cachedDetails: cachedDetailsMap.get(numericId) ?? null,
           hasCachedEntry,
+          log: activityLog,
           setProgressText: (text) => {
             progressContext.task = `match ${i + 1}/${total} (ID ${matchId})`;
             setProgress(true, pct, text);
@@ -746,10 +773,14 @@ form.addEventListener("submit", async (event) => {
       void el.offsetHeight;
       el.style.animation = "";
     });
+    activityLog?.info(
+      `Analysis complete — ${analysis.totalGames} games, ${loadStats.cacheHits} cache hits, ${loadStats.fetched} API fetches`
+    );
     exportBtn.disabled = false;
     setProgress(false);
   } catch (error) {
     if (error.name !== "AbortError") {
+      activityLog?.warn(error.message || "Something went wrong while fetching data.");
       showError(error.message || "Something went wrong while fetching data.");
       setProgress(false);
     }
