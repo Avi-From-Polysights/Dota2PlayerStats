@@ -3,9 +3,14 @@ import {
   loadMatchDetails,
   loadPlayerMatches,
 } from "./api.js";
-import { renderLaneChart, renderWinrateChart } from "./charts.js";
+import {
+  renderLaneChart,
+  renderLaneVsGameChart,
+  renderWinrateChart,
+} from "./charts.js";
 import {
   analyzeMatches,
+  rollingLaneVsGame,
   rollingWinRate,
   trendDirection,
 } from "./stats.js";
@@ -24,6 +29,7 @@ const summaryCards = document.getElementById("summary-cards");
 const matchupTableBody = document.querySelector("#matchup-table tbody");
 const matchupHeaders = document.querySelectorAll("#matchup-table th[data-sort]");
 const laneTable = document.getElementById("lane-table");
+const laneVsGameStats = document.getElementById("lane-vs-game-stats");
 const exportBtn = document.getElementById("export-btn");
 const fetchBtn = document.getElementById("fetch-btn");
 
@@ -81,16 +87,26 @@ function renderSummary(analysis, heroName, trend, rollingWindow) {
   const trendClass =
     trend === "improving" ? "positive" : trend === "declining" ? "negative" : "";
 
+  const laneDataNote =
+    analysis.laneDecided > 0
+      ? `${analysis.laneDecided} with lane data · ${analysis.laneUnknown} unknown`
+      : "No parsed replay lane data";
+
   summaryCards.innerHTML = `
     <div class="summary-card">
-      <div class="summary-card__label">Overall win rate</div>
+      <div class="summary-card__label">Game win rate</div>
       <div class="summary-card__value ${analysis.overallWinrate >= 50 ? "positive" : "negative"}">${formatPct(analysis.overallWinrate)}</div>
       <div class="summary-card__sub">Wilson ${formatCi(analysis.overallCi.lower, analysis.overallCi.upper)}</div>
     </div>
     <div class="summary-card">
+      <div class="summary-card__label">Lane win rate</div>
+      <div class="summary-card__value ${analysis.overallLaneWinrate >= 50 ? "positive" : "negative"}">${analysis.laneDecided ? formatPct(analysis.overallLaneWinrate) : "—"}</div>
+      <div class="summary-card__sub">${analysis.laneDecided ? `Wilson ${formatCi(analysis.overallLaneCi.lower, analysis.overallLaneCi.upper)}` : laneDataNote}</div>
+    </div>
+    <div class="summary-card">
       <div class="summary-card__label">Record</div>
       <div class="summary-card__value">${analysis.totalWins}W – ${analysis.totalLosses}L</div>
-      <div class="summary-card__sub">${analysis.totalGames} matches analyzed</div>
+      <div class="summary-card__sub">${analysis.totalGames} matches · ${laneDataNote}</div>
     </div>
     <div class="summary-card">
       <div class="summary-card__label">Hero</div>
@@ -170,15 +186,53 @@ matchupHeaders.forEach((th) => {
   });
 });
 
+function renderLaneVsGameStats(analysis) {
+  const fmt = (v) => (v == null ? "—" : formatPct(v));
+
+  laneVsGameStats.innerHTML = `
+    <div class="compare-stat">
+      <span class="compare-stat__label">Lane win %</span>
+      <span class="compare-stat__value compare-stat__value--lane">${analysis.laneDecided ? formatPct(analysis.overallLaneWinrate) : "—"}</span>
+      <span class="compare-stat__sub">${analysis.laneWon}W · ${analysis.laneLost}L · ${analysis.laneDraw}D</span>
+    </div>
+    <div class="compare-stat">
+      <span class="compare-stat__label">Game win %</span>
+      <span class="compare-stat__value compare-stat__value--game">${formatPct(analysis.overallWinrate)}</span>
+      <span class="compare-stat__sub">${analysis.totalWins}W · ${analysis.totalLosses}L</span>
+    </div>
+    <div class="compare-stat">
+      <span class="compare-stat__label">Game WR when lane won</span>
+      <span class="compare-stat__value positive">${fmt(analysis.gameWinWhenLaneWon)}</span>
+      <span class="compare-stat__sub">Convert laning lead to wins</span>
+    </div>
+    <div class="compare-stat">
+      <span class="compare-stat__label">Game WR when lane lost</span>
+      <span class="compare-stat__value negative">${fmt(analysis.gameWinWhenLaneLost)}</span>
+      <span class="compare-stat__sub">Comeback rate from behind</span>
+    </div>
+  `;
+}
+
 function renderLaneTable(laneRows) {
   laneTable.innerHTML = laneRows
     .filter((r) => r.games > 0)
     .map(
       (row) => `
-      <div class="lane-row">
-        <span>${row.label}</span>
-        <div class="lane-bar"><div class="lane-bar__fill" style="width:${row.winrate}%"></div></div>
-        <span>${formatPct(row.winrate)} (${row.games}g)</span>
+      <div class="lane-row lane-row--dual">
+        <span class="lane-row__label">${row.label}</span>
+        <div class="lane-row__bars">
+          <div class="lane-row__metric">
+            <span class="lane-row__tag">Lane</span>
+            <div class="lane-bar"><div class="lane-bar__fill lane-bar__fill--lane" style="width:${row.laneWinrate}%"></div></div>
+            <span>${row.laneKnown ? formatPct(row.laneWinrate) : "—"}</span>
+          </div>
+          <div class="lane-row__metric">
+            <span class="lane-row__tag">Game</span>
+            <div class="lane-bar"><div class="lane-bar__fill lane-bar__fill--game" style="width:${row.gameWinrate}%"></div></div>
+            <span>${formatPct(row.gameWinrate)}</span>
+          </div>
+        </div>
+        <span class="lane-row__games">${row.games}g</span>
       </div>
     `
     )
@@ -298,9 +352,17 @@ form.addEventListener("submit", async (event) => {
 
     const analysis = analyzeMatches(detailsList, accountId, heroMap, confidence);
     const rolling = rollingWinRate(analysis.timeline, rollingWindow);
+    const laneVsGameRolling = rollingLaneVsGame(analysis.timeline, rollingWindow);
     const trend = trendDirection(rolling);
 
     renderSummary(analysis, heroName, trend, rollingWindow);
+    renderLaneVsGameStats(analysis);
+    renderLaneVsGameChart(
+      document.getElementById("lane-vs-game-chart"),
+      laneVsGameRolling,
+      analysis.overallLaneWinrate,
+      analysis.overallWinrate
+    );
     renderWinrateChart(
       document.getElementById("winrate-chart"),
       rolling,

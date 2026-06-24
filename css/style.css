@@ -303,6 +303,67 @@ button:disabled {
   height: 220px;
 }
 
+.chart-wrap--mini {
+  height: 200px;
+}
+
+.lane-vs-game-panel {
+  border-color: rgba(38, 166, 154, 0.35);
+  background: linear-gradient(180deg, var(--surface) 0%, rgba(26, 35, 48, 0.95) 100%);
+}
+
+.lane-vs-game-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.compare-stat {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.compare-stat__label {
+  font-size: 0.75rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.compare-stat__value {
+  font-family: Rajdhani, sans-serif;
+  font-size: 1.65rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.compare-stat__value--lane {
+  color: #26a69a;
+}
+
+.compare-stat__value--game {
+  color: var(--accent-2);
+}
+
+.compare-stat__value.positive {
+  color: var(--radiant);
+}
+
+.compare-stat__value.negative {
+  color: var(--dire);
+}
+
+.compare-stat__sub {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
 .panel-header {
   margin-bottom: 0.75rem;
 }
@@ -376,6 +437,40 @@ tbody tr:hover {
   font-size: 0.9rem;
 }
 
+.lane-row--dual {
+  grid-template-columns: 72px 1fr 36px;
+  align-items: start;
+}
+
+.lane-row__label {
+  padding-top: 0.35rem;
+}
+
+.lane-row__bars {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.lane-row__metric {
+  display: grid;
+  grid-template-columns: 36px 1fr 44px;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+.lane-row__tag {
+  font-size: 0.7rem;
+  color: var(--muted);
+  text-transform: uppercase;
+}
+
+.lane-row__games {
+  font-size: 0.8rem;
+  color: var(--muted);
+  padding-top: 0.35rem;
+  text-align: right;
+}
+
 .lane-bar {
   height: 8px;
   background: var(--surface-2);
@@ -386,6 +481,14 @@ tbody tr:hover {
 .lane-bar__fill {
   height: 100%;
   background: linear-gradient(90deg, var(--accent-2), var(--radiant));
+}
+
+.lane-bar__fill--lane {
+  background: linear-gradient(90deg, #1e8a7f, #26a69a);
+}
+
+.lane-bar__fill--game {
+  background: linear-gradient(90deg, #2a6fad, var(--accent-2));
 }
 
 footer {

@@ -87,6 +87,17 @@
       <section id="results" class="results hidden">
         <div class="summary-grid" id="summary-cards"></div>
 
+        <article class="panel lane-vs-game-panel">
+          <div class="panel-header">
+            <h2>Lane win % vs game win %</h2>
+            <p class="panel-note">Lane outcome uses gold at 10 minutes vs your lane opponent (parsed replays). See whether winning lane translates into winning the game.</p>
+          </div>
+          <div id="lane-vs-game-stats" class="lane-vs-game-stats"></div>
+          <div class="chart-wrap chart-wrap--mini">
+            <canvas id="lane-vs-game-chart"></canvas>
+          </div>
+        </article>
+
         <div class="charts-row">
           <article class="panel chart-panel">
             <h2>Win rate over time</h2>
@@ -97,8 +108,8 @@
           </article>
 
           <article class="panel chart-panel">
-            <h2>Lane win %</h2>
-            <p class="panel-note">Win rate grouped by lane assignment in each match.</p>
+            <h2>By lane position</h2>
+            <p class="panel-note">Lane win % (10-min gold) vs game win % for each lane you played.</p>
             <div class="chart-wrap chart-wrap--short">
               <canvas id="lane-chart"></canvas>
             </div>

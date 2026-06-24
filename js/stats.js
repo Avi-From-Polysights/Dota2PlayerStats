@@ -1,5 +1,6 @@
 import { wilsonInterval } from "./wilson.js";
 import { didPlayerWin, isRadiant } from "./api.js";
+import { computeLaneOutcome } from "./lane.js";
 
 const LANE_LABELS = {
   0: "Unknown",
@@ -14,7 +15,15 @@ export function laneLabel(lane) {
 }
 
 function emptyBucket() {
-  return { games: 0, wins: 0, losses: 0 };
+  return {
+    games: 0,
+    wins: 0,
+    losses: 0,
+    laneWon: 0,
+    laneLost: 0,
+    laneDraw: 0,
+    laneKnown: 0,
+  };
 }
 
 function emptyMatchup() {
@@ -28,6 +37,15 @@ function emptyMatchup() {
   };
 }
 
+function laneWinRate(bucket) {
+  const decided = bucket.laneWon + bucket.laneLost;
+  return decided ? (bucket.laneWon / decided) * 100 : 0;
+}
+
+function gameWinRate(bucket) {
+  return bucket.games ? (bucket.wins / bucket.games) * 100 : 0;
+}
+
 export function analyzeMatches(matches, accountId, heroNames, confidence) {
   const matchups = new Map();
   const laneStats = new Map();
@@ -37,6 +55,13 @@ export function analyzeMatches(matches, accountId, heroNames, confidence) {
   let skipped = 0;
   let totalWins = 0;
   let totalLosses = 0;
+  let laneWon = 0;
+  let laneLost = 0;
+  let laneDraw = 0;
+  let laneUnknown = 0;
+  let gameWinsWhenLaneWon = 0;
+  let gameWinsWhenLaneLost = 0;
+  let gameWinsWhenLaneDraw = 0;
 
   for (const details of matches) {
     if (!details) {
@@ -59,14 +84,33 @@ export function analyzeMatches(matches, accountId, heroNames, confidence) {
     const kills = me.kills ?? 0;
     const deaths = me.deaths ?? 0;
     const lane = me.lane ?? 0;
+    const laneOutcome = computeLaneOutcome(me, players);
+    const goldAt10 = me.gold_t?.[10] ?? null;
 
     if (win) totalWins += 1;
     else totalLosses += 1;
+
+    if (laneOutcome === "won") {
+      laneWon += 1;
+      if (win) gameWinsWhenLaneWon += 1;
+    } else if (laneOutcome === "lost") {
+      laneLost += 1;
+      if (win) gameWinsWhenLaneLost += 1;
+    } else if (laneOutcome === "draw") {
+      laneDraw += 1;
+      if (win) gameWinsWhenLaneDraw += 1;
+    } else {
+      laneUnknown += 1;
+    }
 
     const laneBucket = laneStats.get(lane) ?? emptyBucket();
     laneBucket.games += 1;
     if (win) laneBucket.wins += 1;
     else laneBucket.losses += 1;
+    if (laneOutcome === "won") laneBucket.laneWon += 1;
+    else if (laneOutcome === "lost") laneBucket.laneLost += 1;
+    else if (laneOutcome === "draw") laneBucket.laneDraw += 1;
+    if (laneOutcome) laneBucket.laneKnown += 1;
     laneStats.set(lane, laneBucket);
 
     timeline.push({
@@ -74,6 +118,8 @@ export function analyzeMatches(matches, accountId, heroNames, confidence) {
       startTime: details.start_time,
       win,
       lane,
+      laneOutcome,
+      goldAt10,
       durationMin,
       kills,
       deaths,
@@ -121,16 +167,25 @@ export function analyzeMatches(matches, accountId, heroNames, confidence) {
 
   const laneRows = [...laneStats.entries()]
     .map(([lane, s]) => {
-      const ci = wilsonInterval(s.wins, s.games, confidence);
+      const gameCi = wilsonInterval(s.wins, s.games, confidence);
+      const laneDecided = s.laneWon + s.laneLost;
+      const laneCi = wilsonInterval(s.laneWon, laneDecided, confidence);
       return {
         lane,
         label: laneLabel(lane),
         games: s.games,
         wins: s.wins,
         losses: s.losses,
-        winrate: s.games ? (s.wins / s.games) * 100 : 0,
-        wilsonLower: ci.lower,
-        wilsonUpper: ci.upper,
+        gameWinrate: gameWinRate(s),
+        laneWinrate: laneWinRate(s),
+        laneWon: s.laneWon,
+        laneLost: s.laneLost,
+        laneDraw: s.laneDraw,
+        laneKnown: s.laneKnown,
+        gameWilsonLower: gameCi.lower,
+        gameWilsonUpper: gameCi.upper,
+        laneWilsonLower: laneCi.lower,
+        laneWilsonUpper: laneCi.upper,
       };
     })
     .sort((a, b) => b.games - a.games);
@@ -139,6 +194,9 @@ export function analyzeMatches(matches, accountId, heroNames, confidence) {
 
   const totalGames = totalWins + totalLosses;
   const overallCi = wilsonInterval(totalWins, totalGames, confidence);
+  const laneDecided = laneWon + laneLost;
+  const overallLaneWinrate = laneDecided ? (laneWon / laneDecided) * 100 : 0;
+  const overallLaneCi = wilsonInterval(laneWon, laneDecided, confidence);
 
   return {
     processed,
@@ -148,6 +206,16 @@ export function analyzeMatches(matches, accountId, heroNames, confidence) {
     totalGames,
     overallWinrate: totalGames ? (totalWins / totalGames) * 100 : 0,
     overallCi,
+    laneWon,
+    laneLost,
+    laneDraw,
+    laneUnknown,
+    laneDecided,
+    overallLaneWinrate,
+    overallLaneCi,
+    gameWinWhenLaneWon: laneWon ? (gameWinsWhenLaneWon / laneWon) * 100 : null,
+    gameWinWhenLaneLost: laneLost ? (gameWinsWhenLaneLost / laneLost) * 100 : null,
+    gameWinWhenLaneDraw: laneDraw ? (gameWinsWhenLaneDraw / laneDraw) * 100 : null,
     matchupRows,
     laneRows,
     timeline,
@@ -170,6 +238,40 @@ export function rollingWinRate(timeline, windowSize) {
       index: i + 1,
       date: new Date(timeline[i].startTime * 1000),
       winrate,
+      windowSize: slice.length,
+      matchId: timeline[i].matchId,
+    });
+  }
+
+  return points;
+}
+
+export function rollingLaneVsGame(timeline, windowSize) {
+  if (!timeline.length) return [];
+
+  const window = Math.max(3, Math.min(windowSize, timeline.length));
+  const points = [];
+
+  for (let i = 0; i < timeline.length; i += 1) {
+    const start = Math.max(0, i - window + 1);
+    const slice = timeline.slice(start, i + 1);
+    const gameWins = slice.filter((m) => m.win).length;
+    const gameWinrate = (gameWins / slice.length) * 100;
+
+    const laneSlice = slice.filter(
+      (m) => m.laneOutcome === "won" || m.laneOutcome === "lost"
+    );
+    const laneWins = laneSlice.filter((m) => m.laneOutcome === "won").length;
+    const laneWinrate = laneSlice.length
+      ? (laneWins / laneSlice.length) * 100
+      : null;
+
+    points.push({
+      index: i + 1,
+      date: new Date(timeline[i].startTime * 1000),
+      gameWinrate,
+      laneWinrate,
+      laneSample: laneSlice.length,
       windowSize: slice.length,
       matchId: timeline[i].matchId,
     });
