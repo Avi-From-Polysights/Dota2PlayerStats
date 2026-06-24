@@ -7,7 +7,8 @@ import {
   loadMatchDetailsBatch,
 } from "../match-loader.js";
 import { rememberAccountFromApi } from "../saved-accounts.js";
-import { DEFAULT_PARSE_CONCURRENCY, clampParseConcurrency } from "../parse-concurrency.js";
+import { DEFAULT_PARSE_CONCURRENCY } from "../parse-concurrency.js";
+import { getParallelConcurrency } from "../config-ui.js";
 import { APP_VERSION } from "../version.js";
 import { initMultiActivityLog } from "../multi-activity-log.js";
 
@@ -34,7 +35,6 @@ export async function runParseAllTool({
   maxMatches,
   excludeTurbo,
   significant,
-  concurrency,
   signal,
   multiLog,
   progressEl,
@@ -45,7 +45,12 @@ export async function runParseAllTool({
   stopBtn,
 }) {
   hideToolError(errorBanner);
-  const slots = clampParseConcurrency(concurrency);
+  const parallelEnabled = document.getElementById("tool-parse-parallel-enabled")?.checked ?? true;
+  const slots = getParallelConcurrency(
+    parallelEnabled,
+    document.getElementById("tool-parse-concurrency"),
+    DEFAULT_PARSE_CONCURRENCY
+  );
   const scanLimit = maxMatches > 0 ? maxMatches : 10_000;
 
   multiLog?.clear();
@@ -237,7 +242,6 @@ export function initParseAllTool({ getAnalyzeAbortSignal }) {
       maxMatches: Number(document.getElementById("tool-max-matches").value),
       excludeTurbo: document.getElementById("tool-exclude-turbo").checked,
       significant: document.getElementById("tool-significant-only").checked,
-      concurrency: Number(document.getElementById("tool-parse-concurrency").value) || DEFAULT_PARSE_CONCURRENCY,
       signal: abortController.signal,
       multiLog,
       progressEl,

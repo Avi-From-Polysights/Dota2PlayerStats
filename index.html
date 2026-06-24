@@ -37,180 +37,213 @@
           <p class="section-desc">Configure your account, hero filter, and analysis settings.</p>
         </div>
 
-        <form id="stats-form" class="config-grid">
-          <div class="field-group field-group--primary">
-            <label class="field field--with-hint">
-              <div class="field__label-row">
-                <span class="field__label">Account ID</span>
-                <span class="info-tip">
-                  <button type="button" class="info-tip__btn" aria-label="About Account ID">i</button>
-                  <span class="info-tip__panel" role="tooltip">Your OpenDota player ID: the number in your profile URL (opendota.com/players/123456789). This is not your Steam ID64.</span>
-                </span>
+        <form id="stats-form" class="config-form">
+          <details class="config-section" open>
+            <summary class="config-section__summary">
+              <span class="config-section__title">Player &amp; hero</span>
+              <span class="config-section__badge">Required</span>
+            </summary>
+            <div class="config-section__body">
+              <div class="field-group field-group--primary">
+                <label class="field field--with-hint">
+                  <div class="field__label-row">
+                    <span class="field__label">Account ID</span>
+                    <span class="info-tip">
+                      <button type="button" class="info-tip__btn" aria-label="About Account ID">i</button>
+                      <span class="info-tip__panel" role="tooltip">Your OpenDota player ID: the number in your profile URL (opendota.com/players/123456789). This is not your Steam ID64.</span>
+                    </span>
+                  </div>
+                  <input type="number" id="account-id" name="accountId" required placeholder="427824243" min="1" />
+                  <p class="field__hint">
+                    Find it on your
+                    <a href="https://www.opendota.com/" target="_blank" rel="noopener">OpenDota</a>
+                    profile — the number in the URL, not Steam ID64.
+                  </p>
+                  <div id="saved-accounts" class="saved-accounts hidden" aria-live="polite"></div>
+                </label>
+
+                <label class="field">
+                  <div class="field__label-row">
+                    <span class="field__label">Hero</span>
+                    <span class="info-tip">
+                      <button type="button" class="info-tip__btn" aria-label="About Hero">i</button>
+                      <span class="info-tip__panel" role="tooltip">The hero you played in these games. The matchup table shows enemy heroes you faced while on this pick.</span>
+                    </span>
+                  </div>
+                  <input type="text" id="hero-search" list="hero-list" placeholder="Search hero…" autocomplete="off" required />
+                  <input type="hidden" id="hero-id" name="heroId" />
+                  <datalist id="hero-list"></datalist>
+                </label>
               </div>
-              <input type="number" id="account-id" name="accountId" required placeholder="427824243" min="1" />
-              <p class="field__hint">
-                Find it on your
-                <a href="https://www.opendota.com/" target="_blank" rel="noopener">OpenDota</a>
-                profile: search your Steam name, open your player page, and use the number in the URL
-                (<code>opendota.com/players/<strong>123456789</strong></code>).
-                This is not your Steam ID64.
-              </p>
-              <div id="saved-accounts" class="saved-accounts hidden" aria-live="polite"></div>
-            </label>
+            </div>
+          </details>
 
-            <label class="field">
-              <div class="field__label-row">
-                <span class="field__label">Hero</span>
-                <span class="info-tip">
-                  <button type="button" class="info-tip__btn" aria-label="About Hero">i</button>
-                  <span class="info-tip__panel" role="tooltip">The hero you played in these games. The matchup table shows enemy heroes you faced while on this pick.</span>
-                </span>
+          <details class="config-section" open>
+            <summary class="config-section__summary">
+              <span class="config-section__title">Sample &amp; filters</span>
+            </summary>
+            <div class="config-section__body">
+              <div class="field-group">
+                <label class="field">
+                  <div class="field__label-row">
+                    <span class="field__label">Match limit</span>
+                    <span class="info-tip">
+                      <button type="button" class="info-tip__btn" aria-label="About Match limit">i</button>
+                      <span class="info-tip__panel" role="tooltip">How many of your most recent matches on this hero to fetch and analyze.</span>
+                    </span>
+                  </div>
+                  <input type="number" id="match-limit" name="limit" value="100" min="1" max="500" />
+                </label>
+
+                <label class="field">
+                  <div class="field__label-row">
+                    <span class="field__label">Patch filter</span>
+                    <span class="info-tip">
+                      <button type="button" class="info-tip__btn" aria-label="About Patch">i</button>
+                      <span class="info-tip__panel" role="tooltip">Filter to one Dota patch, or All patches for a per-patch breakdown.</span>
+                    </span>
+                  </div>
+                  <select id="patch-filter" name="patch">
+                    <option value="">All patches</option>
+                  </select>
+                </label>
               </div>
-              <input type="text" id="hero-search" list="hero-list" placeholder="Search hero…" autocomplete="off" required />
-              <input type="hidden" id="hero-id" name="heroId" />
-              <datalist id="hero-list"></datalist>
-            </label>
-          </div>
 
-          <div class="field-group">
-            <label class="field">
-              <div class="field__label-row">
-                <span class="field__label">Match limit</span>
-                <span class="info-tip">
-                  <button type="button" class="info-tip__btn" aria-label="About Match limit">i</button>
-                  <span class="info-tip__panel" role="tooltip">How many of your most recent matches on this hero to fetch and analyze. More matches means richer stats, but a longer load time.</span>
-                </span>
+              <div class="config-section__checks">
+                <label class="field field--checkbox">
+                  <input type="checkbox" id="exclude-turbo" name="excludeTurbo" checked />
+                  <div class="field__label-row">
+                    <span class="field__label">Exclude Turbo</span>
+                    <span class="info-tip">
+                      <button type="button" class="info-tip__btn" aria-label="About Exclude Turbo">i</button>
+                      <span class="info-tip__panel" role="tooltip">Skip Turbo matches when building your sample.</span>
+                    </span>
+                  </div>
+                </label>
+
+                <label class="field field--checkbox">
+                  <input type="checkbox" id="significant-only" name="significant" />
+                  <div class="field__label-row">
+                    <span class="field__label">Significant matches only</span>
+                    <span class="info-tip">
+                      <button type="button" class="info-tip__btn" aria-label="About Significant matches only">i</button>
+                      <span class="info-tip__panel" role="tooltip">Typically ranked games only.</span>
+                    </span>
+                  </div>
+                </label>
               </div>
-              <input type="number" id="match-limit" name="limit" value="100" min="1" max="500" />
-            </label>
+            </div>
+          </details>
 
-            <label class="field">
-              <div class="field__label-row">
-                <span class="field__label">Request delay (ms)</span>
-                <span class="info-tip">
-                  <button type="button" class="info-tip__btn" aria-label="About Request delay">i</button>
-                  <span class="info-tip__panel" role="tooltip">Extra milliseconds between match fetches. The app also auto-paces to OpenDota's 60 requests/minute limit (parse requests count as 10). Increase this if you still see 429 errors.</span>
-                </span>
+          <details class="config-section">
+            <summary class="config-section__summary">
+              <span class="config-section__title">Charts &amp; statistics</span>
+            </summary>
+            <div class="config-section__body">
+              <div class="field-group">
+                <label class="field">
+                  <div class="field__label-row">
+                    <span class="field__label">Wilson confidence</span>
+                    <span class="info-tip">
+                      <button type="button" class="info-tip__btn" aria-label="About Wilson confidence">i</button>
+                      <span class="info-tip__panel" role="tooltip">Confidence level for Wilson score intervals on win rates.</span>
+                    </span>
+                  </div>
+                  <select id="confidence-level" name="confidence">
+                    <option value="0.90">90%</option>
+                    <option value="0.95" selected>95%</option>
+                    <option value="0.99">99%</option>
+                  </select>
+                </label>
+
+                <label class="field">
+                  <div class="field__label-row">
+                    <span class="field__label">Rolling window</span>
+                    <span class="info-tip">
+                      <button type="button" class="info-tip__btn" aria-label="About Rolling window">i</button>
+                      <span class="info-tip__panel" role="tooltip">Matches per point on the rolling win-rate chart.</span>
+                    </span>
+                  </div>
+                  <input type="number" id="rolling-window" name="rollingWindow" value="20" min="3" max="100" />
+                </label>
+
+                <label class="field">
+                  <div class="field__label-row">
+                    <span class="field__label">Request delay (ms)</span>
+                    <span class="info-tip">
+                      <button type="button" class="info-tip__btn" aria-label="About Request delay">i</button>
+                      <span class="info-tip__panel" role="tooltip">Extra delay between fetches. The app also auto-paces to 60 req/min.</span>
+                    </span>
+                  </div>
+                  <input type="number" id="request-delay" name="delay" value="150" min="0" max="2000" step="50" />
+                </label>
               </div>
-              <input type="number" id="request-delay" name="delay" value="150" min="0" max="2000" step="50" />
-            </label>
+            </div>
+          </details>
 
-            <label class="field">
-              <div class="field__label-row">
-                <span class="field__label">Wilson confidence</span>
-                <span class="info-tip">
-                  <button type="button" class="info-tip__btn" aria-label="About Wilson confidence">i</button>
-                  <span class="info-tip__panel" role="tooltip">Confidence level for Wilson score intervals on win rates. Wilson intervals estimate a plausible true win-rate range when sample size is small (e.g. 3 wins out of 5 games). 95% is a common default.</span>
-                </span>
+          <details class="config-section" id="parse-options">
+            <summary class="config-section__summary">
+              <span class="config-section__title">OpenDota replay parse</span>
+              <span class="config-section__badge config-section__badge--optional">Optional</span>
+            </summary>
+            <div class="config-section__body">
+              <label class="field field--checkbox field--parse-master">
+                <input type="checkbox" id="request-parse" name="requestParse" />
+                <div class="field__label-row">
+                  <span class="field__label">Request OpenDota parse</span>
+                  <span class="info-tip">
+                    <button type="button" class="info-tip__btn" aria-label="About Request OpenDota parse">i</button>
+                    <span class="info-tip__panel" role="tooltip">Queue replay parses for lane data. Parsed matches are cached locally.</span>
+                  </span>
+                </div>
+              </label>
+
+              <div class="config-subgrid">
+                <label class="field field--parse-max" data-parse-field>
+                  <div class="field__label-row">
+                    <span class="field__label">Max parses per run</span>
+                    <span class="info-tip">
+                      <button type="button" class="info-tip__btn" aria-label="About Max parses per run">i</button>
+                      <span class="info-tip__panel" role="tooltip">0 = no limit. Cached parses never count.</span>
+                    </span>
+                  </div>
+                  <input type="number" id="parse-max" name="parseMax" value="0" min="0" max="500" data-parse-field disabled />
+                </label>
+
+                <label class="field field--checkbox" data-parse-field>
+                  <input type="checkbox" id="parse-parallel-enabled" name="parseParallelEnabled" checked data-parse-field disabled />
+                  <span class="field__label">Parallel parsing</span>
+                </label>
+
+                <label class="field field--parse-parallel" data-parse-field>
+                  <div class="field__label-row">
+                    <span class="field__label">Parallel lanes</span>
+                    <span class="info-tip">
+                      <button type="button" class="info-tip__btn" aria-label="About Parallel lanes">i</button>
+                      <span class="info-tip__panel" role="tooltip">Up to 6 concurrent parse pipelines when parallel is on.</span>
+                    </span>
+                  </div>
+                  <input type="number" id="parse-parallelism" name="parseParallelism" value="6" min="1" max="6" data-parse-field disabled />
+                </label>
+
+                <label class="field field--checkbox" data-parse-field>
+                  <input type="checkbox" id="parse-retry" name="parseRetry" data-parse-field disabled />
+                  <span class="field__label">Retry failed parses</span>
+                </label>
+
+                <label class="field field--parse-retries" data-parse-field>
+                  <div class="field__label-row">
+                    <span class="field__label">Max parse retries</span>
+                    <span class="info-tip">
+                      <button type="button" class="info-tip__btn" aria-label="About Max parse retries">i</button>
+                      <span class="info-tip__panel" role="tooltip">Re-queue after timeout. Exceeded matches are excluded and listed in results.</span>
+                    </span>
+                  </div>
+                  <input type="number" id="parse-max-retries" name="parseMaxRetries" value="2" min="0" max="10" data-parse-field disabled />
+                </label>
               </div>
-              <select id="confidence-level" name="confidence">
-                <option value="0.90">90%</option>
-                <option value="0.95" selected>95%</option>
-                <option value="0.99">99%</option>
-              </select>
-            </label>
-
-            <label class="field">
-              <div class="field__label-row">
-                <span class="field__label">Patch filter</span>
-                <span class="info-tip">
-                  <button type="button" class="info-tip__btn" aria-label="About Patch">i</button>
-                  <span class="info-tip__panel" role="tooltip">Filter to one Dota patch version, or choose All patches to analyze recent games across patches and see the per-patch breakdown table.</span>
-                </span>
-              </div>
-              <select id="patch-filter" name="patch">
-                <option value="">All patches</option>
-              </select>
-            </label>
-
-            <label class="field">
-              <div class="field__label-row">
-                <span class="field__label">Rolling window</span>
-                <span class="info-tip">
-                  <button type="button" class="info-tip__btn" aria-label="About Rolling window">i</button>
-                  <span class="info-tip__panel" role="tooltip">Number of consecutive matches used for each point on the rolling win-rate chart. A larger window smooths noise; a smaller window reacts faster to recent form.</span>
-                </span>
-              </div>
-              <input type="number" id="rolling-window" name="rollingWindow" value="20" min="3" max="100" />
-            </label>
-          </div>
-
-          <label class="field field--checkbox">
-            <input type="checkbox" id="exclude-turbo" name="excludeTurbo" checked />
-            <div class="field__label-row">
-              <span class="field__label">Exclude Turbo</span>
-              <span class="info-tip">
-                <button type="button" class="info-tip__btn" aria-label="About Exclude Turbo">i</button>
-                <span class="info-tip__panel" role="tooltip">Skip Turbo matches (game mode 23) when building your sample. OpenDota scans further back in your history to still reach your match limit.</span>
-              </span>
             </div>
-          </label>
-
-          <label class="field field--checkbox">
-            <input type="checkbox" id="significant-only" name="significant" />
-            <div class="field__label-row">
-              <span class="field__label">Significant matches only</span>
-              <span class="info-tip">
-                <button type="button" class="info-tip__btn" aria-label="About Significant matches only">i</button>
-                <span class="info-tip__panel" role="tooltip">When enabled, only OpenDota significant matches are included (typically ranked games). Turn off to add casual or low-priority matches.</span>
-              </span>
-            </div>
-          </label>
-
-          <label class="field field--checkbox">
-            <input type="checkbox" id="request-parse" name="requestParse" />
-            <div class="field__label-row">
-              <span class="field__label">Request OpenDota parse</span>
-              <span class="info-tip">
-                <button type="button" class="info-tip__btn" aria-label="About Request OpenDota parse">i</button>
-                <span class="info-tip__panel" role="tooltip">Queue OpenDota replay parses for matches missing lane data. Each parse uses 10 of your 60 requests/minute — large jobs are paced automatically and may take a while. Parsed matches are cached in your browser; re-run later to continue without redoing finished games.</span>
-              </span>
-            </div>
-          </label>
-
-          <label class="field field--parse-max">
-            <div class="field__label-row">
-              <span class="field__label">Max parses per run</span>
-              <span class="info-tip">
-                <button type="button" class="info-tip__btn" aria-label="About Max parses per run">i</button>
-                <span class="info-tip__panel" role="tooltip">Cap how many unparsed matches to queue this run. 0 means no limit (can take a long time on large samples). Already-parsed cached matches never count toward this limit.</span>
-              </span>
-            </div>
-            <input type="number" id="parse-max" name="parseMax" value="0" min="0" max="500" />
-          </label>
-
-          <label class="field field--parse-parallel">
-            <div class="field__label-row">
-              <span class="field__label">Parallel parse lanes</span>
-              <span class="info-tip">
-                <button type="button" class="info-tip__btn" aria-label="About Parallel parse lanes">i</button>
-                <span class="info-tip__panel" role="tooltip">How many matches to parse at once. Each lane waits on OpenDota's replay queue independently, so up to 6 lanes can run without extra 429s (same as opening multiple tabs). All lanes share the 60 req/min API budget.</span>
-              </span>
-            </div>
-            <input type="number" id="parse-parallelism" name="parseParallelism" value="6" min="1" max="6" />
-          </label>
-
-          <label class="field field--checkbox">
-            <input type="checkbox" id="parse-retry" name="parseRetry" />
-            <div class="field__label-row">
-              <span class="field__label">Retry failed parses</span>
-              <span class="info-tip">
-                <button type="button" class="info-tip__btn" aria-label="About Retry failed parses">i</button>
-                <span class="info-tip__panel" role="tooltip">When enabled, re-queue OpenDota parses that time out or fail, up to the max retries below. After max retries, those matches are dropped from this analysis and saved to the failed-parse list (retry from Tools).</span>
-              </span>
-            </div>
-          </label>
-
-          <label class="field field--parse-retries">
-            <div class="field__label-row">
-              <span class="field__label">Max parse retries</span>
-              <span class="info-tip">
-                <button type="button" class="info-tip__btn" aria-label="About Max parse retries">i</button>
-                <span class="info-tip__panel" role="tooltip">Extra parse attempts per match when retries are enabled. When disabled, timed-out matches stay in the sample with game stats only — lane stats show as N/A.</span>
-              </span>
-            </div>
-            <input type="number" id="parse-max-retries" name="parseMaxRetries" value="2" min="0" max="10" disabled />
-          </label>
+          </details>
 
           <div class="form-actions">
             <button type="submit" id="fetch-btn" class="btn btn--primary">Analyze matches</button>
@@ -333,125 +366,125 @@
         <section class="card tools-panel">
           <div class="section-head">
             <h2 class="section-title">Batch tools</h2>
-            <p class="section-desc">Long-running jobs that cache parsed replays locally. Leave the tab open overnight — progress is saved in your browser cache.</p>
+            <p class="section-desc">Long-running jobs with local caching. Expand a tool to configure and run it.</p>
           </div>
 
-          <article class="tool-card">
-            <header class="tool-card__head">
-              <h3 class="tool-card__title">Parse all matches</h3>
-              <p class="tool-card__desc">Fetch your recent match history across every hero and queue OpenDota replay parses for anything missing lane data. Re-runs skip already-parsed games.</p>
-            </header>
+          <details class="tool-accordion">
+            <summary class="tool-accordion__summary">
+              <span class="tool-accordion__title">Parse all matches</span>
+              <span class="tool-accordion__badge">Overnight</span>
+            </summary>
+            <div class="tool-accordion__body">
+              <p class="tool-accordion__desc">Fetch match history across every hero and parse anything missing lane data.</p>
 
-            <form id="tool-parse-all-form" class="tool-card__form config-grid">
-              <label class="field field--with-hint">
-                <div class="field__label-row">
+              <form id="tool-parse-all-form" class="tool-card__form config-grid">
+                <label class="field field--with-hint">
                   <span class="field__label">Account ID</span>
-                </div>
-                <input type="number" id="tool-account-id" required placeholder="427824243" min="1" />
-                <p class="field__hint">Same OpenDota player ID as on the Analyze tab.</p>
-              </label>
+                  <input type="number" id="tool-account-id" required placeholder="427824243" min="1" />
+                </label>
 
-              <label class="field">
-                <div class="field__label-row">
+                <label class="field">
                   <span class="field__label">Max matches to scan</span>
-                  <span class="info-tip">
-                    <button type="button" class="info-tip__btn" aria-label="About Max matches to scan">i</button>
-                    <span class="info-tip__panel" role="tooltip">How far back to scan your match history (newest first). 0 = up to 10,000 matches. Already-parsed matches are skipped quickly from cache.</span>
-                  </span>
+                  <input type="number" id="tool-max-matches" value="2000" min="0" max="10000" />
+                </label>
+
+                <label class="field field--checkbox">
+                  <input type="checkbox" id="tool-parse-parallel-enabled" checked />
+                  <span class="field__label">Parallel parsing</span>
+                </label>
+
+                <label class="field">
+                  <span class="field__label">Parallel lanes</span>
+                  <input type="number" id="tool-parse-concurrency" value="6" min="1" max="6" />
+                </label>
+
+                <label class="field field--checkbox">
+                  <input type="checkbox" id="tool-exclude-turbo" checked />
+                  <span class="field__label">Exclude Turbo</span>
+                </label>
+
+                <label class="field field--checkbox">
+                  <input type="checkbox" id="tool-significant-only" />
+                  <span class="field__label">Significant matches only</span>
+                </label>
+
+                <label class="field field--checkbox">
+                  <input type="checkbox" id="tool-parse-retry" checked />
+                  <span class="field__label">Retry failed parses</span>
+                </label>
+
+                <label class="field">
+                  <span class="field__label">Max parse retries</span>
+                  <input type="number" id="tool-parse-max-retries" value="2" min="0" max="10" />
+                </label>
+
+                <div class="form-actions">
+                  <button type="submit" id="tool-parse-all-start" class="btn btn--primary">Start parse-all</button>
+                  <button type="button" id="tool-parse-all-stop" class="btn btn--outline" disabled>Stop</button>
                 </div>
-                <input type="number" id="tool-max-matches" value="2000" min="0" max="10000" />
-              </label>
+              </form>
 
-              <label class="field">
-                <div class="field__label-row">
-                  <span class="field__label">Parallel parse lanes</span>
-                  <span class="info-tip">
-                    <button type="button" class="info-tip__btn" aria-label="About Parallel parse lanes">i</button>
-                    <span class="info-tip__panel" role="tooltip">Up to 6 concurrent parse pipelines. Recommended for overnight runs.</span>
-                  </span>
+              <div id="tools-progress" class="progress hidden" aria-live="polite">
+                <div class="progress__track">
+                  <div id="tools-progress-fill" class="progress__fill"></div>
                 </div>
-                <input type="number" id="tool-parse-concurrency" value="6" min="1" max="6" />
-              </label>
-
-              <label class="field field--checkbox">
-                <input type="checkbox" id="tool-exclude-turbo" checked />
-                <span class="field__label">Exclude Turbo</span>
-              </label>
-
-              <label class="field field--checkbox">
-                <input type="checkbox" id="tool-significant-only" />
-                <span class="field__label">Significant matches only</span>
-              </label>
-
-              <label class="field field--checkbox">
-                <input type="checkbox" id="tool-parse-retry" checked />
-                <span class="field__label">Retry failed parses</span>
-              </label>
-
-              <label class="field">
-                <span class="field__label">Max parse retries</span>
-                <input type="number" id="tool-parse-max-retries" value="2" min="0" max="10" />
-              </label>
-
-              <div class="form-actions">
-                <button type="submit" id="tool-parse-all-start" class="btn btn--primary">Start parse-all</button>
-                <button type="button" id="tool-parse-all-stop" class="btn btn--outline" disabled>Stop</button>
+                <p id="tools-progress-text" class="progress__text">Starting…</p>
+                <details id="tools-activity-log-panel" class="activity-log-panel hidden" open>
+                  <summary class="activity-log-panel__summary">Activity log</summary>
+                  <div class="multi-log" data-multi-log-root></div>
+                </details>
               </div>
-            </form>
-          </article>
-
-          <div id="tools-progress" class="progress hidden" aria-live="polite">
-            <div class="progress__track">
-              <div id="tools-progress-fill" class="progress__fill"></div>
             </div>
-            <p id="tools-progress-text" class="progress__text">Starting…</p>
-            <details id="tools-activity-log-panel" class="activity-log-panel hidden" open>
-              <summary class="activity-log-panel__summary">Activity log</summary>
-              <div class="multi-log" data-multi-log-root></div>
-            </details>
-          </div>
+          </details>
 
-          <article class="tool-card">
-            <header class="tool-card__head">
-              <h3 class="tool-card__title">Retry failed parses</h3>
-              <p class="tool-card__desc">Find matches that failed to parse (timeout, error, or max retries exceeded) and try again. Successful retries update your local cache and remove them from the failed list.</p>
-            </header>
+          <details class="tool-accordion">
+            <summary class="tool-accordion__summary">
+              <span class="tool-accordion__title">Retry failed parses</span>
+              <span class="tool-accordion__badge tool-accordion__badge--accent">Recovery</span>
+            </summary>
+            <div class="tool-accordion__body">
+              <p class="tool-accordion__desc">Re-queue matches that timed out or hit max retries. Successful runs update cache and clear the failed list.</p>
+              <p id="tool-retry-failed-status" class="tool-card__status">Enter an account ID to see failed parses.</p>
 
-            <p id="tool-retry-failed-status" class="tool-card__status">Enter an account ID to see failed parses.</p>
+              <form id="tool-retry-failed-form" class="tool-card__form config-grid">
+                <label class="field">
+                  <span class="field__label">Account ID</span>
+                  <input type="number" id="tool-retry-account-id" required placeholder="427824243" min="1" />
+                </label>
 
-            <form id="tool-retry-failed-form" class="tool-card__form config-grid">
-              <label class="field">
-                <span class="field__label">Account ID</span>
-                <input type="number" id="tool-retry-account-id" required placeholder="427824243" min="1" />
-              </label>
+                <label class="field field--checkbox">
+                  <input type="checkbox" id="tool-retry-parallel-enabled" checked />
+                  <span class="field__label">Parallel parsing</span>
+                </label>
 
-              <label class="field">
-                <span class="field__label">Parallel parse lanes</span>
-                <input type="number" id="tool-retry-concurrency" value="6" min="1" max="6" />
-              </label>
+                <label class="field">
+                  <span class="field__label">Parallel lanes</span>
+                  <input type="number" id="tool-retry-concurrency" value="6" min="1" max="6" />
+                </label>
 
-              <label class="field">
-                <span class="field__label">Max parse retries</span>
-                <input type="number" id="tool-retry-max-retries" value="2" min="0" max="10" />
-              </label>
+                <label class="field">
+                  <span class="field__label">Max parse retries</span>
+                  <input type="number" id="tool-retry-max-retries" value="2" min="0" max="10" />
+                </label>
 
-              <div class="form-actions">
-                <button type="submit" id="tool-retry-failed-start" class="btn btn--primary">Retry failed parses</button>
-                <button type="button" id="tool-retry-failed-stop" class="btn btn--outline" disabled>Stop</button>
+                <div class="form-actions">
+                  <button type="submit" id="tool-retry-failed-start" class="btn btn--primary">Retry failed parses</button>
+                  <button type="button" id="tool-retry-failed-stop" class="btn btn--outline" disabled>Stop</button>
+                </div>
+              </form>
+
+              <div id="tools-retry-progress" class="progress hidden" aria-live="polite">
+                <div class="progress__track">
+                  <div id="tools-retry-progress-fill" class="progress__fill"></div>
+                </div>
+                <p id="tools-retry-progress-text" class="progress__text">Starting…</p>
+                <details id="tools-retry-log-panel" class="activity-log-panel hidden" open>
+                  <summary class="activity-log-panel__summary">Activity log</summary>
+                  <div class="multi-log" data-multi-log-root></div>
+                </details>
               </div>
-            </form>
-
-            <div id="tools-retry-progress" class="progress hidden" aria-live="polite">
-              <div class="progress__track">
-                <div id="tools-retry-progress-fill" class="progress__fill"></div>
-              </div>
-              <p id="tools-retry-progress-text" class="progress__text">Starting…</p>
-              <details id="tools-retry-log-panel" class="activity-log-panel hidden" open>
-                <summary class="activity-log-panel__summary">Activity log</summary>
-                <div class="multi-log" data-multi-log-root></div>
-              </details>
             </div>
-          </article>
+          </details>
         </section>
 
         <section id="tools-error-banner" class="alert alert--error hidden" role="alert"></section>

@@ -56,6 +56,18 @@ export class MultiActivityLog {
     this.summaryLog?.wait(message);
   }
 
+  cache(message) {
+    this.summaryLog?.cache(message);
+  }
+
+  fetch(message) {
+    this.summaryLog?.fetch(message);
+  }
+
+  parse(message) {
+    this.summaryLog?.parse(message);
+  }
+
   _configure(count) {
     this.workerCount = count;
     this.mount.innerHTML = "";

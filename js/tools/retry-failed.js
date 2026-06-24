@@ -11,7 +11,8 @@ import {
   loadMatchDetailsBatch,
 } from "../match-loader.js";
 import { rememberAccountFromApi } from "../saved-accounts.js";
-import { DEFAULT_PARSE_CONCURRENCY, clampParseConcurrency } from "../parse-concurrency.js";
+import { DEFAULT_PARSE_CONCURRENCY } from "../parse-concurrency.js";
+import { getParallelConcurrency } from "../config-ui.js";
 import { APP_VERSION } from "../version.js";
 import { initMultiActivityLog } from "../multi-activity-log.js";
 
@@ -32,7 +33,6 @@ function hideToolError(banner) {
 
 export async function runRetryFailedTool({
   accountId,
-  concurrency,
   parseMaxRetries,
   signal,
   multiLog,
@@ -45,7 +45,12 @@ export async function runRetryFailedTool({
   statusEl,
 }) {
   hideToolError(errorBanner);
-  const slots = clampParseConcurrency(concurrency);
+  const parallelEnabled = document.getElementById("tool-retry-parallel-enabled")?.checked ?? true;
+  const slots = getParallelConcurrency(
+    parallelEnabled,
+    document.getElementById("tool-retry-concurrency"),
+    DEFAULT_PARSE_CONCURRENCY
+  );
 
   multiLog?.clear();
   multiLog?.show();
@@ -227,9 +232,6 @@ export function initRetryFailedTool({ getAnalyzeAbortSignal }) {
 
     await runRetryFailedTool({
       accountId,
-      concurrency:
-        Number(document.getElementById("tool-retry-concurrency").value) ||
-        DEFAULT_PARSE_CONCURRENCY,
       parseMaxRetries: Number(document.getElementById("tool-retry-max-retries").value) || 2,
       signal: abortController.signal,
       multiLog,

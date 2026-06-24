@@ -49,6 +49,7 @@ import {
 } from "./share.js";
 import { initMainTabs } from "./tabs.js";
 import { initTools } from "./tools.js";
+import { initConfigUi, getParallelConcurrency } from "./config-ui.js";
 import { parseFailureLabel } from "./parse-failures.js";
 
 const form = document.getElementById("stats-form");
@@ -75,6 +76,7 @@ const shareToast = document.getElementById("share-toast");
 const requestParseCheckbox = document.getElementById("request-parse");
 const parseMaxInput = document.getElementById("parse-max");
 const parseParallelismInput = document.getElementById("parse-parallelism");
+const parseParallelEnabledCheckbox = document.getElementById("parse-parallel-enabled");
 const parseRetryCheckbox = document.getElementById("parse-retry");
 const parseMaxRetriesInput = document.getElementById("parse-max-retries");
 const clearCacheBtn = document.getElementById("clear-cache-btn");
@@ -503,6 +505,7 @@ form.addEventListener("submit", async (event) => {
   const requestParse = requestParseCheckbox.checked;
   const parseMaxRaw = Number(parseMaxInput.value);
   const parseParallelism = clampParseConcurrency(parseParallelismInput?.value);
+  const parseParallelEnabled = parseParallelEnabledCheckbox?.checked ?? true;
   const parseRetry = parseRetryCheckbox?.checked ?? false;
   const parseMaxRetries = Math.max(0, Number(parseMaxRetriesInput?.value) || 0);
   const parseBudget = {
@@ -610,7 +613,9 @@ form.addEventListener("submit", async (event) => {
       );
     }
 
-    const concurrency = requestParse ? parseParallelism : 3;
+    const concurrency = requestParse
+      ? getParallelConcurrency(parseParallelEnabled, parseParallelismInput, parseParallelism)
+      : getParallelConcurrency(parseParallelEnabled, parseParallelismInput, 3);
 
     const detailsList = await loadMatchDetailsBatch({
       matchList,
@@ -627,7 +632,10 @@ form.addEventListener("submit", async (event) => {
       patchId,
       onProgress: ({ completed, total: matchTotal, matchId, hasCachedEntry, workerId }) => {
         const pct = (completed / matchTotal) * 100;
-        const laneSuffix = concurrency > 1 && requestParse ? ` · lane ${workerId + 1}` : "";
+        const laneSuffix =
+          concurrency > 1 && requestParse && parseParallelEnabled
+            ? ` · lane ${workerId + 1}`
+            : "";
         progressContext = { pct, task: `match ${completed}/${matchTotal} (ID ${matchId})` };
         setProgress(
           true,
@@ -706,20 +714,13 @@ async function init() {
   document.getElementById("app-version").textContent = `v${APP_VERSION}`;
   initFieldTooltips();
   initMainTabs();
+  initConfigUi();
   analyzeMultiLog = initMultiActivityLog("activity-log-panel");
   initTools({
     getAnalyzeAbortSignal: () =>
       abortController && !abortController.signal.aborted ? abortController.signal : null,
   });
   initSavedAccounts({ onSelect: () => syncUrlFromForm() });
-
-  const syncParseRetryField = () => {
-    if (parseMaxRetriesInput) {
-      parseMaxRetriesInput.disabled = !parseRetryCheckbox?.checked;
-    }
-  };
-  parseRetryCheckbox?.addEventListener("change", syncParseRetryField);
-  syncParseRetryField();
 
   try {
     const count = await getMatchCacheCount();
