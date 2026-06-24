@@ -7,7 +7,7 @@ const DEFAULTS = {
   patch: "",
   turbo: "0",
   parse: "0",
-  parsemax: "10",
+  parsemax: "0",
 };
 
 export function readFormParams() {

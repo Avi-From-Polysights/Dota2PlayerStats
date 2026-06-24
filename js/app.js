@@ -72,14 +72,6 @@ let lastMatchupRows = [];
 let sortState = { key: "games", dir: "desc" };
 let abortController = null;
 
-function syncParseMaxField() {
-  const enabled = requestParseCheckbox.checked;
-  parseMaxInput.disabled = !enabled;
-  parseMaxInput.closest(".field--parse-max")?.classList.toggle("field--disabled", !enabled);
-}
-
-requestParseCheckbox.addEventListener("change", syncParseMaxField);
-
 async function resolveMatchDetails(
   matchId,
   accountId,
@@ -657,7 +649,6 @@ form.addEventListener("submit", async (event) => {
 async function init() {
   document.getElementById("app-version").textContent = `v${APP_VERSION}`;
   initFieldTooltips();
-  syncParseMaxField();
   initSavedAccounts({ onSelect: () => syncUrlFromForm() });
 
   try {
@@ -675,8 +666,6 @@ async function init() {
     populatePatches(patchList);
 
     const { hasParams, shouldAutoRun } = applyUrlParams(list);
-    syncParseMaxField();
-
     const accountFromUrl = document.getElementById("account-id").value;
     if (accountFromUrl) {
       rememberAccountFromApi(Number(accountFromUrl)).catch(() => {});

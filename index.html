@@ -167,10 +167,10 @@
               <span class="field__label">Max parses per run</span>
               <span class="info-tip">
                 <button type="button" class="info-tip__btn" aria-label="About Max parses per run">i</button>
-                <span class="info-tip__panel" role="tooltip">Cap how many unparsed matches to queue this run. Use 0 for no limit (can take hours on large samples). Already-parsed cached matches never count toward this limit.</span>
+                <span class="info-tip__panel" role="tooltip">Cap how many unparsed matches to queue this run. 0 means no limit (can take a long time on large samples). Already-parsed cached matches never count toward this limit.</span>
               </span>
             </div>
-            <input type="number" id="parse-max" name="parseMax" value="10" min="0" max="100" disabled />
+            <input type="number" id="parse-max" name="parseMax" value="0" min="0" max="500" />
           </label>
 
           <div class="form-actions">
