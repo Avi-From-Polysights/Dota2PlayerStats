@@ -6,6 +6,8 @@ const DEFAULTS = {
   sig: "0",
   patch: "",
   turbo: "0",
+  parse: "0",
+  parsemax: "10",
 };
 
 export function readFormParams() {
@@ -19,6 +21,8 @@ export function readFormParams() {
     patch: document.getElementById("patch-filter").value,
     window: document.getElementById("rolling-window").value,
     turbo: document.getElementById("exclude-turbo").checked ? "0" : "1",
+    parse: document.getElementById("request-parse").checked ? "1" : "0",
+    parsemax: document.getElementById("parse-max").value,
   };
 }
 
@@ -44,6 +48,10 @@ export function buildShareUrl(params, { autoRun = false } = {}) {
     url.searchParams.set("window", params.window);
   }
   if (params.turbo === "1") url.searchParams.set("turbo", "1");
+  if (params.parse === "1") url.searchParams.set("parse", "1");
+  if (params.parsemax && params.parsemax !== DEFAULTS.parsemax) {
+    url.searchParams.set("parsemax", params.parsemax);
+  }
   if (autoRun) url.searchParams.set("run", "1");
 
   return url.toString();
@@ -97,6 +105,14 @@ export function applyUrlParams(heroes) {
   }
   if (params.has("turbo")) {
     document.getElementById("exclude-turbo").checked = params.get("turbo") !== "1";
+    hasParams = true;
+  }
+  if (params.has("parse")) {
+    document.getElementById("request-parse").checked = params.get("parse") === "1";
+    hasParams = true;
+  }
+  if (params.has("parsemax")) {
+    document.getElementById("parse-max").value = params.get("parsemax");
     hasParams = true;
   }
 

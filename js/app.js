@@ -4,6 +4,13 @@ import {
   loadPlayerMatchesFiltered,
 } from "./api.js";
 import {
+  clearMatchCache,
+  getCachedMatch,
+  getMatchCacheCount,
+  setCachedMatch,
+} from "./match-cache.js";
+import { ensureMatchParsed, isMatchParsedForPlayer } from "./parse.js";
+import {
   loadPatches,
   patchLabel,
   selectablePatches,
@@ -49,6 +56,9 @@ const patchBreakdown = document.getElementById("patch-breakdown");
 const patchTableBody = document.querySelector("#patch-table tbody");
 const shareBtn = document.getElementById("share-btn");
 const shareToast = document.getElementById("share-toast");
+const requestParseCheckbox = document.getElementById("request-parse");
+const parseMaxInput = document.getElementById("parse-max");
+const clearCacheBtn = document.getElementById("clear-cache-btn");
 
 const ACCOUNT_ID_HINT =
   "Check your Account ID on OpenDota: search your Steam name, open your profile, and copy the number from the URL (opendota.com/players/123456789). Use that ID, not Steam ID64.";
@@ -58,6 +68,78 @@ let heroByName = new Map();
 let lastMatchupRows = [];
 let sortState = { key: "games", dir: "desc" };
 let abortController = null;
+
+function syncParseMaxField() {
+  const enabled = requestParseCheckbox.checked;
+  parseMaxInput.disabled = !enabled;
+  parseMaxInput.closest(".field--parse-max")?.classList.toggle("field--disabled", !enabled);
+}
+
+requestParseCheckbox.addEventListener("change", syncParseMaxField);
+
+async function resolveMatchDetails(
+  matchId,
+  accountId,
+  {
+    signal,
+    requestParse,
+    parseBudget,
+    loadStats,
+    matchIndex,
+    total,
+    setProgressText,
+  }
+) {
+  let details = await getCachedMatch(matchId);
+  if (details) {
+    loadStats.cacheHits += 1;
+  } else {
+    details = await loadMatchDetails(matchId, signal);
+    loadStats.fetched += 1;
+  }
+
+  const alreadyParsed = isMatchParsedForPlayer(details, accountId);
+  const shouldParse =
+    requestParse &&
+    !alreadyParsed &&
+    (parseBudget.remaining === Infinity || parseBudget.remaining > 0);
+
+  if (shouldParse) {
+    loadStats.parseQueued += 1;
+    if (parseBudget.remaining !== Infinity) parseBudget.remaining -= 1;
+
+    setProgressText(
+      `Parsing match ${matchIndex + 1} of ${total} (ID ${matchId}) — OpenDota queue…`
+    );
+
+    details = await ensureMatchParsed(matchId, accountId, {
+      signal,
+      initialDetails: details,
+      onPoll: () => {
+        setProgressText(
+          `Waiting for parse ${matchIndex + 1}/${total} (ID ${matchId})…`
+        );
+      },
+    });
+
+    if (isMatchParsedForPlayer(details, accountId)) loadStats.newlyParsed += 1;
+    else loadStats.parseTimedOut += 1;
+  } else if (!alreadyParsed) {
+    loadStats.unparsed += 1;
+  }
+
+  await setCachedMatch(matchId, details);
+  return details;
+}
+
+function formatLoadStats(loadStats) {
+  const parts = [];
+  if (loadStats.cacheHits) parts.push(`${loadStats.cacheHits} from cache`);
+  if (loadStats.newlyParsed) parts.push(`${loadStats.newlyParsed} newly parsed`);
+  if (loadStats.parseTimedOut) parts.push(`${loadStats.parseTimedOut} parse wait timeout`);
+  if (loadStats.unparsed) parts.push(`${loadStats.unparsed} still unparsed`);
+  return parts.length ? parts.join(" · ") : "";
+}
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -107,7 +189,7 @@ function populatePatches(list) {
   patchFilter.innerHTML = `<option value="">All patches</option>${options}`;
 }
 
-function renderSummary(analysis, heroName, trend, rollingWindow, selectedPatchLabel) {
+function renderSummary(analysis, heroName, trend, rollingWindow, selectedPatchLabel, loadStats) {
   const trendLabels = {
     improving: "Trending up",
     declining: "Trending down",
@@ -132,6 +214,8 @@ function renderSummary(analysis, heroName, trend, rollingWindow, selectedPatchLa
     ? `Filtered to ${selectedPatchLabel}`
     : `${analysis.patchRows.length} patch(es) in sample`;
 
+  const loadNote = loadStats ? formatLoadStats(loadStats) : "";
+
   summaryCards.innerHTML = `
     <div class="summary-card">
       <div class="summary-card__label">Game win rate</div>
@@ -151,7 +235,7 @@ function renderSummary(analysis, heroName, trend, rollingWindow, selectedPatchLa
     <div class="summary-card">
       <div class="summary-card__label">Hero</div>
       <div class="summary-card__value" style="font-size:1.35rem">${heroName}</div>
-      <div class="summary-card__sub">${analysis.processed} processed · ${analysis.skipped} skipped${analysis.turboSkipped ? ` · ${analysis.turboSkipped} turbo excluded` : ""}</div>
+      <div class="summary-card__sub">${analysis.processed} processed · ${analysis.skipped} skipped${analysis.turboSkipped ? ` · ${analysis.turboSkipped} turbo excluded` : ""}${loadNote ? ` · ${loadNote}` : ""}</div>
     </div>
     <div class="summary-card">
       <div class="summary-card__label">Recent trend</div>
@@ -271,7 +355,7 @@ function renderPatchTable(patchRows) {
     .join("");
 }
 
-function renderLaneDataNote(analysis) {
+function renderLaneDataNote(analysis, loadStats) {
   const el = document.getElementById("lane-data-note");
   if (!el) return;
 
@@ -279,12 +363,17 @@ function renderLaneDataNote(analysis) {
     ? Math.round((analysis.lanePositionUnknown / analysis.totalGames) * 100)
     : 0;
 
+  const cacheHint = loadStats
+    ? " Parsed matches are saved in your browser — re-run later to parse more without redoing finished games."
+    : "";
+
   el.textContent =
-    `Lane position and lane win % come from OpenDota parsed replays (lane, gold at 10 min). ` +
-    `${analysis.parsedReplayCount} of ${analysis.totalGames} matches are fully parsed. ` +
+    `Lane position and lane win % need OpenDota parsed replays (lane, gold at 10 min). ` +
+    `${analysis.parsedReplayCount} of ${analysis.totalGames} matches in this sample are fully parsed.` +
+    cacheHint +
     (analysis.lanePositionUnknown > 0
-      ? `${analysis.lanePositionUnknown} (${unknownPct}%) have no lane assignment on OpenDota; those show as Unknown.`
-      : "All matches in this sample have lane data.");
+      ? ` ${analysis.lanePositionUnknown} (${unknownPct}%) have no lane assignment; those show as Unknown.`
+      : " All matches in this sample have lane data.");
 }
 
 function renderLaneTable(laneRows) {
@@ -387,6 +476,15 @@ shareBtn.addEventListener("click", async () => {
   }
 });
 
+clearCacheBtn.addEventListener("click", async () => {
+  try {
+    await clearMatchCache();
+    showShareToast("Local match cache cleared.");
+  } catch {
+    showShareToast("Could not clear match cache.");
+  }
+});
+
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
   hideError();
@@ -401,6 +499,16 @@ form.addEventListener("submit", async (event) => {
   const delayMs = Number(document.getElementById("request-delay").value);
   const significant = document.getElementById("significant-only").checked;
   const excludeTurbo = document.getElementById("exclude-turbo").checked;
+  const requestParse = requestParseCheckbox.checked;
+  const parseMaxRaw = Number(parseMaxInput.value);
+  const parseBudget = {
+    remaining:
+      requestParse && parseMaxRaw === 0
+        ? Infinity
+        : requestParse
+          ? Math.max(0, parseMaxRaw)
+          : 0,
+  };
   const confidence = Number(document.getElementById("confidence-level").value);
   const rollingWindow = Number(document.getElementById("rolling-window").value);
   const patchValue = patchFilter.value;
@@ -447,6 +555,14 @@ form.addEventListener("submit", async (event) => {
 
     const detailsList = [];
     const total = matchList.length;
+    const loadStats = {
+      cacheHits: 0,
+      fetched: 0,
+      parseQueued: 0,
+      newlyParsed: 0,
+      parseTimedOut: 0,
+      unparsed: 0,
+    };
 
     for (let i = 0; i < total; i += 1) {
       if (signal.aborted) return;
@@ -455,11 +571,20 @@ form.addEventListener("submit", async (event) => {
       setProgress(
         true,
         ((i + 1) / total) * 100,
-        `Fetching match ${i + 1} of ${total} (ID ${matchId})…`
+        `Loading match ${i + 1} of ${total} (ID ${matchId})…`
       );
 
       try {
-        const details = await loadMatchDetails(matchId, signal);
+        let details = await resolveMatchDetails(matchId, accountId, {
+          signal,
+          requestParse,
+          parseBudget,
+          loadStats,
+          matchIndex: i,
+          total,
+          setProgressText: (text) => setProgress(true, ((i + 1) / total) * 100, text),
+        });
+
         if (patchId != null && details?.patch != null && details.patch !== patchId) {
           detailsList.push(null);
         } else {
@@ -479,7 +604,7 @@ form.addEventListener("submit", async (event) => {
     const laneVsGameRolling = rollingLaneVsGame(analysis.timeline, rollingWindow);
     const trend = trendDirection(rolling);
 
-    renderSummary(analysis, heroName, trend, rollingWindow, selectedPatchLabel);
+    renderSummary(analysis, heroName, trend, rollingWindow, selectedPatchLabel, loadStats);
     renderLaneVsGameStats(analysis);
     renderLaneVsGameChart(
       document.getElementById("lane-vs-game-chart"),
@@ -494,7 +619,7 @@ form.addEventListener("submit", async (event) => {
     );
     renderLaneChart(document.getElementById("lane-chart"), analysis.laneRows);
     renderLaneTable(analysis.laneRows);
-    renderLaneDataNote(analysis);
+    renderLaneDataNote(analysis, loadStats);
 
     const showPatchBreakdown = analysis.patchRows.length > 0;
     patchBreakdown.classList.toggle("hidden", !showPatchBreakdown);
@@ -527,6 +652,16 @@ form.addEventListener("submit", async (event) => {
 async function init() {
   document.getElementById("app-version").textContent = `v${APP_VERSION}`;
   initFieldTooltips();
+  syncParseMaxField();
+
+  try {
+    const count = await getMatchCacheCount();
+    if (count > 0) {
+      clearCacheBtn.title = `${count} match(es) cached locally`;
+    }
+  } catch {
+    // IndexedDB unavailable (private mode, etc.)
+  }
 
   try {
     const [list, patchList] = await Promise.all([loadHeroes(), loadPatches()]);
@@ -534,6 +669,7 @@ async function init() {
     populatePatches(patchList);
 
     const { hasParams, shouldAutoRun } = applyUrlParams(list);
+    syncParseMaxField();
 
     if (!hasParams) {
       const kez = list.find((h) => h.name === "Kez");

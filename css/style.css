@@ -316,6 +316,15 @@ a:hover {
   color: var(--foreground);
 }
 
+.field--parse-max {
+  max-width: 12rem;
+}
+
+.field--disabled {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
 .field__hint {
   margin: 0.15rem 0 0;
   font-size: 0.75rem;

@@ -120,6 +120,38 @@ export async function loadMatchDetails(matchId, signal) {
   return fetchJson(`${BASE_URL}/matches/${matchId}`, { signal });
 }
 
+export async function requestMatchParse(matchId, signal) {
+  return postJson(`${BASE_URL}/request/${matchId}`, { signal });
+}
+
+async function postJson(url, { signal } = {}) {
+  let lastError = null;
+
+  for (let attempt = 1; attempt <= RETRIES; attempt += 1) {
+    try {
+      const response = await fetch(url, { method: "POST", signal });
+
+      if ([429, 500, 502, 503, 504].includes(response.status)) {
+        await sleep(RETRY_SLEEP_MS * attempt);
+        continue;
+      }
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status} for ${url}`);
+      }
+
+      const text = await response.text();
+      return text ? JSON.parse(text) : null;
+    } catch (error) {
+      if (error.name === "AbortError") throw error;
+      lastError = error;
+      await sleep(RETRY_SLEEP_MS * attempt);
+    }
+  }
+
+  throw lastError ?? new Error(`Failed to POST: ${url}`);
+}
+
 export function isRadiant(playerSlot) {
   return playerSlot < 128;
 }

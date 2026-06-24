@@ -150,6 +150,28 @@
             </div>
           </label>
 
+          <label class="field field--checkbox">
+            <input type="checkbox" id="request-parse" name="requestParse" />
+            <div class="field__label-row">
+              <span class="field__label">Request OpenDota parse</span>
+              <span class="info-tip">
+                <button type="button" class="info-tip__btn" aria-label="About Request OpenDota parse">i</button>
+                <span class="info-tip__panel" role="tooltip">Queue OpenDota replay parses for matches missing lane data (slow — each request uses heavy API quota). Parsed matches are cached in your browser; re-run later to parse more without redoing finished games.</span>
+              </span>
+            </div>
+          </label>
+
+          <label class="field field--parse-max">
+            <div class="field__label-row">
+              <span class="field__label">Max parses per run</span>
+              <span class="info-tip">
+                <button type="button" class="info-tip__btn" aria-label="About Max parses per run">i</button>
+                <span class="info-tip__panel" role="tooltip">Cap how many unparsed matches to queue this run. Use 0 for no limit (can take hours on large samples). Already-parsed cached matches never count toward this limit.</span>
+              </span>
+            </div>
+            <input type="number" id="parse-max" name="parseMax" value="10" min="0" max="100" disabled />
+          </label>
+
           <div class="form-actions">
             <button type="submit" id="fetch-btn" class="btn btn--primary">Analyze matches</button>
             <button type="button" id="export-btn" class="btn btn--outline" disabled>Export CSV</button>
@@ -260,10 +282,11 @@
     <div class="footer-bar__inner">
       <p class="footer-bar__note">
         Data from <a href="https://www.opendota.com/" target="_blank" rel="noopener">OpenDota</a>.
-        Runs in your browser; nothing is stored.
+        Runs in your browser; match data may be cached locally on your device.
       </p>
       <div class="footer-bar__actions">
         <span class="footer-bar__version" id="app-version"></span>
+        <button type="button" id="clear-cache-btn" class="btn btn--outline btn--footer">Clear cache</button>
         <a
           class="btn btn--outline btn--footer"
           href="https://github.com/Avi-From-Polysights/Dota2PlayerStats"
