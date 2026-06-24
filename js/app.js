@@ -1,7 +1,7 @@
 import {
   loadHeroes,
   loadMatchDetails,
-  loadPlayerMatches,
+  loadPlayerMatchesFiltered,
 } from "./api.js";
 import {
   loadPatches,
@@ -119,9 +119,14 @@ function renderSummary(analysis, heroName, trend, rollingWindow, selectedPatchLa
     trend === "improving" ? "positive" : trend === "declining" ? "negative" : "";
 
   const laneDataNote =
-    analysis.laneDecided > 0
-      ? `${analysis.laneDecided} with lane data · ${analysis.laneUnknown} unknown`
-      : "No parsed replay lane data";
+    analysis.parsedReplayCount > 0
+      ? `${analysis.parsedReplayCount}/${analysis.totalGames} parsed replays · ${analysis.laneDecided} lane outcomes`
+      : "No parsed replays (lane win % needs OpenDota replay parse)";
+
+  const lanePositionNote =
+    analysis.lanePositionUnknown > 0
+      ? `${analysis.lanePositionKnown}/${analysis.totalGames} with lane position`
+      : `${analysis.lanePositionKnown} matches with lane position`;
 
   const patchNote = selectedPatchLabel
     ? `Filtered to ${selectedPatchLabel}`
@@ -136,7 +141,7 @@ function renderSummary(analysis, heroName, trend, rollingWindow, selectedPatchLa
     <div class="summary-card">
       <div class="summary-card__label">Lane win rate</div>
       <div class="summary-card__value ${analysis.overallLaneWinrate >= 50 ? "positive" : "negative"}">${analysis.laneDecided ? formatPct(analysis.overallLaneWinrate) : "N/A"}</div>
-      <div class="summary-card__sub">${analysis.laneDecided ? `Wilson ${formatCi(analysis.overallLaneCi.lower, analysis.overallLaneCi.upper)}` : laneDataNote}</div>
+      <div class="summary-card__sub">${analysis.laneDecided ? `Wilson ${formatCi(analysis.overallLaneCi.lower, analysis.overallLaneCi.upper)} · ${lanePositionNote}` : laneDataNote}</div>
     </div>
     <div class="summary-card">
       <div class="summary-card__label">Record</div>
@@ -146,7 +151,7 @@ function renderSummary(analysis, heroName, trend, rollingWindow, selectedPatchLa
     <div class="summary-card">
       <div class="summary-card__label">Hero</div>
       <div class="summary-card__value" style="font-size:1.35rem">${heroName}</div>
-      <div class="summary-card__sub">${analysis.processed} processed · ${analysis.skipped} skipped</div>
+      <div class="summary-card__sub">${analysis.processed} processed · ${analysis.skipped} skipped${analysis.turboSkipped ? ` · ${analysis.turboSkipped} turbo excluded` : ""}</div>
     </div>
     <div class="summary-card">
       <div class="summary-card__label">Recent trend</div>
@@ -266,6 +271,22 @@ function renderPatchTable(patchRows) {
     .join("");
 }
 
+function renderLaneDataNote(analysis) {
+  const el = document.getElementById("lane-data-note");
+  if (!el) return;
+
+  const unknownPct = analysis.totalGames
+    ? Math.round((analysis.lanePositionUnknown / analysis.totalGames) * 100)
+    : 0;
+
+  el.textContent =
+    `Lane position and lane win % come from OpenDota parsed replays (lane, gold at 10 min). ` +
+    `${analysis.parsedReplayCount} of ${analysis.totalGames} matches are fully parsed. ` +
+    (analysis.lanePositionUnknown > 0
+      ? `${analysis.lanePositionUnknown} (${unknownPct}%) have no lane assignment on OpenDota; those show as Unknown.`
+      : "All matches in this sample have lane data.");
+}
+
 function renderLaneTable(laneRows) {
   laneTable.innerHTML = laneRows
     .filter((r) => r.games > 0)
@@ -379,6 +400,7 @@ form.addEventListener("submit", async (event) => {
   const limit = Number(document.getElementById("match-limit").value);
   const delayMs = Number(document.getElementById("request-delay").value);
   const significant = document.getElementById("significant-only").checked;
+  const excludeTurbo = document.getElementById("exclude-turbo").checked;
   const confidence = Number(document.getElementById("confidence-level").value);
   const rollingWindow = Number(document.getElementById("rolling-window").value);
   const patchValue = patchFilter.value;
@@ -404,12 +426,13 @@ form.addEventListener("submit", async (event) => {
 
   try {
     const heroMap = new Map(heroes.map((h) => [h.id, h.name]));
-    const matchList = await loadPlayerMatches(
+    const { matches: matchList, turboSkipped } = await loadPlayerMatchesFiltered(
       accountId,
       heroId,
       limit,
       significant,
-      patchId
+      patchId,
+      { excludeTurbo, signal }
     );
 
     if (!matchList.length) {
@@ -449,7 +472,9 @@ form.addEventListener("submit", async (event) => {
       if (delayMs > 0 && i < total - 1) await sleep(delayMs);
     }
 
-    const analysis = analyzeMatches(detailsList, accountId, heroMap, confidence);
+    const analysis = analyzeMatches(detailsList, accountId, heroMap, confidence, {
+      turboSkippedList: turboSkipped,
+    });
     const rolling = rollingWinRate(analysis.timeline, rollingWindow);
     const laneVsGameRolling = rollingLaneVsGame(analysis.timeline, rollingWindow);
     const trend = trendDirection(rolling);
@@ -469,6 +494,7 @@ form.addEventListener("submit", async (event) => {
     );
     renderLaneChart(document.getElementById("lane-chart"), analysis.laneRows);
     renderLaneTable(analysis.laneRows);
+    renderLaneDataNote(analysis);
 
     const showPatchBreakdown = analysis.patchRows.length > 0;
     patchBreakdown.classList.toggle("hidden", !showPatchBreakdown);

@@ -129,6 +129,17 @@
           </div>
 
           <label class="field field--checkbox">
+            <input type="checkbox" id="exclude-turbo" name="excludeTurbo" checked />
+            <div class="field__label-row">
+              <span class="field__label">Exclude Turbo</span>
+              <span class="info-tip">
+                <button type="button" class="info-tip__btn" aria-label="About Exclude Turbo">i</button>
+                <span class="info-tip__panel" role="tooltip">Skip Turbo matches (game mode 23) when building your sample. OpenDota scans further back in your history to still reach your match limit.</span>
+              </span>
+            </div>
+          </label>
+
+          <label class="field field--checkbox">
             <input type="checkbox" id="significant-only" name="significant" />
             <div class="field__label-row">
               <span class="field__label">Significant matches only</span>
@@ -184,6 +195,7 @@
             <div class="section-head section-head--compact">
               <h2 class="section-title">By lane position</h2>
               <p class="section-desc">Lane win % (10-min gold) vs game win % for each lane you played.</p>
+              <p id="lane-data-note" class="section-desc section-desc--note"></p>
             </div>
             <div class="chart-wrap chart-wrap--short">
               <canvas id="lane-chart"></canvas>

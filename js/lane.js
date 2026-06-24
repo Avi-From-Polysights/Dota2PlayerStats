@@ -6,6 +6,61 @@ export const LANE_GOLD_MINUTE = 10;
 /** Gold diff within this band counts as a lane draw. */
 export const LANE_DRAW_THRESHOLD = 200;
 
+const LANE_LABELS = {
+  0: "Unknown",
+  1: "Safe Lane",
+  2: "Mid Lane",
+  3: "Off Lane",
+  4: "Jungle",
+  5: "Roaming",
+};
+
+export function laneLabel(lane) {
+  return LANE_LABELS[lane] ?? `Lane ${lane}`;
+}
+
+/**
+ * Lane assignment from OpenDota match player object.
+ * Primary `lane` and lane win % (`gold_t`) only exist on parsed replays.
+ * Falls back to `lane_role` for position grouping when lane is missing.
+ */
+export function resolvePlayerLane(player) {
+  const lane = player?.lane;
+  if (typeof lane === "number" && lane >= 1 && lane <= 4) {
+    return {
+      lane,
+      label: laneLabel(lane),
+      source: "lane",
+      hasParsedReplay: Boolean(player?.gold_t?.length),
+    };
+  }
+
+  const role = player?.lane_role;
+  if (role === 5) {
+    return {
+      lane: 5,
+      label: laneLabel(5),
+      source: "lane_role",
+      hasParsedReplay: Boolean(player?.gold_t?.length),
+    };
+  }
+  if (typeof role === "number" && role >= 1 && role <= 4) {
+    return {
+      lane: role,
+      label: laneLabel(role),
+      source: "lane_role",
+      hasParsedReplay: Boolean(player?.gold_t?.length),
+    };
+  }
+
+  return {
+    lane: 0,
+    label: laneLabel(0),
+    source: "none",
+    hasParsedReplay: false,
+  };
+}
+
 export function goldAtMinute(player, minute = LANE_GOLD_MINUTE) {
   const series = player?.gold_t;
   if (!Array.isArray(series) || series.length === 0) return null;
@@ -14,14 +69,14 @@ export function goldAtMinute(player, minute = LANE_GOLD_MINUTE) {
   return typeof value === "number" ? value : null;
 }
 
-export function findLaneOpponents(me, players) {
-  const lane = me.lane;
-  if (!lane || lane === 4) return [];
+export function findLaneOpponents(me, players, laneInfo) {
+  const lane = laneInfo.lane;
+  if (!lane || lane === 4 || lane === 5) return [];
 
   const enemies = players.filter(
     (p) =>
       isRadiant(p.player_slot) !== isRadiant(me.player_slot) &&
-      p.lane === lane
+      resolvePlayerLane(p).lane === lane
   );
 
   if (!enemies.length) return [];
@@ -36,10 +91,11 @@ export function findLaneOpponents(me, players) {
 
 /**
  * Lane outcome from gold at 10 min vs lane opponent(s).
- * Returns "won" | "lost" | "draw" | null when data is unavailable.
+ * Requires parsed replay (`gold_t`). Returns null when unavailable.
  */
 export function computeLaneOutcome(me, players) {
-  const opponents = findLaneOpponents(me, players);
+  const laneInfo = resolvePlayerLane(me);
+  const opponents = findLaneOpponents(me, players, laneInfo);
   if (!opponents.length) return null;
 
   const myGold = goldAtMinute(me);

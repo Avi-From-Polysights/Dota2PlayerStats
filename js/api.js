@@ -1,3 +1,5 @@
+import { GAMEMODE_TURBO } from "./game-modes.js";
+
 const BASE_URL = "https://api.opendota.com/api";
 
 const RETRIES = 5;
@@ -60,6 +62,58 @@ export async function loadPlayerMatches(
   }
 
   return fetchJson(`${BASE_URL}/players/${accountId}/matches?${params}`);
+}
+
+/**
+ * Fetch up to `limit` matches, optionally skipping Turbo and scanning further back.
+ */
+export async function loadPlayerMatchesFiltered(
+  accountId,
+  heroId,
+  limit,
+  significant,
+  patchId = null,
+  { excludeTurbo = true, signal } = {}
+) {
+  const matches = [];
+  let offset = 0;
+  let turboSkipped = 0;
+  const maxScan = Math.min(Math.max(limit * 6, limit), 500);
+
+  while (matches.length < limit && offset < maxScan) {
+    const batchLimit = Math.min(100, maxScan - offset);
+    const params = new URLSearchParams({
+      hero_id: String(heroId),
+      limit: String(batchLimit),
+      offset: String(offset),
+      significant: significant ? "1" : "0",
+    });
+
+    if (patchId != null && patchId !== "") {
+      params.set("patch", String(patchId));
+    }
+
+    const batch = await fetchJson(
+      `${BASE_URL}/players/${accountId}/matches?${params}`,
+      { signal }
+    );
+
+    if (!batch.length) break;
+
+    for (const match of batch) {
+      if (excludeTurbo && match.game_mode === GAMEMODE_TURBO) {
+        turboSkipped += 1;
+        continue;
+      }
+      matches.push(match);
+      if (matches.length >= limit) break;
+    }
+
+    offset += batch.length;
+    if (batch.length < batchLimit) break;
+  }
+
+  return { matches, turboSkipped };
 }
 
 export async function loadMatchDetails(matchId, signal) {

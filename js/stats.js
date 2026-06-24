@@ -1,18 +1,7 @@
 import { wilsonInterval } from "./wilson.js";
 import { didPlayerWin, isRadiant } from "./api.js";
-import { computeLaneOutcome } from "./lane.js";
-
-const LANE_LABELS = {
-  0: "Unknown",
-  1: "Safe Lane",
-  2: "Mid Lane",
-  3: "Off Lane",
-  4: "Jungle",
-};
-
-export function laneLabel(lane) {
-  return LANE_LABELS[lane] ?? `Lane ${lane}`;
-}
+import { computeLaneOutcome, laneLabel, resolvePlayerLane } from "./lane.js";
+import { GAMEMODE_TURBO } from "./game-modes.js";
 
 function emptyBucket() {
   return {
@@ -46,7 +35,13 @@ function gameWinRate(bucket) {
   return bucket.games ? (bucket.wins / bucket.games) * 100 : 0;
 }
 
-export function analyzeMatches(matches, accountId, heroNames, confidence) {
+export function analyzeMatches(
+  matches,
+  accountId,
+  heroNames,
+  confidence,
+  { turboSkippedList = 0 } = {}
+) {
   const matchups = new Map();
   const laneStats = new Map();
   const patchStats = new Map();
@@ -60,6 +55,10 @@ export function analyzeMatches(matches, accountId, heroNames, confidence) {
   let laneLost = 0;
   let laneDraw = 0;
   let laneUnknown = 0;
+  let lanePositionKnown = 0;
+  let lanePositionUnknown = 0;
+  let parsedReplayCount = 0;
+  let turboSkipped = 0;
   let gameWinsWhenLaneWon = 0;
   let gameWinsWhenLaneLost = 0;
   let gameWinsWhenLaneDraw = 0;
@@ -84,10 +83,21 @@ export function analyzeMatches(matches, accountId, heroNames, confidence) {
     const durationMin = (details.duration ?? 0) / 60;
     const kills = me.kills ?? 0;
     const deaths = me.deaths ?? 0;
-    const lane = me.lane ?? 0;
+    const laneInfo = resolvePlayerLane(me);
+    const lane = laneInfo.lane;
     const laneOutcome = computeLaneOutcome(me, players);
     const goldAt10 = me.gold_t?.[10] ?? null;
     const patch = details.patch ?? null;
+
+    if (details.game_mode === GAMEMODE_TURBO) {
+      skipped += 1;
+      turboSkipped += 1;
+      continue;
+    }
+
+    if (laneInfo.source === "none") lanePositionUnknown += 1;
+    else lanePositionKnown += 1;
+    if (laneInfo.hasParsedReplay) parsedReplayCount += 1;
 
     if (win) totalWins += 1;
     else totalLosses += 1;
@@ -127,6 +137,8 @@ export function analyzeMatches(matches, accountId, heroNames, confidence) {
       startTime: details.start_time,
       win,
       lane,
+      laneLabel: laneInfo.label,
+      laneSource: laneInfo.source,
       laneOutcome,
       goldAt10,
       patch,
@@ -237,6 +249,11 @@ export function analyzeMatches(matches, accountId, heroNames, confidence) {
     laneDraw,
     laneUnknown,
     laneDecided,
+    laneOutcomeUnknown: laneUnknown,
+    lanePositionKnown,
+    lanePositionUnknown,
+    parsedReplayCount,
+    turboSkipped: turboSkippedList + turboSkipped,
     overallLaneWinrate,
     overallLaneCi,
     gameWinWhenLaneWon: laneWon ? (gameWinsWhenLaneWon / laneWon) * 100 : null,

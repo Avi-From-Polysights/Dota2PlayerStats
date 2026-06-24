@@ -5,6 +5,7 @@ const DEFAULTS = {
   window: "20",
   sig: "0",
   patch: "",
+  turbo: "0",
 };
 
 export function readFormParams() {
@@ -17,6 +18,7 @@ export function readFormParams() {
     conf: document.getElementById("confidence-level").value,
     patch: document.getElementById("patch-filter").value,
     window: document.getElementById("rolling-window").value,
+    turbo: document.getElementById("exclude-turbo").checked ? "0" : "1",
   };
 }
 
@@ -41,6 +43,7 @@ export function buildShareUrl(params, { autoRun = false } = {}) {
   if (params.window && params.window !== DEFAULTS.window) {
     url.searchParams.set("window", params.window);
   }
+  if (params.turbo === "1") url.searchParams.set("turbo", "1");
   if (autoRun) url.searchParams.set("run", "1");
 
   return url.toString();
@@ -90,6 +93,10 @@ export function applyUrlParams(heroes) {
   }
   if (params.has("window")) {
     document.getElementById("rolling-window").value = params.get("window");
+    hasParams = true;
+  }
+  if (params.has("turbo")) {
+    document.getElementById("exclude-turbo").checked = params.get("turbo") !== "1";
     hasParams = true;
   }
 

@@ -213,7 +213,9 @@ export function renderLaneVsGameChart(canvas, points, overallLane, overallGame) 
 export function renderLaneChart(canvas, laneRows) {
   destroyChart(laneChart);
 
-  const filtered = laneRows.filter((r) => r.games > 0 && r.laneKnown > 0);
+  const filtered = laneRows.filter(
+    (r) => r.games > 0 && r.laneKnown > 0 && r.lane !== 0
+  );
 
   laneChart = new Chart(canvas, {
     type: "bar",
