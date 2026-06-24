@@ -42,6 +42,10 @@ Win rates use the [Wilson score interval](https://en.wikipedia.org/wiki/Binomial
 
 This project is a browser port of a Python script that fetched Kez matchup data and exported an Excel file. The core matchup aggregation logic is preserved; Excel generation was replaced with an interactive UI and CSV export.
 
+## Contributing
+
+Contributions are welcome. Please read [CONTRIBUTING.md](CONTRIBUTING.md) — fork, open a PR, and note that **only the maintainer can approve and merge** pull requests.
+
 ## License
 
-MIT
+MIT — see [LICENSE](LICENSE).

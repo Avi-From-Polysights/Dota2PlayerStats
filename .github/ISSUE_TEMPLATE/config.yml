@@ -1,5 +1,8 @@
 blank_issues_enabled: true
 contact_links:
+  - name: Contributing guide
+    url: https://github.com/Avi-From-Polysights/Dota2PlayerStats/blob/master/CONTRIBUTING.md
+    about: How to fork, open PRs, and get changes reviewed
   - name: Live app
     url: https://avi-from-polysights.github.io/Dota2PlayerStats/
     about: Open Dota 2 Player Stats on GitHub Pages
