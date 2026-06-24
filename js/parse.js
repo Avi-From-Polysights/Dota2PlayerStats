@@ -19,7 +19,7 @@ export async function ensureMatchParsed(
   accountId,
   {
     signal,
-    pollMs = 6000,
+    pollMs = 8000,
     maxWaitMs = 120000,
     onPoll,
     initialDetails = null,
@@ -37,7 +37,14 @@ export async function ensureMatchParsed(
     await sleep(pollMs);
     if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
 
-    details = await loadMatchDetails(matchId, signal);
+    try {
+      details = await loadMatchDetails(matchId, signal);
+    } catch (error) {
+      if (error?.rateLimited) throw error;
+      onPoll?.(details);
+      continue;
+    }
+
     onPoll?.(details);
 
     if (isMatchParsedForPlayer(details, accountId)) return details;

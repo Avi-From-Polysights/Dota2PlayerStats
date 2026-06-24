@@ -2,23 +2,43 @@ import { GAMEMODE_TURBO } from "./game-modes.js";
 
 const BASE_URL = "https://api.opendota.com/api";
 
-const RETRIES = 5;
-const RETRY_SLEEP_MS = 2000;
+const RETRIES = 8;
+const RETRY_SLEEP_MS = 2500;
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function retryWaitMs(response, attempt) {
+  if (response?.status === 429) {
+    const retryAfter = Number(response.headers.get("Retry-After"));
+    if (Number.isFinite(retryAfter) && retryAfter > 0) {
+      return Math.min(retryAfter * 1000, 120_000);
+    }
+    return Math.min(RETRY_SLEEP_MS * attempt * 3, 60_000);
+  }
+  return RETRY_SLEEP_MS * attempt;
+}
+
+export class OpenDotaRateLimitError extends Error {
+  constructor(message = "OpenDota rate limit (429)") {
+    super(message);
+    this.name = "OpenDotaRateLimitError";
+    this.rateLimited = true;
+  }
+}
+
 export async function fetchJson(url, { signal } = {}) {
   let lastError = null;
+  let saw429 = false;
 
   for (let attempt = 1; attempt <= RETRIES; attempt += 1) {
     try {
       const response = await fetch(url, { signal });
 
       if ([429, 500, 502, 503, 504].includes(response.status)) {
-        const wait = RETRY_SLEEP_MS * attempt;
-        await sleep(wait);
+        if (response.status === 429) saw429 = true;
+        await sleep(retryWaitMs(response, attempt));
         continue;
       }
 
@@ -34,6 +54,7 @@ export async function fetchJson(url, { signal } = {}) {
     }
   }
 
+  if (saw429) throw new OpenDotaRateLimitError();
   throw lastError ?? new Error(`Failed to fetch: ${url}`);
 }
 
@@ -145,13 +166,15 @@ export async function requestMatchParse(matchId, signal) {
 
 async function postJson(url, { signal } = {}) {
   let lastError = null;
+  let saw429 = false;
 
   for (let attempt = 1; attempt <= RETRIES; attempt += 1) {
     try {
       const response = await fetch(url, { method: "POST", signal });
 
       if ([429, 500, 502, 503, 504].includes(response.status)) {
-        await sleep(RETRY_SLEEP_MS * attempt);
+        if (response.status === 429) saw429 = true;
+        await sleep(retryWaitMs(response, attempt));
         continue;
       }
 
@@ -168,6 +191,7 @@ async function postJson(url, { signal } = {}) {
     }
   }
 
+  if (saw429) throw new OpenDotaRateLimitError();
   throw lastError ?? new Error(`Failed to POST: ${url}`);
 }
 

@@ -21,8 +21,10 @@ jobs:
 
       - name: Prepare site
         run: |
+          VERSION=$(grep 'APP_VERSION' js/version.js | sed 's/.*"\(.*\)".*/\1/')
           mkdir -p _site
-          cp index.html .nojekyll _site/
+          sed "s/__VERSION__/${VERSION}/g" index.html > _site/index.html
+          cp .nojekyll _site/
           cp -r css js _site/
 
       - name: Publish to gh-pages branch

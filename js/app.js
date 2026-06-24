@@ -13,6 +13,7 @@ import {
   initSavedAccounts,
   rememberAccountFromApi,
 } from "./saved-accounts.js";
+import { ensureMatchParsed, isMatchParsedForPlayer } from "./parse.js";
 import {
   loadPatches,
   patchLabel,
@@ -107,18 +108,23 @@ async function resolveMatchDetails(
       `Parsing match ${matchIndex + 1} of ${total} (ID ${matchId}) — OpenDota queue…`
     );
 
-    details = await ensureMatchParsed(matchId, accountId, {
-      signal,
-      initialDetails: details,
-      onPoll: () => {
-        setProgressText(
-          `Waiting for parse ${matchIndex + 1}/${total} (ID ${matchId})…`
-        );
-      },
-    });
+    try {
+      details = await ensureMatchParsed(matchId, accountId, {
+        signal,
+        initialDetails: details,
+        onPoll: () => {
+          setProgressText(
+            `Waiting for parse ${matchIndex + 1}/${total} (ID ${matchId})…`
+          );
+        },
+      });
 
-    if (isMatchParsedForPlayer(details, accountId)) loadStats.newlyParsed += 1;
-    else loadStats.parseTimedOut += 1;
+      if (isMatchParsedForPlayer(details, accountId)) loadStats.newlyParsed += 1;
+      else loadStats.parseTimedOut += 1;
+    } catch (error) {
+      loadStats.parseFailed += 1;
+      if (error?.rateLimited) loadStats.rateLimited += 1;
+    }
   } else if (!alreadyParsed) {
     loadStats.unparsed += 1;
   }
@@ -131,7 +137,8 @@ function formatLoadStats(loadStats) {
   const parts = [];
   if (loadStats.cacheHits) parts.push(`${loadStats.cacheHits} from cache`);
   if (loadStats.newlyParsed) parts.push(`${loadStats.newlyParsed} newly parsed`);
-  if (loadStats.parseTimedOut) parts.push(`${loadStats.parseTimedOut} parse wait timeout`);
+  if (loadStats.parseFailed) parts.push(`${loadStats.parseFailed} parse failed`);
+  if (loadStats.rateLimited) parts.push("OpenDota rate limited");
   if (loadStats.unparsed) parts.push(`${loadStats.unparsed} still unparsed`);
   return parts.length ? parts.join(" · ") : "";
 }
@@ -527,8 +534,6 @@ form.addEventListener("submit", async (event) => {
   resultsEl.classList.add("hidden");
   setProgress(true, 0, "Loading match list…");
 
-  rememberAccountFromApi(accountId, { signal }).catch(() => {});
-
   try {
     const heroMap = new Map(heroes.map((h) => [h.id, h.name]));
     const { matches: matchList, turboSkipped } = await loadPlayerMatchesFiltered(
@@ -550,6 +555,8 @@ form.addEventListener("submit", async (event) => {
       return;
     }
 
+    rememberAccountFromApi(accountId, { signal }).catch(() => {});
+
     const detailsList = [];
     const total = matchList.length;
     const loadStats = {
@@ -558,6 +565,8 @@ form.addEventListener("submit", async (event) => {
       parseQueued: 0,
       newlyParsed: 0,
       parseTimedOut: 0,
+      parseFailed: 0,
+      rateLimited: 0,
       unparsed: 0,
     };
 
@@ -587,11 +596,20 @@ form.addEventListener("submit", async (event) => {
         } else {
           detailsList.push(details);
         }
-      } catch {
+      } catch (error) {
+        if (error?.rateLimited) loadStats.rateLimited += 1;
         detailsList.push(null);
       }
 
-      if (delayMs > 0 && i < total - 1) await sleep(delayMs);
+      if (delayMs > 0 && i < total - 1) {
+        await sleep(requestParse ? Math.max(delayMs, 400) : delayMs);
+      }
+    }
+
+    if (loadStats.rateLimited) {
+      showError(
+        "OpenDota rate limited some requests. Increase request delay, turn off parse for this run, or wait a minute and retry."
+      );
     }
 
     const analysis = analyzeMatches(detailsList, accountId, heroMap, confidence, {
