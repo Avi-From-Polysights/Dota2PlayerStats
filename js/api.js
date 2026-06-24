@@ -37,6 +37,25 @@ export async function fetchJson(url, { signal } = {}) {
   throw lastError ?? new Error(`Failed to fetch: ${url}`);
 }
 
+export async function loadPlayerProfile(accountId, signal) {
+  return fetchJson(`${BASE_URL}/players/${accountId}`, { signal });
+}
+
+export function profileFromPlayerResponse(data, accountId) {
+  const profile = data?.profile ?? data ?? {};
+  const id = Number(accountId);
+
+  return {
+    accountId: id,
+    personaname: profile.personaname ?? null,
+    name: profile.name ?? null,
+    avatar: profile.avatar ?? null,
+    avatarFull: profile.avatarfull ?? profile.avatarmedium ?? profile.avatar ?? null,
+    profileUrl:
+      profile.profileurl ?? `https://www.opendota.com/players/${id}`,
+  };
+}
+
 export async function loadHeroes() {
   const heroes = await fetchJson(`${BASE_URL}/heroes`);
   return heroes

@@ -9,7 +9,10 @@ import {
   getMatchCacheCount,
   setCachedMatch,
 } from "./match-cache.js";
-import { ensureMatchParsed, isMatchParsedForPlayer } from "./parse.js";
+import {
+  initSavedAccounts,
+  rememberAccountFromApi,
+} from "./saved-accounts.js";
 import {
   loadPatches,
   patchLabel,
@@ -532,6 +535,8 @@ form.addEventListener("submit", async (event) => {
   resultsEl.classList.add("hidden");
   setProgress(true, 0, "Loading match list…");
 
+  rememberAccountFromApi(accountId, { signal }).catch(() => {});
+
   try {
     const heroMap = new Map(heroes.map((h) => [h.id, h.name]));
     const { matches: matchList, turboSkipped } = await loadPlayerMatchesFiltered(
@@ -653,6 +658,7 @@ async function init() {
   document.getElementById("app-version").textContent = `v${APP_VERSION}`;
   initFieldTooltips();
   syncParseMaxField();
+  initSavedAccounts({ onSelect: () => syncUrlFromForm() });
 
   try {
     const count = await getMatchCacheCount();
@@ -670,6 +676,11 @@ async function init() {
 
     const { hasParams, shouldAutoRun } = applyUrlParams(list);
     syncParseMaxField();
+
+    const accountFromUrl = document.getElementById("account-id").value;
+    if (accountFromUrl) {
+      rememberAccountFromApi(Number(accountFromUrl)).catch(() => {});
+    }
 
     if (!hasParams) {
       const kez = list.find((h) => h.name === "Kez");
