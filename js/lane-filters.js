@@ -1,4 +1,4 @@
-import { laneLabel, resolvePlayerLane } from "./lane.js";
+import { isSupportPlayer, laneLabel, resolveOpenDotaLaneRole, resolvePlayerLane } from "./lane.js";
 
 export const LANE_FILTER_OPTIONS = [
   { value: "", label: "All lanes" },
@@ -10,14 +10,15 @@ export const LANE_FILTER_OPTIONS = [
   { value: "0", label: "Unknown" },
 ];
 
-/** OpenDota lane_role (farm priority / position). */
+/** OpenDota lane_role + support heuristic (see resolveOpenDotaLaneRole / isSupportPlayer). */
 export const LANE_ROLE_FILTER_OPTIONS = [
   { value: "", label: "All roles" },
-  { value: "1", label: "Safe Core" },
-  { value: "2", label: "Mid" },
+  { value: "1", label: "Safe Lane" },
+  { value: "2", label: "Mid Lane" },
   { value: "3", label: "Off Lane" },
   { value: "4", label: "Jungle" },
-  { value: "5", label: "Support" },
+  { value: "5", label: "Roaming" },
+  { value: "support", label: "Support" },
 ];
 
 export function populateLaneFilterSelects() {
@@ -62,6 +63,7 @@ export function hasActiveLaneFilters(filters) {
 }
 
 function roleLabel(role) {
+  if (role === "support") return "Support";
   const opt = LANE_ROLE_FILTER_OPTIONS.find((o) => o.value === String(role));
   return opt?.label ?? `Role ${role}`;
 }
@@ -77,6 +79,12 @@ export function formatLaneFilterSummary(filters) {
   return parts.join(" · ");
 }
 
+function matchRoleFilter(player, roleValue) {
+  if (!roleValue) return true;
+  if (roleValue === "support") return isSupportPlayer(player);
+  return String(resolveOpenDotaLaneRole(player)) === String(roleValue);
+}
+
 export function matchMyLaneFilter(player, filters) {
   if (!filters?.myLane && !filters?.myRole) return true;
 
@@ -85,9 +93,8 @@ export function matchMyLaneFilter(player, filters) {
     if (String(lane) !== String(filters.myLane)) return false;
   }
 
-  if (filters.myRole) {
-    const role = player?.lane_role;
-    if (role == null || String(role) !== String(filters.myRole)) return false;
+  if (filters.myRole && !matchRoleFilter(player, filters.myRole)) {
+    return false;
   }
 
   return true;
@@ -101,9 +108,8 @@ export function matchEnemyLaneFilter(player, filters) {
     if (String(lane) !== String(filters.enemyLane)) return false;
   }
 
-  if (filters.enemyRole) {
-    const role = player?.lane_role;
-    if (role == null || String(role) !== String(filters.enemyRole)) return false;
+  if (filters.enemyRole && !matchRoleFilter(player, filters.enemyRole)) {
+    return false;
   }
 
   return true;

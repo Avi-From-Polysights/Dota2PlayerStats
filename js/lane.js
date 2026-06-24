@@ -20,6 +20,40 @@ export function laneLabel(lane) {
 }
 
 /**
+ * OpenDota lane_role / lane assignment used for position filters.
+ * lane_role 1–4 = Safe/Mid/Off/Jungle; 5 = Roaming (not Dota pos 5 support).
+ */
+export function resolveOpenDotaLaneRole(player) {
+  const lane = player?.lane;
+  if (lane === 4) return 4;
+
+  const laneRole = player?.lane_role;
+  if (typeof laneRole === "number" && laneRole >= 1 && laneRole <= 5) {
+    return laneRole;
+  }
+
+  if (typeof lane === "number" && lane >= 1 && lane <= 3) {
+    return lane;
+  }
+
+  if (player?.is_roaming) return 5;
+  return 0;
+}
+
+/** OpenDota web-style support heuristic (parsed replays). */
+export function isSupportPlayer(player) {
+  const lhSeries = player?.lh_t;
+  if (!Array.isArray(lhSeries) || lhSeries.length === 0) return false;
+
+  const idx = Math.min(LANE_GOLD_MINUTE, lhSeries.length - 1);
+  const lh10 = lhSeries[idx];
+  if (typeof lh10 !== "number") return false;
+
+  const wards = (player.obs_placed ?? 0) + (player.sen_placed ?? 0);
+  return lh10 < 20 && wards > 2;
+}
+
+/**
  * Lane assignment from OpenDota match player object.
  * Primary `lane` and lane win % (`gold_t`) only exist on parsed replays.
  * Falls back to `lane_role` for position grouping when lane is missing.

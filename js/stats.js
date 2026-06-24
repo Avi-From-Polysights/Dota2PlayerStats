@@ -21,6 +21,8 @@ function emptyMatchup() {
     games: 0,
     wins: 0,
     losses: 0,
+    laneWon: 0,
+    laneLost: 0,
     totalDurationMin: 0,
     totalKills: 0,
     totalDeaths: 0,
@@ -172,6 +174,8 @@ export function analyzeMatches(
       bucket.totalDeaths += deaths;
       if (win) bucket.wins += 1;
       else bucket.losses += 1;
+      if (laneOutcome === "won") bucket.laneWon += 1;
+      else if (laneOutcome === "lost") bucket.laneLost += 1;
 
       matchups.set(enemyName, bucket);
     }
@@ -183,12 +187,16 @@ export function analyzeMatches(
     .map(([hero, s]) => {
       const ci = wilsonInterval(s.wins, s.games, confidence);
       const winrate = s.games ? (s.wins / s.games) * 100 : 0;
+      const laneDecided = s.laneWon + s.laneLost;
+      const laneWinrate = laneDecided ? (s.laneWon / laneDecided) * 100 : null;
       return {
         hero,
         games: s.games,
         wins: s.wins,
         losses: s.losses,
         winrate,
+        laneWinrate,
+        laneDecided,
         wilsonCenter: ci.center,
         wilsonLower: ci.lower,
         wilsonUpper: ci.upper,

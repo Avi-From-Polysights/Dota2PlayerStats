@@ -98,6 +98,92 @@ let sortState = { key: "games", dir: "desc" };
 let abortController = null;
 let progressContext = { pct: 0, task: "" };
 let analyzeMultiLog = null;
+let cachedAnalysisSession = null;
+
+function renderAnalysisResults(analysis, meta) {
+  const {
+    heroName,
+    rollingWindow,
+    selectedPatchLabel,
+    loadStats,
+    laneFilters,
+  } = meta;
+
+  const rolling = rollingWinRate(analysis.timeline, rollingWindow);
+  const laneVsGameRolling = rollingLaneVsGame(analysis.timeline, rollingWindow);
+  const trend = trendDirection(rolling);
+
+  renderSummary(analysis, heroName, trend, rollingWindow, selectedPatchLabel, loadStats, laneFilters);
+  renderParseStatusPanel(loadStats, meta.requestParse);
+  renderMatchupFilterNote(laneFilters);
+  renderLaneVsGameStats(analysis);
+  renderLaneVsGameChart(
+    document.getElementById("lane-vs-game-chart"),
+    laneVsGameRolling,
+    analysis.overallLaneWinrate,
+    analysis.overallWinrate
+  );
+  renderWinrateChart(
+    document.getElementById("winrate-chart"),
+    rolling,
+    analysis.overallWinrate
+  );
+  renderLaneChart(document.getElementById("lane-chart"), analysis.laneRows);
+  renderLaneTable(analysis.laneRows);
+  renderLaneDataNote(analysis, loadStats);
+
+  const showPatchBreakdown = analysis.patchRows.length > 0;
+  patchBreakdown.classList.toggle("hidden", !showPatchBreakdown);
+  if (showPatchBreakdown) {
+    renderPatchTable(analysis.patchRows);
+  }
+
+  sortState = { key: "games", dir: "desc" };
+  updateSortHeaders();
+  renderMatchupTable(analysis.matchupRows);
+
+  resultsEl.classList.remove("hidden");
+  resultsEl.querySelectorAll(".motion-rise, .motion-stagger > *").forEach((el) => {
+    el.style.animation = "none";
+    void el.offsetHeight;
+    el.style.animation = "";
+  });
+  exportBtn.disabled = false;
+}
+
+function refilterCachedAnalysis() {
+  if (!cachedAnalysisSession) return;
+
+  const laneFilters = readLaneFiltersFromDom();
+  syncUrlFromForm();
+
+  const analysis = analyzeMatches(
+    cachedAnalysisSession.detailsList,
+    cachedAnalysisSession.accountId,
+    cachedAnalysisSession.heroMap,
+    cachedAnalysisSession.confidence,
+    {
+      turboSkippedList: cachedAnalysisSession.turboSkippedList,
+      laneFilters,
+    }
+  );
+
+  renderAnalysisResults(analysis, { ...cachedAnalysisSession, laneFilters });
+
+  const summary = formatLaneFilterSummary(laneFilters);
+  analyzeMultiLog?.info(summary ? `Filters updated — ${summary}` : "Filters cleared — showing all games");
+}
+
+function initLaneFilterListeners() {
+  for (const id of [
+    "my-lane-filter",
+    "my-role-filter",
+    "enemy-lane-filter",
+    "enemy-role-filter",
+  ]) {
+    document.getElementById(id)?.addEventListener("change", refilterCachedAnalysis);
+  }
+}
 
 function showError(message) {
   errorBanner.textContent = message;
@@ -214,7 +300,7 @@ function renderMatchupFilterNote(laneFilters) {
     el.classList.add("hidden");
     return;
   }
-  el.textContent = `Matchups filtered: ${formatLaneFilterSummary(laneFilters)}. Enemy lane/role filters only affect the table below.`;
+  el.textContent = `Matchups filtered: ${formatLaneFilterSummary(laneFilters)}. Enemy lane/role filters only affect the table below. Change filters anytime after analysis — no re-fetch needed.`;
   el.classList.remove("hidden");
 }
 
@@ -235,6 +321,7 @@ function renderMatchupTable(rows) {
         <td>${row.wins}</td>
         <td>${row.losses}</td>
         <td class="winrate-cell ${winrateClass(row.winrate)}">${formatPct(row.winrate)}</td>
+        <td class="winrate-cell ${row.laneWinrate != null ? winrateClass(row.laneWinrate) : ""}">${row.laneWinrate != null ? formatPct(row.laneWinrate) : "—"}</td>
         <td>${formatPct(row.wilsonLower)}</td>
         <td>${formatPct(row.wilsonUpper)}</td>
         <td>${row.avgDuration.toFixed(1)} min</td>
@@ -253,6 +340,9 @@ function sortRows(rows, key, dir) {
   sorted.sort((a, b) => {
     const av = a[key];
     const bv = b[key];
+    if (av == null && bv == null) return 0;
+    if (av == null) return 1;
+    if (bv == null) return -1;
     if (typeof av === "string") return factor * av.localeCompare(bv);
     return factor * (av - bv);
   });
@@ -439,6 +529,7 @@ function exportCsv(rows) {
     "wins",
     "losses",
     "winrate",
+    "lane_winrate",
     "wilson_lower",
     "wilson_upper",
     "avg_duration_min",
@@ -455,6 +546,7 @@ function exportCsv(rows) {
         r.wins,
         r.losses,
         r.winrate.toFixed(2),
+        r.laneWinrate != null ? r.laneWinrate.toFixed(2) : "",
         r.wilsonLower.toFixed(2),
         r.wilsonUpper.toFixed(2),
         r.avgDuration.toFixed(2),
@@ -561,6 +653,7 @@ form.addEventListener("submit", async (event) => {
 
   const heroName = heroSearch.value.trim();
   syncUrlFromForm();
+  cachedAnalysisSession = null;
   fetchBtn.disabled = true;
   exportBtn.disabled = true;
   resultsEl.classList.add("hidden");
@@ -680,53 +773,29 @@ form.addEventListener("submit", async (event) => {
       );
     }
 
+    cachedAnalysisSession = {
+      detailsList,
+      accountId,
+      heroMap,
+      confidence,
+      turboSkippedList: turboSkipped,
+      heroName,
+      rollingWindow,
+      selectedPatchLabel,
+      loadStats,
+      requestParse,
+    };
+
     const analysis = analyzeMatches(detailsList, accountId, heroMap, confidence, {
       turboSkippedList: turboSkipped,
       laneFilters,
     });
-    const rolling = rollingWinRate(analysis.timeline, rollingWindow);
-    const laneVsGameRolling = rollingLaneVsGame(analysis.timeline, rollingWindow);
-    const trend = trendDirection(rolling);
 
-    renderSummary(analysis, heroName, trend, rollingWindow, selectedPatchLabel, loadStats, laneFilters);
-    renderParseStatusPanel(loadStats, requestParse);
-    renderMatchupFilterNote(laneFilters);
-    renderLaneVsGameStats(analysis);
-    renderLaneVsGameChart(
-      document.getElementById("lane-vs-game-chart"),
-      laneVsGameRolling,
-      analysis.overallLaneWinrate,
-      analysis.overallWinrate
-    );
-    renderWinrateChart(
-      document.getElementById("winrate-chart"),
-      rolling,
-      analysis.overallWinrate
-    );
-    renderLaneChart(document.getElementById("lane-chart"), analysis.laneRows);
-    renderLaneTable(analysis.laneRows);
-    renderLaneDataNote(analysis, loadStats);
+    renderAnalysisResults(analysis, { ...cachedAnalysisSession, laneFilters });
 
-    const showPatchBreakdown = analysis.patchRows.length > 0;
-    patchBreakdown.classList.toggle("hidden", !showPatchBreakdown);
-    if (showPatchBreakdown) {
-      renderPatchTable(analysis.patchRows);
-    }
-
-    sortState = { key: "games", dir: "desc" };
-    updateSortHeaders();
-    renderMatchupTable(analysis.matchupRows);
-
-    resultsEl.classList.remove("hidden");
-    resultsEl.querySelectorAll(".motion-rise, .motion-stagger > *").forEach((el) => {
-      el.style.animation = "none";
-      void el.offsetHeight;
-      el.style.animation = "";
-    });
     analyzeMultiLog?.info(
       `Analysis complete — ${analysis.totalGames} games, ${loadStats.cacheHits} cache hits, ${loadStats.fetched} API fetches`
     );
-    exportBtn.disabled = false;
     setProgress(false);
   } catch (error) {
     if (error.name !== "AbortError") {
@@ -745,6 +814,7 @@ async function init() {
   initMainTabs();
   initConfigUi();
   populateLaneFilterSelects();
+  initLaneFilterListeners();
   analyzeMultiLog = initMultiActivityLog("activity-log-panel");
   initTools({
     getAnalyzeAbortSignal: () =>
