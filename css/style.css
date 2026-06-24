@@ -1291,6 +1291,13 @@ input[type="checkbox"] {
   border-top: 1px solid var(--border);
 }
 
+.lane-filter-block--matchup {
+  margin-top: 0;
+  margin-bottom: 0.875rem;
+  padding-top: 0;
+  border-top: none;
+}
+
 .lane-filter-block__label {
   margin: 0;
   font-family: var(--font-display);

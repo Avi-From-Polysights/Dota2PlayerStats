@@ -132,35 +132,6 @@
                   </div>
                 </label>
               </div>
-
-              <div class="lane-filter-block">
-                <p class="lane-filter-block__label">Lane &amp; role filters</p>
-                <p class="lane-filter-block__hint">Filter by where you played and where enemies were (e.g. mid vs mid, off vs safe support). Requires parsed replays for lane data. After analysis, change filters here — results update instantly without re-fetching.</p>
-                <div class="lane-filter-grid">
-                  <fieldset class="lane-filter-group">
-                    <legend class="lane-filter-group__legend">Your position</legend>
-                    <label class="field">
-                      <span class="field__label">Your lane</span>
-                      <select id="my-lane-filter" name="myLane"></select>
-                    </label>
-                    <label class="field">
-                      <span class="field__label">Your role</span>
-                      <select id="my-role-filter" name="myRole"></select>
-                    </label>
-                  </fieldset>
-                  <fieldset class="lane-filter-group">
-                    <legend class="lane-filter-group__legend">Enemy in matchups</legend>
-                    <label class="field">
-                      <span class="field__label">Enemy lane</span>
-                      <select id="enemy-lane-filter" name="enemyLane"></select>
-                    </label>
-                    <label class="field">
-                      <span class="field__label">Enemy role</span>
-                      <select id="enemy-role-filter" name="enemyRole"></select>
-                    </label>
-                  </fieldset>
-                </div>
-              </div>
             </div>
           </details>
           <details class="config-section">
@@ -365,7 +336,35 @@
         <article class="card motion-rise">
           <div class="section-head">
             <h2 class="section-title">Enemy hero matchups</h2>
-            <p class="section-desc">Sorted by games played. Wilson CI shows statistically plausible win-rate range.</p>
+            <p class="section-desc">Sorted by games played. Wilson CI shows statistically plausible win-rate range. Lane win % is vs that hero in lane only (parsed replays).</p>
+          </div>
+          <div class="lane-filter-block lane-filter-block--matchup">
+            <p class="lane-filter-block__label">Lane &amp; position filters</p>
+            <p class="lane-filter-block__hint">Adjust filters here — results update instantly after analysis. Positions use Dota roles 1–5 (inferred from lane + LH@10). Enable OpenDota parse for lane data.</p>
+            <div class="lane-filter-grid">
+              <fieldset class="lane-filter-group">
+                <legend class="lane-filter-group__legend">Your position</legend>
+                <label class="field">
+                  <span class="field__label">Your lane</span>
+                  <select id="my-lane-filter" name="myLane"></select>
+                </label>
+                <label class="field">
+                  <span class="field__label">Your position</span>
+                  <select id="my-role-filter" name="myRole"></select>
+                </label>
+              </fieldset>
+              <fieldset class="lane-filter-group">
+                <legend class="lane-filter-group__legend">Enemy in matchups</legend>
+                <label class="field">
+                  <span class="field__label">Enemy lane</span>
+                  <select id="enemy-lane-filter" name="enemyLane"></select>
+                </label>
+                <label class="field">
+                  <span class="field__label">Enemy position</span>
+                  <select id="enemy-role-filter" name="enemyRole"></select>
+                </label>
+              </fieldset>
+            </div>
           </div>
           <p id="matchup-filter-note" class="matchup-filter-note hidden" role="status"></p>
           <div class="table-wrap">
@@ -377,6 +376,7 @@
                   <th data-sort="wins">Wins</th>
                   <th data-sort="losses">Losses</th>
                   <th data-sort="winrate">Win %</th>
+                  <th data-sort="laneGames">Lane games</th>
                   <th data-sort="laneWinrate">Lane win %</th>
                   <th data-sort="wilsonLower">Wilson low</th>
                   <th data-sort="wilsonUpper">Wilson high</th>

@@ -321,6 +321,7 @@ function renderMatchupTable(rows) {
         <td>${row.wins}</td>
         <td>${row.losses}</td>
         <td class="winrate-cell ${winrateClass(row.winrate)}">${formatPct(row.winrate)}</td>
+        <td>${row.laneGames ?? 0}</td>
         <td class="winrate-cell ${row.laneWinrate != null ? winrateClass(row.laneWinrate) : ""}">${row.laneWinrate != null ? formatPct(row.laneWinrate) : "—"}</td>
         <td>${formatPct(row.wilsonLower)}</td>
         <td>${formatPct(row.wilsonUpper)}</td>
@@ -529,6 +530,7 @@ function exportCsv(rows) {
     "wins",
     "losses",
     "winrate",
+    "lane_games",
     "lane_winrate",
     "wilson_lower",
     "wilson_upper",
@@ -546,6 +548,7 @@ function exportCsv(rows) {
         r.wins,
         r.losses,
         r.winrate.toFixed(2),
+        r.laneGames ?? 0,
         r.laneWinrate != null ? r.laneWinrate.toFixed(2) : "",
         r.wilsonLower.toFixed(2),
         r.wilsonUpper.toFixed(2),

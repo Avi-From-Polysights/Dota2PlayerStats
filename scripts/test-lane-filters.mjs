@@ -1,14 +1,25 @@
-import { resolveOpenDotaLaneRole, isSupportPlayer } from "../js/lane.js";
+import {
+  resolveDotaPosition,
+  isSupportPlayer,
+  lastHitsAt10,
+  computeLaneOutcomeVsOpponent,
+  isLaneOpponent,
+  goldAtMinute,
+} from "../js/lane.js";
 import { matchMyLaneFilter, matchEnemyLaneFilter } from "../js/lane-filters.js";
 
-const jungle = { lane: 4, lane_role: 1 };
-const support = {
-  lane: 1,
-  lane_role: 1,
-  lh_t: Array(11).fill(5),
-  obs_placed: 3,
-  sen_placed: 1,
-};
+function player(slot, lane, lh10, wards = 0, extra = {}) {
+  return {
+    player_slot: slot,
+    lane,
+    lh_t: lh10 != null ? Array(11).fill(lh10) : undefined,
+    lane_last_hits: lh10,
+    obs_placed: wards,
+    sen_placed: 0,
+    lane_total_gold: extra.gold,
+    ...extra,
+  };
+}
 
 let ok = true;
 const assert = (label, cond) => {
@@ -20,18 +31,43 @@ const assert = (label, cond) => {
   }
 };
 
-assert("jungle role via lane", resolveOpenDotaLaneRole(jungle) === 4);
-assert("support heuristic", isSupportPlayer(support));
-assert("role jungle filter", matchMyLaneFilter(jungle, { myRole: "4" }));
-assert("role support filter", matchMyLaneFilter(support, { myRole: "support" }));
-assert(
-  "role support rejects core",
-  !matchMyLaneFilter(
-    { lane: 1, lane_role: 1, lh_t: Array(11).fill(50), obs_placed: 0 },
-    { myRole: "support" }
-  )
-);
-assert("enemy support", matchEnemyLaneFilter(support, { enemyRole: "support" }));
+// Positions
+const teamRadiant = [
+  player(0, 1, 80), // pos 1 safe carry
+  player(1, 2, 70), // pos 2 mid
+  player(2, 3, 65), // pos 3 off
+  player(3, 3, 8, 4), // pos 4 soft sup off
+  player(4, 1, 4, 5), // pos 5 hard sup safe
+];
+const teamDire = [
+  player(128, 1, 75),
+  player(129, 2, 68),
+  player(130, 3, 60),
+  player(131, 3, 10, 3),
+  player(132, 1, 3, 6),
+];
+const all = [...teamRadiant, ...teamDire];
+
+assert("pos 1", resolveDotaPosition(teamRadiant[0], all) === 1);
+assert("pos 2", resolveDotaPosition(teamRadiant[1], all) === 2);
+assert("pos 3", resolveDotaPosition(teamRadiant[2], all) === 3);
+assert("pos 4", resolveDotaPosition(teamRadiant[3], all) === 4);
+assert("pos 5", resolveDotaPosition(teamRadiant[4], all) === 5);
+
+assert("pos 4 filter", matchMyLaneFilter(teamRadiant[3], { myRole: "4" }, all));
+assert("pos 5 filter", matchMyLaneFilter(teamRadiant[4], { myRole: "5" }, all));
+assert("pos 4 rejects pos 5", !matchMyLaneFilter(teamRadiant[4], { myRole: "4" }, all));
+
+// Per-hero lane outcome
+const me = player(1, 2, 70, 0, { gold: 5200 });
+const enemyMid = player(129, 2, 50, 0, { gold: 4100 });
+const enemyOff = player(130, 3, 60, 0, { gold: 4500 });
+const players = [me, enemyMid, enemyOff];
+
+assert("mid is lane opponent", isLaneOpponent(me, enemyMid, players));
+assert("off is not lane opponent", !isLaneOpponent(me, enemyOff, players));
+assert("won lane vs mid", computeLaneOutcomeVsOpponent(me, enemyMid, players) === "won");
+assert("null vs off", computeLaneOutcomeVsOpponent(me, enemyOff, players) === null);
 
 if (!ok) process.exit(1);
 console.log("All tests passed");

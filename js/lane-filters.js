@@ -1,4 +1,9 @@
-import { isSupportPlayer, laneLabel, resolveOpenDotaLaneRole, resolvePlayerLane } from "./lane.js";
+import {
+  dotaPositionLabel,
+  laneLabel,
+  resolveDotaPosition,
+  resolvePlayerLane,
+} from "./lane.js";
 
 export const LANE_FILTER_OPTIONS = [
   { value: "", label: "All lanes" },
@@ -10,16 +15,21 @@ export const LANE_FILTER_OPTIONS = [
   { value: "0", label: "Unknown" },
 ];
 
-/** OpenDota lane_role + support heuristic (see resolveOpenDotaLaneRole / isSupportPlayer). */
+/** Dota positions 1–5 (inferred from parsed lane + LH@10 / wards). */
 export const LANE_ROLE_FILTER_OPTIONS = [
-  { value: "", label: "All roles" },
-  { value: "1", label: "Safe Lane" },
-  { value: "2", label: "Mid Lane" },
-  { value: "3", label: "Off Lane" },
-  { value: "4", label: "Jungle" },
-  { value: "5", label: "Roaming" },
-  { value: "support", label: "Support" },
+  { value: "", label: "All positions" },
+  { value: "1", label: "Pos 1 — Hard Carry" },
+  { value: "2", label: "Pos 2 — Mid" },
+  { value: "3", label: "Pos 3 — Off Lane" },
+  { value: "4", label: "Pos 4 — Soft Support" },
+  { value: "5", label: "Pos 5 — Hard Support" },
 ];
+
+/** Legacy share URL values mapped to Dota positions. */
+const LEGACY_ROLE_MAP = {
+  support: "5",
+  roaming: "4",
+};
 
 export function populateLaneFilterSelects() {
   const map = {
@@ -48,14 +58,19 @@ export function readLaneFiltersFromDom() {
 }
 
 export function applyLaneFiltersToDom(filters) {
+  const normalizeRole = (value) => {
+    if (value == null || value === "") return "";
+    return LEGACY_ROLE_MAP[value] ?? String(value);
+  };
+
   const set = (id, value) => {
     const el = document.getElementById(id);
     if (el && value != null) el.value = String(value);
   };
   set("my-lane-filter", filters.myLane ?? "");
-  set("my-role-filter", filters.myRole ?? "");
+  set("my-role-filter", normalizeRole(filters.myRole));
   set("enemy-lane-filter", filters.enemyLane ?? "");
-  set("enemy-role-filter", filters.enemyRole ?? "");
+  set("enemy-role-filter", normalizeRole(filters.enemyRole));
 }
 
 export function hasActiveLaneFilters(filters) {
@@ -63,9 +78,10 @@ export function hasActiveLaneFilters(filters) {
 }
 
 function roleLabel(role) {
-  if (role === "support") return "Support";
+  if (!role) return "";
   const opt = LANE_ROLE_FILTER_OPTIONS.find((o) => o.value === String(role));
-  return opt?.label ?? `Role ${role}`;
+  if (opt) return opt.label;
+  return dotaPositionLabel(Number(role));
 }
 
 export function formatLaneFilterSummary(filters) {
@@ -73,19 +89,23 @@ export function formatLaneFilterSummary(filters) {
 
   const parts = [];
   if (filters.myLane) parts.push(`you: ${laneLabel(Number(filters.myLane))}`);
-  if (filters.myRole) parts.push(`your role: ${roleLabel(filters.myRole)}`);
+  if (filters.myRole) parts.push(`your position: ${roleLabel(filters.myRole)}`);
   if (filters.enemyLane) parts.push(`enemy lane: ${laneLabel(Number(filters.enemyLane))}`);
-  if (filters.enemyRole) parts.push(`enemy role: ${roleLabel(filters.enemyRole)}`);
+  if (filters.enemyRole) parts.push(`enemy position: ${roleLabel(filters.enemyRole)}`);
   return parts.join(" · ");
 }
 
-function matchRoleFilter(player, roleValue) {
+function matchRoleFilter(player, roleValue, allPlayers) {
   if (!roleValue) return true;
-  if (roleValue === "support") return isSupportPlayer(player);
-  return String(resolveOpenDotaLaneRole(player)) === String(roleValue);
+
+  const normalized = LEGACY_ROLE_MAP[roleValue] ?? String(roleValue);
+  const position = resolveDotaPosition(player, allPlayers);
+  if (position === 0) return false;
+
+  return String(position) === normalized;
 }
 
-export function matchMyLaneFilter(player, filters) {
+export function matchMyLaneFilter(player, filters, allPlayers = []) {
   if (!filters?.myLane && !filters?.myRole) return true;
 
   if (filters.myLane) {
@@ -93,14 +113,14 @@ export function matchMyLaneFilter(player, filters) {
     if (String(lane) !== String(filters.myLane)) return false;
   }
 
-  if (filters.myRole && !matchRoleFilter(player, filters.myRole)) {
+  if (filters.myRole && !matchRoleFilter(player, filters.myRole, allPlayers)) {
     return false;
   }
 
   return true;
 }
 
-export function matchEnemyLaneFilter(player, filters) {
+export function matchEnemyLaneFilter(player, filters, allPlayers = []) {
   if (!filters?.enemyLane && !filters?.enemyRole) return true;
 
   if (filters.enemyLane) {
@@ -108,7 +128,7 @@ export function matchEnemyLaneFilter(player, filters) {
     if (String(lane) !== String(filters.enemyLane)) return false;
   }
 
-  if (filters.enemyRole && !matchRoleFilter(player, filters.enemyRole)) {
+  if (filters.enemyRole && !matchRoleFilter(player, filters.enemyRole, allPlayers)) {
     return false;
   }
 

@@ -1,6 +1,6 @@
 import { wilsonInterval } from "./wilson.js";
 import { didPlayerWin, isRadiant } from "./api.js";
-import { computeLaneOutcome, laneLabel, resolvePlayerLane } from "./lane.js";
+import { computeLaneOutcome, computeLaneOutcomeVsOpponent, laneLabel, resolvePlayerLane } from "./lane.js";
 import { matchEnemyLaneFilter, matchMyLaneFilter } from "./lane-filters.js";
 import { GAMEMODE_TURBO } from "./game-modes.js";
 
@@ -23,6 +23,7 @@ function emptyMatchup() {
     losses: 0,
     laneWon: 0,
     laneLost: 0,
+    laneGames: 0,
     totalDurationMin: 0,
     totalKills: 0,
     totalDeaths: 0,
@@ -102,7 +103,7 @@ export function analyzeMatches(
       continue;
     }
 
-    if (filterMyPosition && !matchMyLaneFilter(me, laneFilters)) {
+    if (filterMyPosition && !matchMyLaneFilter(me, laneFilters, players)) {
       skipped += 1;
       laneFilterSkipped += 1;
       continue;
@@ -162,11 +163,12 @@ export function analyzeMatches(
 
     for (const p of players) {
       if (isRadiant(p.player_slot) === mySideRadiant) continue;
-      if (filterEnemyPosition && !matchEnemyLaneFilter(p, laneFilters)) continue;
+      if (filterEnemyPosition && !matchEnemyLaneFilter(p, laneFilters, players)) continue;
 
       const enemyId = p.hero_id;
       const enemyName = heroNames.get(enemyId) ?? `hero_${enemyId}`;
       const bucket = matchups.get(enemyName) ?? emptyMatchup();
+      const heroLaneOutcome = computeLaneOutcomeVsOpponent(me, p, players);
 
       bucket.games += 1;
       bucket.totalDurationMin += durationMin;
@@ -174,8 +176,10 @@ export function analyzeMatches(
       bucket.totalDeaths += deaths;
       if (win) bucket.wins += 1;
       else bucket.losses += 1;
-      if (laneOutcome === "won") bucket.laneWon += 1;
-      else if (laneOutcome === "lost") bucket.laneLost += 1;
+
+      if (heroLaneOutcome === "won") bucket.laneWon += 1;
+      else if (heroLaneOutcome === "lost") bucket.laneLost += 1;
+      if (heroLaneOutcome) bucket.laneGames += 1;
 
       matchups.set(enemyName, bucket);
     }
@@ -197,6 +201,7 @@ export function analyzeMatches(
         winrate,
         laneWinrate,
         laneDecided,
+        laneGames: s.laneGames,
         wilsonCenter: ci.center,
         wilsonLower: ci.lower,
         wilsonUpper: ci.upper,
