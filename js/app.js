@@ -4,10 +4,13 @@ import {
   loadPlayerMatchesFiltered,
 } from "./api.js";
 import {
+  buildMatchListCacheKey,
   clearMatchCache,
-  getCachedMatch,
+  getCachedMatchList,
+  getCachedMatches,
   getMatchCacheCount,
   setCachedMatch,
+  setCachedMatchList,
 } from "./match-cache.js";
 import {
   initSavedAccounts,
@@ -99,25 +102,32 @@ async function resolveMatchDetails(
     total,
     setProgressText,
     onRateLimitWait,
+    cachedDetails = null,
+    hasCachedEntry = false,
   }
 ) {
-  let details = await getCachedMatch(matchId);
-  if (details) {
+  let details = hasCachedEntry ? cachedDetails : null;
+  let usedNetwork = false;
+
+  if (hasCachedEntry) {
     loadStats.cacheHits += 1;
   } else {
     details = await loadMatchDetails(matchId, signal, { onRateLimitWait });
     loadStats.fetched += 1;
+    usedNetwork = true;
   }
 
-  const alreadyParsed = isMatchParsedForPlayer(details, accountId);
+  const alreadyParsed = details && isMatchParsedForPlayer(details, accountId);
   const shouldParse =
     requestParse &&
+    details &&
     !alreadyParsed &&
     (parseBudget.remaining === Infinity || parseBudget.remaining > 0);
 
   if (shouldParse) {
     loadStats.parseQueued += 1;
     if (parseBudget.remaining !== Infinity) parseBudget.remaining -= 1;
+    usedNetwork = true;
 
     setProgressText(
       `Parsing match ${matchIndex + 1} of ${total} (ID ${matchId}) — OpenDota queue…`
@@ -147,17 +157,22 @@ async function resolveMatchDetails(
       loadStats.parseFailed += 1;
       if (error?.rateLimited) loadStats.rateLimited += 1;
     }
-  } else if (!alreadyParsed) {
+  } else if (details && !alreadyParsed) {
     loadStats.unparsed += 1;
   }
 
-  await setCachedMatch(matchId, details);
-  return details;
+  if (details) {
+    await setCachedMatch(matchId, details);
+  }
+
+  return { details, usedNetwork };
 }
 
 function formatLoadStats(loadStats) {
   const parts = [];
+  if (loadStats.matchListFromCache) parts.push("match list from cache");
   if (loadStats.cacheHits) parts.push(`${loadStats.cacheHits} from cache`);
+  if (loadStats.fetched) parts.push(`${loadStats.fetched} from OpenDota`);
   if (loadStats.newlyParsed) parts.push(`${loadStats.newlyParsed} newly parsed`);
   if (loadStats.parseFailed) parts.push(`${loadStats.parseFailed} parse failed`);
   if (loadStats.throttlePauses) {
@@ -572,17 +587,41 @@ form.addEventListener("submit", async (event) => {
       rateLimited: 0,
       throttlePauses: 0,
       unparsed: 0,
+      matchListFromCache: false,
     };
     const onRateLimitWait = createRateLimitWaitHandler(loadStats);
 
-    const { matches: matchList, turboSkipped } = await loadPlayerMatchesFiltered(
+    const matchListKey = buildMatchListCacheKey({
       accountId,
       heroId,
       limit,
       significant,
       patchId,
-      { excludeTurbo, signal, onRateLimitWait }
-    );
+      excludeTurbo,
+    });
+
+    let matchList;
+    let turboSkipped;
+    const cachedList = await getCachedMatchList(matchListKey);
+
+    if (cachedList) {
+      matchList = cachedList.matches;
+      turboSkipped = cachedList.turboSkipped;
+      loadStats.matchListFromCache = true;
+      setProgress(true, 2, `Match list loaded from cache (${matchList.length} games)…`);
+    } else {
+      const result = await loadPlayerMatchesFiltered(
+        accountId,
+        heroId,
+        limit,
+        significant,
+        patchId,
+        { excludeTurbo, signal, onRateLimitWait }
+      );
+      matchList = result.matches;
+      turboSkipped = result.turboSkipped;
+      await setCachedMatchList(matchListKey, { matches: matchList, turboSkipped });
+    }
 
     if (!matchList.length) {
       const patchMsg = selectedPatchLabel ? ` on ${selectedPatchLabel}` : "";
@@ -598,11 +637,24 @@ form.addEventListener("submit", async (event) => {
 
     const detailsList = [];
     const total = matchList.length;
+    const matchIds = matchList.map((m) => m.match_id);
+    const cachedDetailsMap = await getCachedMatches(matchIds);
+    const cachedCount = cachedDetailsMap.size;
+
+    if (cachedCount > 0) {
+      setProgress(
+        true,
+        4,
+        `${cachedCount}/${total} match details in local cache — skipping OpenDota for those…`
+      );
+    }
 
     for (let i = 0; i < total; i += 1) {
       if (signal.aborted) return;
 
       const matchId = matchList[i].match_id;
+      const numericId = Number(matchId);
+      const hasCachedEntry = cachedDetailsMap.has(numericId);
       const pct = ((i + 1) / total) * 100;
       progressContext = {
         pct,
@@ -611,11 +663,13 @@ form.addEventListener("submit", async (event) => {
       setProgress(
         true,
         pct,
-        `Loading match ${i + 1} of ${total} (ID ${matchId})…`
+        hasCachedEntry
+          ? `Using cache ${i + 1}/${total} (ID ${matchId})…`
+          : `Fetching from OpenDota ${i + 1}/${total} (ID ${matchId})…`
       );
 
       try {
-        let details = await resolveMatchDetails(matchId, accountId, {
+        const { details, usedNetwork } = await resolveMatchDetails(matchId, accountId, {
           signal,
           requestParse,
           parseBudget,
@@ -623,6 +677,8 @@ form.addEventListener("submit", async (event) => {
           matchIndex: i,
           total,
           onRateLimitWait,
+          cachedDetails: cachedDetailsMap.get(numericId) ?? null,
+          hasCachedEntry,
           setProgressText: (text) => {
             progressContext.task = `match ${i + 1}/${total} (ID ${matchId})`;
             setProgress(true, pct, text);
@@ -634,13 +690,13 @@ form.addEventListener("submit", async (event) => {
         } else {
           detailsList.push(details);
         }
+
+        if (usedNetwork && delayMs > 0 && i < total - 1) {
+          await sleep(requestParse ? Math.max(delayMs, 400) : delayMs);
+        }
       } catch (error) {
         if (error?.rateLimited) loadStats.rateLimited += 1;
         detailsList.push(null);
-      }
-
-      if (delayMs > 0 && i < total - 1) {
-        await sleep(requestParse ? Math.max(delayMs, 400) : delayMs);
       }
     }
 
