@@ -10,6 +10,11 @@ import { formatRateLimitWaitMessage } from "./rate-limit.js";
 import { setCachedMatch } from "./match-cache.js";
 import { runPool } from "./parallel-pool.js";
 import { effectiveConcurrency } from "./parse-concurrency.js";
+import {
+  isMatchEligibleForParse,
+  PARSE_MAX_AGE_DAYS,
+  parseAgeSkipMessage,
+} from "./parse-age.js";
 
 export function createLoadStats() {
   return {
@@ -22,6 +27,7 @@ export function createLoadStats() {
     parseIncomplete: 0,
     parseExcluded: 0,
     parseRetries: 0,
+    parseSkippedTooOld: 0,
     rateLimited: 0,
     throttlePauses: 0,
     unparsed: 0,
@@ -44,6 +50,9 @@ export function formatLoadStats(loadStats) {
     parts.push(`${loadStats.parseExcluded} excluded after max retries`);
   }
   if (loadStats.parseRetries) parts.push(`${loadStats.parseRetries} parse retry(s)`);
+  if (loadStats.parseSkippedTooOld) {
+    parts.push(`${loadStats.parseSkippedTooOld} skipped (>${PARSE_MAX_AGE_DAYS}d)`);
+  }
   if (loadStats.parseFailed) parts.push(`${loadStats.parseFailed} parse failed`);
   if (loadStats.throttlePauses) {
     parts.push(`${loadStats.throttlePauses} rate-limit pause(s)`);
@@ -132,6 +141,8 @@ export async function resolveMatchDetails(
     cachedDetails = null,
     hasCachedEntry = false,
     log,
+    parseIgnoreAgeLimit = false,
+    matchListItem = null,
   }
 ) {
   let details = hasCachedEntry ? cachedDetails : null;
@@ -152,13 +163,23 @@ export async function resolveMatchDetails(
   }
 
   const alreadyParsed = details && isMatchParsedForPlayer(details, accountId);
+  const ageSource = matchListItem ?? details;
+  const parseEligible = isMatchEligibleForParse(ageSource, {
+    ignoreAgeLimit: parseIgnoreAgeLimit,
+  });
+
   const shouldParse =
     requestParse &&
     details &&
     !alreadyParsed &&
+    parseEligible &&
     (parseBudget.remaining === Infinity || parseBudget.remaining > 0);
 
-  if (shouldParse) {
+  if (requestParse && details && !alreadyParsed && !parseEligible) {
+    loadStats.parseSkippedTooOld += 1;
+    loadStats.unparsed += 1;
+    log?.info(parseAgeSkipMessage(matchId, ageSource?.start_time ?? details?.start_time));
+  } else if (shouldParse) {
     loadStats.parseQueued += 1;
     if (parseBudget.remaining !== Infinity) parseBudget.remaining -= 1;
     usedNetwork = true;
@@ -304,6 +325,7 @@ export async function loadMatchDetailsBatch({
   loadStats,
   onProgress,
   patchId = null,
+  parseIgnoreAgeLimit = false,
 }) {
   const total = matchList.length;
   const slots = effectiveConcurrency(requestParse, concurrency, concurrency);
@@ -312,6 +334,16 @@ export async function loadMatchDetailsBatch({
   if (slots > 1) {
     multiLog?.info(
       `Parallel ${requestParse ? "parse" : "fetch"}: ${slots} lanes (OpenDota ~60 req/min shared across lanes)`
+    );
+  }
+
+  if (requestParse && !parseIgnoreAgeLimit) {
+    multiLog?.info(
+      `Parse age limit: replays older than ${PARSE_MAX_AGE_DAYS} days are skipped (use Full history parse in Tools to attempt anyway)`
+    );
+  } else if (requestParse && parseIgnoreAgeLimit) {
+    multiLog?.info(
+      `Full history parse — attempting all ages (OpenDota usually fails beyond ~${PARSE_MAX_AGE_DAYS} days)`
     );
   }
 
@@ -351,6 +383,8 @@ export async function loadMatchDetailsBatch({
           cachedDetails: cachedDetailsMap.get(numericId) ?? null,
           hasCachedEntry,
           log: laneLog,
+          parseIgnoreAgeLimit,
+          matchListItem: match,
         });
 
         completed += 1;

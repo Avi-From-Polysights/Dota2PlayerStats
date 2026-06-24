@@ -23,6 +23,7 @@ function emptyMatchup() {
     losses: 0,
     laneWon: 0,
     laneLost: 0,
+    laneDraw: 0,
     laneGames: 0,
     totalDurationMin: 0,
     totalKills: 0,
@@ -179,6 +180,7 @@ export function analyzeMatches(
 
       if (heroLaneOutcome === "won") bucket.laneWon += 1;
       else if (heroLaneOutcome === "lost") bucket.laneLost += 1;
+      else if (heroLaneOutcome === "draw") bucket.laneDraw += 1;
       if (heroLaneOutcome) bucket.laneGames += 1;
 
       matchups.set(enemyName, bucket);
@@ -199,6 +201,10 @@ export function analyzeMatches(
         wins: s.wins,
         losses: s.losses,
         winrate,
+        laneWon: s.laneWon,
+        laneLost: s.laneLost,
+        laneDraw: s.laneDraw,
+        laneRecord: `${s.laneWon}-${s.laneLost}-${s.laneDraw}`,
         laneWinrate,
         laneDecided,
         laneGames: s.laneGames,

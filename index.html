@@ -192,7 +192,7 @@
                   <span class="field__label">Request OpenDota parse</span>
                   <span class="info-tip">
                     <button type="button" class="info-tip__btn" aria-label="About Request OpenDota parse">i</button>
-                    <span class="info-tip__panel" role="tooltip">Queue replay parses for lane data. Parsed matches are cached locally.</span>
+                    <span class="info-tip__panel" role="tooltip">Queue replay parses for lane data. OpenDota usually cannot parse replays older than 31 days — those are skipped automatically. Parsed matches are cached locally.</span>
                   </span>
                 </div>
               </label>
@@ -377,6 +377,7 @@
                   <th data-sort="losses">Losses</th>
                   <th data-sort="winrate">Win %</th>
                   <th data-sort="laneGames">Lane games</th>
+                  <th data-sort="laneWon">Lane W-L-D</th>
                   <th data-sort="laneWinrate">Lane win %</th>
                   <th data-sort="wilsonLower">Wilson low</th>
                   <th data-sort="wilsonUpper">Wilson high</th>
@@ -405,7 +406,7 @@
               <span class="tool-accordion__badge">Overnight</span>
             </summary>
             <div class="tool-accordion__body">
-              <p class="tool-accordion__desc">Fetch match history across every hero and parse anything missing lane data.</p>
+              <p class="tool-accordion__desc">Fetch match history across every hero and parse unparsed replays from the last 31 days (OpenDota replay limit).</p>
 
               <form id="tool-parse-all-form" class="tool-card__form config-grid">
                 <label class="field field--with-hint">
@@ -460,6 +461,44 @@
                 </div>
                 <p id="tools-progress-text" class="progress__text">Starting…</p>
                 <details id="tools-activity-log-panel" class="activity-log-panel hidden" open>
+                  <summary class="activity-log-panel__summary">Activity log</summary>
+                  <div class="multi-log" data-multi-log-root></div>
+                </details>
+              </div>
+            </div>
+          </details>
+
+          <details class="tool-accordion">
+            <summary class="tool-accordion__summary">
+              <span class="tool-accordion__title">Full history parse</span>
+              <span class="tool-accordion__badge tool-accordion__badge--accent">Experimental</span>
+            </summary>
+            <div class="tool-accordion__body">
+              <p class="tool-accordion__desc">Attempt to parse your entire match history, including games older than 31 days. OpenDota typically cannot parse old replays, so most requests will fail — this is mainly for completeness if you want to try anyway.</p>
+
+              <form id="tool-full-history-form" class="tool-card__form config-grid">
+                <label class="field field--with-hint">
+                  <span class="field__label">Account ID</span>
+                  <input type="number" id="tool-full-history-account-id" required placeholder="427824243" min="1" />
+                </label>
+
+                <label class="field">
+                  <span class="field__label">Max matches to scan</span>
+                  <input type="number" id="tool-full-history-max-matches" value="2000" min="0" max="10000" />
+                </label>
+
+                <div class="form-actions">
+                  <button type="submit" id="tool-full-history-start" class="btn btn--primary">Start full history parse</button>
+                  <button type="button" id="tool-full-history-stop" class="btn btn--outline" disabled>Stop</button>
+                </div>
+              </form>
+
+              <div id="tools-full-history-progress" class="progress hidden" aria-live="polite">
+                <div class="progress__track">
+                  <div id="tools-full-history-progress-fill" class="progress__fill"></div>
+                </div>
+                <p id="tools-full-history-progress-text" class="progress__text">Starting…</p>
+                <details id="tools-full-history-log-panel" class="activity-log-panel hidden" open>
                   <summary class="activity-log-panel__summary">Activity log</summary>
                   <div class="multi-log" data-multi-log-root></div>
                 </details>
