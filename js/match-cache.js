@@ -4,6 +4,7 @@ import {
   MATCH_STORE,
   openDb,
 } from "./db.js";
+import { clearAllParseFailures } from "./parse-failures.js";
 
 export function buildMatchListCacheKey({
   accountId,
@@ -55,15 +56,27 @@ export async function getCachedMatch(matchId) {
   return map.get(Number(matchId)) ?? null;
 }
 
-export async function setCachedMatch(matchId, data) {
+export async function setCachedMatch(matchId, data, meta = {}) {
   const db = await openDb();
   return new Promise((resolve, reject) => {
     const tx = db.transaction(MATCH_STORE, "readwrite");
-    tx.objectStore(MATCH_STORE).put({
-      matchId: Number(matchId),
-      data,
-      savedAt: Date.now(),
-    });
+    const store = tx.objectStore(MATCH_STORE);
+    const id = Number(matchId);
+
+    const request = store.get(id);
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => {
+      const existing = request.result ?? {};
+      store.put({
+        matchId: id,
+        data,
+        savedAt: Date.now(),
+        parseStatus: meta.parseStatus ?? existing.parseStatus ?? null,
+        parseAccountId: meta.parseAccountId ?? existing.parseAccountId ?? null,
+        parseAttempts: meta.parseAttempts ?? existing.parseAttempts ?? 0,
+      });
+    };
+
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error);
   });
@@ -103,13 +116,14 @@ export async function setCachedMatchList(cacheKey, { matches, turboSkipped }) {
 
 export async function clearMatchCache() {
   const db = await openDb();
-  return new Promise((resolve, reject) => {
+  await new Promise((resolve, reject) => {
     const tx = db.transaction([MATCH_STORE, MATCH_LIST_STORE], "readwrite");
     tx.objectStore(MATCH_STORE).clear();
     tx.objectStore(MATCH_LIST_STORE).clear();
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error);
   });
+  await clearAllParseFailures();
 }
 
 export async function getMatchCacheCount() {

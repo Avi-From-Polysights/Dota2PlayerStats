@@ -3,6 +3,8 @@ import {
   loadParseJobStatus,
   requestMatchParse,
 } from "./api.js";
+import { setCachedMatch } from "./match-cache.js";
+import { PARSE_OUTCOME } from "./parse-failures.js";
 
 /** Lane stats need gold at minute 10 from a parsed replay. */
 export function isMatchParsedForPlayer(details, accountId) {
@@ -36,7 +38,7 @@ async function sleepWithProgress(ms, { signal, onTick, tickMs = 1000 } = {}) {
 
 /**
  * Queue an OpenDota parse and poll until lane data appears or timeout.
- * Waits before polling so we do not burn API quota while the replay is still processing.
+ * Returns the last match payload from OpenDota (game stats only on timeout — no lane gold_t).
  */
 export async function ensureMatchParsed(
   matchId,
@@ -55,99 +57,109 @@ export async function ensureMatchParsed(
 
   if (isMatchParsedForPlayer(details, accountId)) {
     onLog?.(`Match ${matchId} already has lane data`);
-    return details;
+    return { details, outcome: PARSE_OUTCOME.ALREADY };
   }
 
-  const parseResponse = await requestMatchParse(matchId, signal, { onRateLimitWait });
-  const jobId = parseResponse?.job?.jobId;
-  onLog?.(
-    jobId
-      ? `Parse queued for match ${matchId} (job ${jobId}) — OpenDota typically needs 30–90s`
-      : `Parse queued for match ${matchId} — OpenDota typically needs 30–90s`
-  );
+  try {
+    const parseResponse = await requestMatchParse(matchId, signal, { onRateLimitWait });
+    const jobId = parseResponse?.job?.jobId;
+    onLog?.(
+      jobId
+        ? `Parse queued for match ${matchId} (job ${jobId}) — OpenDota typically needs 30–90s`
+        : `Parse queued for match ${matchId} — OpenDota typically needs 30–90s`
+    );
 
-  await sleepWithProgress(PARSE_INITIAL_WAIT_MS, {
-    signal,
-    tickMs: 2000,
-    onTick: (elapsed) => {
-      const secs = Math.round(elapsed / 1000);
-      onPoll?.(details, {
-        phase: "initial-wait",
-        elapsedMs: elapsed,
-        initialWaitMs: PARSE_INITIAL_WAIT_MS,
-      });
-      if (secs % 6 === 0 && secs > 0) {
-        onLog?.(`Replay processing… ${secs}s before first status check`);
-      }
-    },
-  });
-
-  const deadline = Date.now() + PARSE_MAX_WAIT_MS;
-  let pollInterval = PARSE_POLL_MIN_MS;
-  let pollCount = 0;
-  const parseStarted = Date.now();
-
-  while (Date.now() < deadline) {
-    if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
-
-    pollCount += 1;
-    const elapsedSec = Math.round((Date.now() - parseStarted) / 1000);
-
-    if (jobId) {
-      try {
-        const job = await loadParseJobStatus(jobId, signal, { onRateLimitWait });
-        if (job?.job?.status) {
-          onLog?.(`Parse job ${jobId}: ${job.job.status} (${elapsedSec}s)`);
-        }
-      } catch {
-        // Job endpoint often returns null when complete — fall through to match check.
-      }
-    }
-
-    try {
-      details = await loadMatchDetails(matchId, signal, { onRateLimitWait });
-    } catch (error) {
-      if (error?.rateLimited) throw error;
-      onLog?.(`Poll ${pollCount} failed (${elapsedSec}s) — will retry`);
-      onPoll?.(details, { phase: "poll-error", elapsedSec, pollCount });
-      await sleepWithProgress(pollInterval, { signal, tickMs: pollInterval });
-      pollInterval = Math.min(PARSE_POLL_MAX_MS, pollInterval + 2000);
-      continue;
-    }
-
-    if (isMatchParsedForPlayer(details, accountId)) {
-      onLog?.(`Lane data ready for match ${matchId} after ${elapsedSec}s (${pollCount} checks)`);
-      onPoll?.(details, { phase: "done", elapsedSec, pollCount });
-      return details;
-    }
-
-    if (isReplayVersionReady(details)) {
-      onLog?.(`Replay parsed (${elapsedSec}s) — waiting for lane gold timeline…`);
-    } else {
-      onLog?.(`Poll ${pollCount}: replay not ready yet (${elapsedSec}s elapsed)`);
-    }
-
-    onPoll?.(details, { phase: "poll", elapsedSec, pollCount });
-
-    await sleepWithProgress(pollInterval, {
+    await sleepWithProgress(PARSE_INITIAL_WAIT_MS, {
       signal,
-      tickMs: Math.min(2000, pollInterval),
-      onTick: (waited) => {
+      tickMs: 2000,
+      onTick: (elapsed) => {
+        const secs = Math.round(elapsed / 1000);
         onPoll?.(details, {
-          phase: "poll-wait",
-          elapsedSec: elapsedSec + Math.round(waited / 1000),
-          pollCount,
-          waitMs: pollInterval,
+          phase: "initial-wait",
+          elapsedMs: elapsed,
+          initialWaitMs: PARSE_INITIAL_WAIT_MS,
         });
+        if (secs % 6 === 0 && secs > 0) {
+          onLog?.(`Replay processing… ${secs}s before first status check`);
+        }
       },
     });
-    pollInterval = Math.min(PARSE_POLL_MAX_MS, pollInterval + 1500);
-  }
 
-  const totalSec = Math.round((Date.now() - parseStarted) / 1000);
-  onLog?.(
-    `Parse timed out for match ${matchId} after ${totalSec}s — continuing without lane data`
-  );
-  onPoll?.(details, { phase: "timeout", elapsedSec: totalSec, pollCount });
-  return details;
+    const deadline = Date.now() + PARSE_MAX_WAIT_MS;
+    let pollInterval = PARSE_POLL_MIN_MS;
+    let pollCount = 0;
+    const parseStarted = Date.now();
+
+    while (Date.now() < deadline) {
+      if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
+
+      pollCount += 1;
+      const elapsedSec = Math.round((Date.now() - parseStarted) / 1000);
+
+      if (jobId) {
+        try {
+          const job = await loadParseJobStatus(jobId, signal, { onRateLimitWait });
+          if (job?.job?.status) {
+            onLog?.(`Parse job ${jobId}: ${job.job.status} (${elapsedSec}s)`);
+          }
+        } catch {
+          // Job endpoint often returns null when complete — fall through to match check.
+        }
+      }
+
+      try {
+        details = await loadMatchDetails(matchId, signal, { onRateLimitWait });
+        await setCachedMatch(matchId, details, {
+          parseStatus: "partial",
+          parseAccountId: accountId,
+        });
+      } catch (error) {
+        if (error?.rateLimited) throw error;
+        onLog?.(`Poll ${pollCount} failed (${elapsedSec}s) — will retry`);
+        onPoll?.(details, { phase: "poll-error", elapsedSec, pollCount });
+        await sleepWithProgress(pollInterval, { signal, tickMs: pollInterval });
+        pollInterval = Math.min(PARSE_POLL_MAX_MS, pollInterval + 2000);
+        continue;
+      }
+
+      if (isMatchParsedForPlayer(details, accountId)) {
+        onLog?.(`Lane data ready for match ${matchId} after ${elapsedSec}s (${pollCount} checks)`);
+        onPoll?.(details, { phase: "done", elapsedSec, pollCount });
+        return { details, outcome: PARSE_OUTCOME.SUCCESS };
+      }
+
+      if (isReplayVersionReady(details)) {
+        onLog?.(`Replay parsed (${elapsedSec}s) — waiting for lane gold timeline…`);
+      } else {
+        onLog?.(`Poll ${pollCount}: replay not ready yet (${elapsedSec}s elapsed)`);
+      }
+
+      onPoll?.(details, { phase: "poll", elapsedSec, pollCount });
+
+      await sleepWithProgress(pollInterval, {
+        signal,
+        tickMs: Math.min(2000, pollInterval),
+        onTick: (waited) => {
+          onPoll?.(details, {
+            phase: "poll-wait",
+            elapsedSec: elapsedSec + Math.round(waited / 1000),
+            pollCount,
+            waitMs: pollInterval,
+          });
+        },
+      });
+      pollInterval = Math.min(PARSE_POLL_MAX_MS, pollInterval + 1500);
+    }
+
+    const totalSec = Math.round((Date.now() - parseStarted) / 1000);
+    onLog?.(
+      `Parse timed out for match ${matchId} after ${totalSec}s — match saved without lane data`
+    );
+    onPoll?.(details, { phase: "timeout", elapsedSec: totalSec, pollCount });
+    return { details, outcome: PARSE_OUTCOME.TIMEOUT };
+  } catch (error) {
+    if (error?.rateLimited) throw error;
+    onLog?.(`Parse failed for match ${matchId}: ${error.message ?? "unknown error"}`);
+    return { details, outcome: PARSE_OUTCOME.ERROR };
+  }
 }

@@ -175,6 +175,58 @@ export async function loadPlayerMatchesFiltered(
   return { matches, turboSkipped };
 }
 
+/**
+ * Fetch recent matches across all heroes (newest first), paginating until limit or history ends.
+ */
+export async function loadPlayerMatchesAll(
+  accountId,
+  limit,
+  { excludeTurbo = true, significant = false, signal, onRateLimitWait, onBatch } = {}
+) {
+  const matches = [];
+  const seen = new Set();
+  let offset = 0;
+  let turboSkipped = 0;
+  const maxScan = limit > 0 ? limit : 10_000;
+
+  while (matches.length < maxScan) {
+    const batchLimit = Math.min(100, maxScan - matches.length);
+    const params = new URLSearchParams({
+      limit: String(batchLimit),
+      offset: String(offset),
+      significant: significant ? "1" : "0",
+    });
+
+    const batch = await fetchJson(
+      `${BASE_URL}/players/${accountId}/matches?${params}`,
+      { signal, onRateLimitWait, label: "match-list-all" }
+    );
+
+    if (!batch.length) break;
+
+    onBatch?.({ offset, batchSize: batch.length, collected: matches.length });
+
+    for (const match of batch) {
+      const id = match.match_id;
+      if (seen.has(id)) continue;
+      seen.add(id);
+
+      if (excludeTurbo && match.game_mode === GAMEMODE_TURBO) {
+        turboSkipped += 1;
+        continue;
+      }
+
+      matches.push(match);
+      if (matches.length >= maxScan) break;
+    }
+
+    offset += batch.length;
+    if (batch.length < batchLimit) break;
+  }
+
+  return { matches, turboSkipped };
+}
+
 export async function loadMatchDetails(matchId, signal, options = {}) {
   return fetchJson(`${BASE_URL}/matches/${matchId}`, {
     signal,

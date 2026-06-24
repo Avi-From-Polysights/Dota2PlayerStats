@@ -24,7 +24,13 @@
       </div>
     </header>
 
+    <nav class="main-tabs" role="tablist" aria-label="App sections">
+      <button type="button" class="main-tabs__tab main-tabs__tab--active" role="tab" aria-selected="true" data-tab="analyze">Analyze</button>
+      <button type="button" class="main-tabs__tab" role="tab" aria-selected="false" data-tab="tools">Tools</button>
+    </nav>
+
     <main>
+      <section data-tab-panel="analyze" class="tab-panel">
       <section class="card config-panel">
         <div class="section-head">
           <h2 class="section-title">Parameters</h2>
@@ -173,6 +179,39 @@
             <input type="number" id="parse-max" name="parseMax" value="0" min="0" max="500" />
           </label>
 
+          <label class="field field--parse-parallel">
+            <div class="field__label-row">
+              <span class="field__label">Parallel parse lanes</span>
+              <span class="info-tip">
+                <button type="button" class="info-tip__btn" aria-label="About Parallel parse lanes">i</button>
+                <span class="info-tip__panel" role="tooltip">How many matches to parse at once. Each lane waits on OpenDota's replay queue independently, so up to 6 lanes can run without extra 429s (same as opening multiple tabs). All lanes share the 60 req/min API budget.</span>
+              </span>
+            </div>
+            <input type="number" id="parse-parallelism" name="parseParallelism" value="6" min="1" max="6" />
+          </label>
+
+          <label class="field field--checkbox">
+            <input type="checkbox" id="parse-retry" name="parseRetry" />
+            <div class="field__label-row">
+              <span class="field__label">Retry failed parses</span>
+              <span class="info-tip">
+                <button type="button" class="info-tip__btn" aria-label="About Retry failed parses">i</button>
+                <span class="info-tip__panel" role="tooltip">When enabled, re-queue OpenDota parses that time out or fail, up to the max retries below. After max retries, those matches are dropped from this analysis and saved to the failed-parse list (retry from Tools).</span>
+              </span>
+            </div>
+          </label>
+
+          <label class="field field--parse-retries">
+            <div class="field__label-row">
+              <span class="field__label">Max parse retries</span>
+              <span class="info-tip">
+                <button type="button" class="info-tip__btn" aria-label="About Max parse retries">i</button>
+                <span class="info-tip__panel" role="tooltip">Extra parse attempts per match when retries are enabled. When disabled, timed-out matches stay in the sample with game stats only — lane stats show as N/A.</span>
+              </span>
+            </div>
+            <input type="number" id="parse-max-retries" name="parseMaxRetries" value="2" min="0" max="10" disabled />
+          </label>
+
           <div class="form-actions">
             <button type="submit" id="fetch-btn" class="btn btn--primary">Analyze matches</button>
             <button type="button" id="export-btn" class="btn btn--outline" disabled>Export CSV</button>
@@ -186,7 +225,7 @@
           <p id="progress-text" class="progress__text">Starting…</p>
           <details id="activity-log-panel" class="activity-log-panel hidden" open>
             <summary class="activity-log-panel__summary">Activity log</summary>
-            <pre id="activity-log" class="activity-log-panel__body"></pre>
+            <div class="multi-log" data-multi-log-root></div>
           </details>
         </div>
       </section>
@@ -195,6 +234,14 @@
 
       <section id="results" class="results hidden">
         <div class="summary-grid motion-stagger" id="summary-cards"></div>
+
+        <article id="parse-status-panel" class="card parse-status-panel motion-rise hidden">
+          <div class="section-head">
+            <h2 class="section-title">Parse status</h2>
+            <p id="parse-status-desc" class="section-desc"></p>
+          </div>
+          <div id="parse-status-body" class="parse-status-body"></div>
+        </article>
 
         <article class="card card--highlight lane-vs-game-panel motion-rise">
           <div class="section-head">
@@ -279,6 +326,135 @@
             </table>
           </div>
         </article>
+      </section>
+      </section>
+
+      <section data-tab-panel="tools" class="tab-panel hidden" hidden>
+        <section class="card tools-panel">
+          <div class="section-head">
+            <h2 class="section-title">Batch tools</h2>
+            <p class="section-desc">Long-running jobs that cache parsed replays locally. Leave the tab open overnight — progress is saved in your browser cache.</p>
+          </div>
+
+          <article class="tool-card">
+            <header class="tool-card__head">
+              <h3 class="tool-card__title">Parse all matches</h3>
+              <p class="tool-card__desc">Fetch your recent match history across every hero and queue OpenDota replay parses for anything missing lane data. Re-runs skip already-parsed games.</p>
+            </header>
+
+            <form id="tool-parse-all-form" class="tool-card__form config-grid">
+              <label class="field field--with-hint">
+                <div class="field__label-row">
+                  <span class="field__label">Account ID</span>
+                </div>
+                <input type="number" id="tool-account-id" required placeholder="427824243" min="1" />
+                <p class="field__hint">Same OpenDota player ID as on the Analyze tab.</p>
+              </label>
+
+              <label class="field">
+                <div class="field__label-row">
+                  <span class="field__label">Max matches to scan</span>
+                  <span class="info-tip">
+                    <button type="button" class="info-tip__btn" aria-label="About Max matches to scan">i</button>
+                    <span class="info-tip__panel" role="tooltip">How far back to scan your match history (newest first). 0 = up to 10,000 matches. Already-parsed matches are skipped quickly from cache.</span>
+                  </span>
+                </div>
+                <input type="number" id="tool-max-matches" value="2000" min="0" max="10000" />
+              </label>
+
+              <label class="field">
+                <div class="field__label-row">
+                  <span class="field__label">Parallel parse lanes</span>
+                  <span class="info-tip">
+                    <button type="button" class="info-tip__btn" aria-label="About Parallel parse lanes">i</button>
+                    <span class="info-tip__panel" role="tooltip">Up to 6 concurrent parse pipelines. Recommended for overnight runs.</span>
+                  </span>
+                </div>
+                <input type="number" id="tool-parse-concurrency" value="6" min="1" max="6" />
+              </label>
+
+              <label class="field field--checkbox">
+                <input type="checkbox" id="tool-exclude-turbo" checked />
+                <span class="field__label">Exclude Turbo</span>
+              </label>
+
+              <label class="field field--checkbox">
+                <input type="checkbox" id="tool-significant-only" />
+                <span class="field__label">Significant matches only</span>
+              </label>
+
+              <label class="field field--checkbox">
+                <input type="checkbox" id="tool-parse-retry" checked />
+                <span class="field__label">Retry failed parses</span>
+              </label>
+
+              <label class="field">
+                <span class="field__label">Max parse retries</span>
+                <input type="number" id="tool-parse-max-retries" value="2" min="0" max="10" />
+              </label>
+
+              <div class="form-actions">
+                <button type="submit" id="tool-parse-all-start" class="btn btn--primary">Start parse-all</button>
+                <button type="button" id="tool-parse-all-stop" class="btn btn--outline" disabled>Stop</button>
+              </div>
+            </form>
+          </article>
+
+          <div id="tools-progress" class="progress hidden" aria-live="polite">
+            <div class="progress__track">
+              <div id="tools-progress-fill" class="progress__fill"></div>
+            </div>
+            <p id="tools-progress-text" class="progress__text">Starting…</p>
+            <details id="tools-activity-log-panel" class="activity-log-panel hidden" open>
+              <summary class="activity-log-panel__summary">Activity log</summary>
+              <div class="multi-log" data-multi-log-root></div>
+            </details>
+          </div>
+
+          <article class="tool-card">
+            <header class="tool-card__head">
+              <h3 class="tool-card__title">Retry failed parses</h3>
+              <p class="tool-card__desc">Find matches that failed to parse (timeout, error, or max retries exceeded) and try again. Successful retries update your local cache and remove them from the failed list.</p>
+            </header>
+
+            <p id="tool-retry-failed-status" class="tool-card__status">Enter an account ID to see failed parses.</p>
+
+            <form id="tool-retry-failed-form" class="tool-card__form config-grid">
+              <label class="field">
+                <span class="field__label">Account ID</span>
+                <input type="number" id="tool-retry-account-id" required placeholder="427824243" min="1" />
+              </label>
+
+              <label class="field">
+                <span class="field__label">Parallel parse lanes</span>
+                <input type="number" id="tool-retry-concurrency" value="6" min="1" max="6" />
+              </label>
+
+              <label class="field">
+                <span class="field__label">Max parse retries</span>
+                <input type="number" id="tool-retry-max-retries" value="2" min="0" max="10" />
+              </label>
+
+              <div class="form-actions">
+                <button type="submit" id="tool-retry-failed-start" class="btn btn--primary">Retry failed parses</button>
+                <button type="button" id="tool-retry-failed-stop" class="btn btn--outline" disabled>Stop</button>
+              </div>
+            </form>
+
+            <div id="tools-retry-progress" class="progress hidden" aria-live="polite">
+              <div class="progress__track">
+                <div id="tools-retry-progress-fill" class="progress__fill"></div>
+              </div>
+              <p id="tools-retry-progress-text" class="progress__text">Starting…</p>
+              <details id="tools-retry-log-panel" class="activity-log-panel hidden" open>
+                <summary class="activity-log-panel__summary">Activity log</summary>
+                <div class="multi-log" data-multi-log-root></div>
+              </details>
+            </div>
+          </article>
+        </section>
+
+        <section id="tools-error-banner" class="alert alert--error hidden" role="alert"></section>
       </section>
     </main>
   </div>
