@@ -694,6 +694,14 @@ input[type="checkbox"] {
   color: var(--muted-foreground);
 }
 
+.site-footer__version {
+  margin: 0.5rem 0 0;
+  font-size: 0.6875rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--disabled);
+  letter-spacing: 0.04em;
+}
+
 /* Motion */
 .motion-rise {
   animation: motion-rise var(--motion-slow) var(--motion-ease) both;

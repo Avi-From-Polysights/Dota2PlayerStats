@@ -20,6 +20,7 @@ import {
   trendDirection,
 } from "./stats.js";
 import { formatCi, formatPct } from "./wilson.js";
+import { APP_VERSION } from "./version.js";
 
 const form = document.getElementById("stats-form");
 const heroSearch = document.getElementById("hero-search");
@@ -460,6 +461,8 @@ form.addEventListener("submit", async (event) => {
 });
 
 async function init() {
+  document.getElementById("app-version").textContent = `v${APP_VERSION}`;
+
   try {
     const [list, patchList] = await Promise.all([loadHeroes(), loadPatches()]);
     populateHeroes(list);
