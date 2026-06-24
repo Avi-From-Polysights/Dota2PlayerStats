@@ -219,6 +219,27 @@ a:hover {
   color: var(--foreground);
 }
 
+.field__hint {
+  margin: 0.15rem 0 0;
+  font-size: 0.75rem;
+  font-weight: var(--weight-body);
+  color: var(--tertiary);
+  line-height: 1.45;
+  max-width: 42ch;
+}
+
+.field__hint code {
+  font-size: 0.6875rem;
+  color: var(--muted-foreground);
+  background: var(--popover);
+  padding: 0.1rem 0.35rem;
+  border-radius: 3px;
+}
+
+.field__hint a {
+  color: var(--accent);
+}
+
 input[type="number"],
 input[type="text"],
 select {
