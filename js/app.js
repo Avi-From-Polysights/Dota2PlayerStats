@@ -100,17 +100,17 @@ function renderSummary(analysis, heroName, trend, rollingWindow) {
     </div>
     <div class="summary-card">
       <div class="summary-card__label">Lane win rate</div>
-      <div class="summary-card__value ${analysis.overallLaneWinrate >= 50 ? "positive" : "negative"}">${analysis.laneDecided ? formatPct(analysis.overallLaneWinrate) : "—"}</div>
+      <div class="summary-card__value ${analysis.overallLaneWinrate >= 50 ? "positive" : "negative"}">${analysis.laneDecided ? formatPct(analysis.overallLaneWinrate) : "N/A"}</div>
       <div class="summary-card__sub">${analysis.laneDecided ? `Wilson ${formatCi(analysis.overallLaneCi.lower, analysis.overallLaneCi.upper)}` : laneDataNote}</div>
     </div>
     <div class="summary-card">
       <div class="summary-card__label">Record</div>
-      <div class="summary-card__value">${analysis.totalWins}W – ${analysis.totalLosses}L</div>
+      <div class="summary-card__value">${analysis.totalWins}W / ${analysis.totalLosses}L</div>
       <div class="summary-card__sub">${analysis.totalGames} matches · ${laneDataNote}</div>
     </div>
     <div class="summary-card">
       <div class="summary-card__label">Hero</div>
-      <div class="summary-card__value">${heroName}</div>
+      <div class="summary-card__value" style="font-size:1.35rem">${heroName}</div>
       <div class="summary-card__sub">${analysis.processed} processed · ${analysis.skipped} skipped</div>
     </div>
     <div class="summary-card">
@@ -187,12 +187,12 @@ matchupHeaders.forEach((th) => {
 });
 
 function renderLaneVsGameStats(analysis) {
-  const fmt = (v) => (v == null ? "—" : formatPct(v));
+  const fmt = (v) => (v == null ? "N/A" : formatPct(v));
 
   laneVsGameStats.innerHTML = `
     <div class="compare-stat">
       <span class="compare-stat__label">Lane win %</span>
-      <span class="compare-stat__value compare-stat__value--lane">${analysis.laneDecided ? formatPct(analysis.overallLaneWinrate) : "—"}</span>
+      <span class="compare-stat__value compare-stat__value--lane">${analysis.laneDecided ? formatPct(analysis.overallLaneWinrate) : "N/A"}</span>
       <span class="compare-stat__sub">${analysis.laneWon}W · ${analysis.laneLost}L · ${analysis.laneDraw}D</span>
     </div>
     <div class="compare-stat">
@@ -224,7 +224,7 @@ function renderLaneTable(laneRows) {
           <div class="lane-row__metric">
             <span class="lane-row__tag">Lane</span>
             <div class="lane-bar"><div class="lane-bar__fill lane-bar__fill--lane" style="width:${row.laneWinrate}%"></div></div>
-            <span>${row.laneKnown ? formatPct(row.laneWinrate) : "—"}</span>
+            <span>${row.laneKnown ? formatPct(row.laneWinrate) : "N/A"}</span>
           </div>
           <div class="lane-row__metric">
             <span class="lane-row__tag">Game</span>
@@ -376,6 +376,11 @@ form.addEventListener("submit", async (event) => {
     renderMatchupTable(analysis.matchupRows);
 
     resultsEl.classList.remove("hidden");
+    resultsEl.querySelectorAll(".motion-rise, .motion-stagger > *").forEach((el) => {
+      el.style.animation = "none";
+      void el.offsetHeight;
+      el.style.animation = "";
+    });
     exportBtn.disabled = false;
     setProgress(false);
   } catch (error) {

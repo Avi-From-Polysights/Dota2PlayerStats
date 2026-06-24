@@ -1,11 +1,11 @@
-const CHART_DEFAULTS = {
-  color: "#8b9bb0",
-  grid: "rgba(255,255,255,0.06)",
-  radiant: "#7cb342",
-  dire: "#e53935",
-  accent: "#3d8fd1",
-  gold: "#d4a843",
-  lane: "#26a69a",
+const CHART = {
+  muted: "#7d7d7d",
+  tertiary: "#9a9a9a",
+  grid: "rgba(255, 255, 255, 0.06)",
+  primary: "#42d68c",
+  accent: "#155dfc",
+  destructive: "#ff6467",
+  popover: "#212121",
 };
 
 let winrateChart = null;
@@ -16,24 +16,62 @@ function destroyChart(chart) {
   if (chart) chart.destroy();
 }
 
+function chartFont() {
+  return {
+    family: "Inter, system-ui, sans-serif",
+    size: 11,
+    weight: "432",
+  };
+}
+
 function baseScaleOptions() {
   return {
     x: {
       ticks: {
-        color: CHART_DEFAULTS.color,
+        color: CHART.muted,
         maxTicksLimit: 12,
+        font: chartFont(),
       },
-      grid: { color: CHART_DEFAULTS.grid },
+      grid: { color: CHART.grid },
+      border: { display: false },
     },
     y: {
       min: 0,
       max: 100,
       ticks: {
-        color: CHART_DEFAULTS.color,
+        color: CHART.muted,
         callback: (v) => `${v}%`,
+        font: chartFont(),
       },
-      grid: { color: CHART_DEFAULTS.grid },
+      grid: { color: CHART.grid },
+      border: { display: false },
     },
+  };
+}
+
+function baseLegend() {
+  return {
+    labels: {
+      color: CHART.tertiary,
+      boxWidth: 10,
+      boxHeight: 2,
+      padding: 14,
+      font: chartFont(),
+    },
+  };
+}
+
+function baseTooltip() {
+  return {
+    backgroundColor: CHART.popover,
+    titleColor: "#ffffff",
+    bodyColor: CHART.tertiary,
+    borderColor: "rgba(255,255,255,0.06)",
+    borderWidth: 1,
+    padding: 10,
+    cornerRadius: 4,
+    titleFont: { ...chartFont(), weight: "600" },
+    bodyFont: chartFont(),
   };
 }
 
@@ -50,20 +88,22 @@ export function renderWinrateChart(canvas, points, overallWinrate) {
         {
           label: "Rolling game win %",
           data: points.map((p) => p.winrate),
-          borderColor: CHART_DEFAULTS.accent,
-          backgroundColor: "rgba(61, 143, 209, 0.12)",
+          borderColor: CHART.accent,
+          backgroundColor: "rgba(21, 93, 252, 0.1)",
           fill: true,
-          tension: 0.25,
+          tension: 0.35,
           pointRadius: points.length > 80 ? 0 : 2,
           pointHoverRadius: 4,
+          borderWidth: 2,
         },
         {
           label: "Overall game win %",
           data: points.map(() => overallWinrate),
-          borderColor: CHART_DEFAULTS.gold,
-          borderDash: [6, 4],
+          borderColor: CHART.tertiary,
+          borderDash: [5, 4],
           pointRadius: 0,
           fill: false,
+          borderWidth: 1,
         },
       ],
     },
@@ -72,8 +112,9 @@ export function renderWinrateChart(canvas, points, overallWinrate) {
       maintainAspectRatio: false,
       interaction: { mode: "index", intersect: false },
       plugins: {
-        legend: { labels: { color: CHART_DEFAULTS.color } },
+        legend: baseLegend(),
         tooltip: {
+          ...baseTooltip(),
           callbacks: {
             afterTitle(items) {
               const idx = items[0]?.dataIndex;
@@ -104,30 +145,30 @@ export function renderLaneVsGameChart(canvas, points, overallLane, overallGame) 
         {
           label: "Rolling lane win %",
           data: points.map((p) => p.laneWinrate),
-          borderColor: CHART_DEFAULTS.lane,
-          backgroundColor: "rgba(38, 166, 154, 0.15)",
+          borderColor: CHART.primary,
+          backgroundColor: "rgba(66, 214, 140, 0.1)",
           fill: true,
           tension: 0.35,
           spanGaps: true,
           pointRadius: points.length > 60 ? 0 : 2,
           pointHoverRadius: 4,
-          borderWidth: 2.5,
+          borderWidth: 2,
         },
         {
           label: "Rolling game win %",
           data: points.map((p) => p.gameWinrate),
-          borderColor: CHART_DEFAULTS.accent,
-          backgroundColor: "rgba(61, 143, 209, 0.08)",
+          borderColor: CHART.accent,
+          backgroundColor: "transparent",
           fill: false,
           tension: 0.35,
           pointRadius: points.length > 60 ? 0 : 2,
           pointHoverRadius: 4,
-          borderWidth: 2.5,
+          borderWidth: 2,
         },
         {
           label: "Overall lane win %",
           data: points.map(() => overallLane),
-          borderColor: CHART_DEFAULTS.lane,
+          borderColor: CHART.primary,
           borderDash: [4, 4],
           pointRadius: 0,
           fill: false,
@@ -136,7 +177,7 @@ export function renderLaneVsGameChart(canvas, points, overallLane, overallGame) 
         {
           label: "Overall game win %",
           data: points.map(() => overallGame),
-          borderColor: CHART_DEFAULTS.gold,
+          borderColor: CHART.tertiary,
           borderDash: [4, 4],
           pointRadius: 0,
           fill: false,
@@ -149,14 +190,9 @@ export function renderLaneVsGameChart(canvas, points, overallLane, overallGame) 
       maintainAspectRatio: false,
       interaction: { mode: "index", intersect: false },
       plugins: {
-        legend: {
-          labels: {
-            color: CHART_DEFAULTS.color,
-            boxWidth: 12,
-            font: { size: 11 },
-          },
-        },
+        legend: baseLegend(),
         tooltip: {
+          ...baseTooltip(),
           callbacks: {
             afterTitle(items) {
               const idx = items[0]?.dataIndex;
@@ -187,14 +223,16 @@ export function renderLaneChart(canvas, laneRows) {
         {
           label: "Lane win %",
           data: filtered.map((r) => r.laneWinrate),
-          backgroundColor: "rgba(38, 166, 154, 0.8)",
-          borderRadius: 4,
+          backgroundColor: "rgba(66, 214, 140, 0.85)",
+          borderRadius: 3,
+          barThickness: 10,
         },
         {
           label: "Game win %",
           data: filtered.map((r) => r.gameWinrate),
-          backgroundColor: "rgba(61, 143, 209, 0.8)",
-          borderRadius: 4,
+          backgroundColor: "rgba(21, 93, 252, 0.85)",
+          borderRadius: 3,
+          barThickness: 10,
         },
       ],
     },
@@ -202,10 +240,9 @@ export function renderLaneChart(canvas, laneRows) {
       responsive: true,
       maintainAspectRatio: false,
       plugins: {
-        legend: {
-          labels: { color: CHART_DEFAULTS.color, boxWidth: 12 },
-        },
+        legend: baseLegend(),
         tooltip: {
+          ...baseTooltip(),
           callbacks: {
             afterBody(ctx) {
               const row = filtered[ctx[0].dataIndex];
@@ -219,17 +256,23 @@ export function renderLaneChart(canvas, laneRows) {
       },
       scales: {
         x: {
-          ticks: { color: CHART_DEFAULTS.color },
+          ticks: {
+            color: CHART.muted,
+            font: chartFont(),
+          },
           grid: { display: false },
+          border: { display: false },
         },
         y: {
           min: 0,
           max: 100,
           ticks: {
-            color: CHART_DEFAULTS.color,
+            color: CHART.muted,
             callback: (v) => `${v}%`,
+            font: chartFont(),
           },
-          grid: { color: CHART_DEFAULTS.grid },
+          grid: { color: CHART.grid },
+          border: { display: false },
         },
       },
     },

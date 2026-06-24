@@ -7,109 +7,125 @@
   <meta name="description" content="Hero matchup stats, lane win rates, and win rate trends from OpenDota." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Source+Sans+3:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,100..900&family=Pragati+Narrow:wght@700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="css/style.css" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js" defer></script>
   <script type="module" src="js/app.js"></script>
 </head>
 <body>
   <div class="page">
-    <header class="hero-header">
-      <div class="hero-header__inner">
-        <div>
-          <p class="eyebrow">OpenDota powered</p>
-          <h1>Dota 2 Player Stats</h1>
-          <p class="subtitle">Matchup tables with Wilson confidence intervals, lane win rates, and win-rate trends over time.</p>
+    <header class="site-header">
+      <div class="site-header__top">
+        <div class="site-header__brand">
+          <span class="badge">OpenDota</span>
+          <h1 class="display-title">Dota 2 Player Stats</h1>
+          <p class="lede">Matchup tables with Wilson confidence intervals, lane win rates, and win-rate trends over time.</p>
         </div>
-        <a class="github-link" href="https://github.com/Avi-From-Polysights/Dota2PlayerStats" target="_blank" rel="noopener">View on GitHub</a>
+        <a class="btn btn--outline" href="https://github.com/Avi-From-Polysights/Dota2PlayerStats" target="_blank" rel="noopener">
+          View on GitHub
+        </a>
       </div>
     </header>
 
     <main>
-      <section class="panel config-panel">
-        <h2>Parameters</h2>
+      <section class="card config-panel">
+        <div class="section-head">
+          <h2 class="section-title">Parameters</h2>
+          <p class="section-desc">Configure your account, hero filter, and analysis settings.</p>
+        </div>
+
         <form id="stats-form" class="config-grid">
-          <label>
-            <span>Account ID</span>
-            <input type="number" id="account-id" name="accountId" required placeholder="e.g. 427824243" min="1" />
-          </label>
+          <div class="field-group field-group--primary">
+            <label class="field">
+              <span class="field__label">Account ID</span>
+              <input type="number" id="account-id" name="accountId" required placeholder="427824243" min="1" />
+            </label>
 
-          <label>
-            <span>Hero</span>
-            <input type="text" id="hero-search" list="hero-list" placeholder="Search hero..." autocomplete="off" required />
-            <input type="hidden" id="hero-id" name="heroId" />
-            <datalist id="hero-list"></datalist>
-          </label>
+            <label class="field">
+              <span class="field__label">Hero</span>
+              <input type="text" id="hero-search" list="hero-list" placeholder="Search hero…" autocomplete="off" required />
+              <input type="hidden" id="hero-id" name="heroId" />
+              <datalist id="hero-list"></datalist>
+            </label>
+          </div>
 
-          <label>
-            <span>Match limit</span>
-            <input type="number" id="match-limit" name="limit" value="100" min="1" max="500" />
-          </label>
+          <div class="field-group">
+            <label class="field">
+              <span class="field__label">Match limit</span>
+              <input type="number" id="match-limit" name="limit" value="100" min="1" max="500" />
+            </label>
 
-          <label>
-            <span>Request delay (ms)</span>
-            <input type="number" id="request-delay" name="delay" value="150" min="0" max="2000" step="50" />
-          </label>
+            <label class="field">
+              <span class="field__label">Request delay (ms)</span>
+              <input type="number" id="request-delay" name="delay" value="150" min="0" max="2000" step="50" />
+            </label>
 
-          <label class="checkbox-label">
+            <label class="field">
+              <span class="field__label">Wilson confidence</span>
+              <select id="confidence-level" name="confidence">
+                <option value="0.90">90%</option>
+                <option value="0.95" selected>95%</option>
+                <option value="0.99">99%</option>
+              </select>
+            </label>
+
+            <label class="field">
+              <span class="field__label">Rolling window</span>
+              <input type="number" id="rolling-window" name="rollingWindow" value="20" min="3" max="100" />
+            </label>
+          </div>
+
+          <label class="field field--checkbox">
             <input type="checkbox" id="significant-only" name="significant" />
-            <span>Significant matches only</span>
-          </label>
-
-          <label>
-            <span>Wilson confidence</span>
-            <select id="confidence-level" name="confidence">
-              <option value="0.90">90%</option>
-              <option value="0.95" selected>95%</option>
-              <option value="0.99">99%</option>
-            </select>
-          </label>
-
-          <label>
-            <span>Rolling window (matches)</span>
-            <input type="number" id="rolling-window" name="rollingWindow" value="20" min="3" max="100" />
+            <span class="field__label">Significant matches only</span>
           </label>
 
           <div class="form-actions">
-            <button type="submit" id="fetch-btn">Analyze matches</button>
-            <button type="button" id="export-btn" class="secondary" disabled>Export CSV</button>
+            <button type="submit" id="fetch-btn" class="btn btn--primary">Analyze matches</button>
+            <button type="button" id="export-btn" class="btn btn--outline" disabled>Export CSV</button>
           </div>
         </form>
 
         <div id="progress" class="progress hidden" aria-live="polite">
-          <div class="progress__bar"><div id="progress-fill" class="progress__fill"></div></div>
+          <div class="progress__track">
+            <div id="progress-fill" class="progress__fill"></div>
+          </div>
           <p id="progress-text" class="progress__text">Starting…</p>
         </div>
       </section>
 
-      <section id="error-banner" class="error-banner hidden" role="alert"></section>
+      <section id="error-banner" class="alert alert--error hidden" role="alert"></section>
 
       <section id="results" class="results hidden">
-        <div class="summary-grid" id="summary-cards"></div>
+        <div class="summary-grid motion-stagger" id="summary-cards"></div>
 
-        <article class="panel lane-vs-game-panel">
-          <div class="panel-header">
-            <h2>Lane win % vs game win %</h2>
-            <p class="panel-note">Lane outcome uses gold at 10 minutes vs your lane opponent (parsed replays). See whether winning lane translates into winning the game.</p>
+        <article class="card card--highlight lane-vs-game-panel motion-rise">
+          <div class="section-head">
+            <h2 class="section-title">Lane win % vs game win %</h2>
+            <p class="section-desc">Lane outcome uses gold at 10 minutes vs your lane opponent on parsed replays. See whether winning lane translates into winning the game.</p>
           </div>
-          <div id="lane-vs-game-stats" class="lane-vs-game-stats"></div>
+          <div id="lane-vs-game-stats" class="compare-grid"></div>
           <div class="chart-wrap chart-wrap--mini">
             <canvas id="lane-vs-game-chart"></canvas>
           </div>
         </article>
 
         <div class="charts-row">
-          <article class="panel chart-panel">
-            <h2>Win rate over time</h2>
-            <p class="panel-note">Rolling win rate by match date. A rising line suggests improvement.</p>
+          <article class="card chart-panel motion-rise">
+            <div class="section-head section-head--compact">
+              <h2 class="section-title">Win rate over time</h2>
+              <p class="section-desc">Rolling win rate by match date. A rising line suggests improvement.</p>
+            </div>
             <div class="chart-wrap">
               <canvas id="winrate-chart"></canvas>
             </div>
           </article>
 
-          <article class="panel chart-panel">
-            <h2>By lane position</h2>
-            <p class="panel-note">Lane win % (10-min gold) vs game win % for each lane you played.</p>
+          <article class="card chart-panel motion-rise">
+            <div class="section-head section-head--compact">
+              <h2 class="section-title">By lane position</h2>
+              <p class="section-desc">Lane win % (10-min gold) vs game win % for each lane you played.</p>
+            </div>
             <div class="chart-wrap chart-wrap--short">
               <canvas id="lane-chart"></canvas>
             </div>
@@ -117,13 +133,13 @@
           </article>
         </div>
 
-        <article class="panel">
-          <div class="panel-header">
-            <h2>Enemy hero matchups</h2>
-            <p class="panel-note">Sorted by games played. Wilson CI shows statistically plausible win-rate range.</p>
+        <article class="card motion-rise">
+          <div class="section-head">
+            <h2 class="section-title">Enemy hero matchups</h2>
+            <p class="section-desc">Sorted by games played. Wilson CI shows statistically plausible win-rate range.</p>
           </div>
           <div class="table-wrap">
-            <table id="matchup-table">
+            <table id="matchup-table" class="data-table">
               <thead>
                 <tr>
                   <th data-sort="hero">Enemy hero</th>
@@ -145,8 +161,8 @@
       </section>
     </main>
 
-    <footer>
-      <p>Data from <a href="https://www.opendota.com/" target="_blank" rel="noopener">OpenDota</a>. Runs entirely in your browser — no account data is stored.</p>
+    <footer class="site-footer">
+      <p>Data from <a href="https://www.opendota.com/" target="_blank" rel="noopener">OpenDota</a>. Runs entirely in your browser. No account data is stored.</p>
     </footer>
   </div>
 </body>
