@@ -203,6 +203,96 @@ a:hover {
   color: var(--muted-foreground);
 }
 
+.field__label-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.info-tip {
+  position: relative;
+  display: inline-flex;
+  flex-shrink: 0;
+}
+
+.info-tip__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1rem;
+  height: 1rem;
+  padding: 0;
+  border: 1px solid var(--border-input);
+  border-radius: 50%;
+  background: var(--popover);
+  color: var(--tertiary);
+  font-family: var(--font-sans);
+  font-size: 0.625rem;
+  font-weight: 600;
+  font-style: italic;
+  line-height: 1;
+  cursor: help;
+  transition:
+    background var(--motion-fast) ease,
+    color var(--motion-fast) ease,
+    border-color var(--motion-fast) ease;
+}
+
+.info-tip__btn:hover,
+.info-tip__btn:focus-visible {
+  outline: none;
+  background: var(--hover-strong);
+  color: var(--foreground);
+  border-color: rgba(255, 255, 255, 0.2);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.2);
+}
+
+.info-tip__panel {
+  position: absolute;
+  z-index: 20;
+  left: 50%;
+  bottom: calc(100% + 0.5rem);
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: min(260px, 85vw);
+  padding: 0.55rem 0.65rem;
+  border: 1px solid var(--border-input);
+  border-radius: var(--radius-sm);
+  background: var(--popover);
+  color: var(--tertiary);
+  font-family: var(--font-sans);
+  font-size: 0.75rem;
+  font-weight: var(--weight-body);
+  font-style: normal;
+  line-height: 1.45;
+  text-transform: none;
+  letter-spacing: normal;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity var(--motion-fast) ease,
+    visibility var(--motion-fast) ease;
+}
+
+.info-tip__panel::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 5px solid transparent;
+  border-top-color: var(--popover);
+}
+
+.info-tip:hover .info-tip__panel,
+.info-tip:focus-within .info-tip__panel,
+.info-tip--open .info-tip__panel {
+  opacity: 1;
+  visibility: visible;
+}
+
 .field--checkbox {
   flex-direction: row;
   align-items: center;
