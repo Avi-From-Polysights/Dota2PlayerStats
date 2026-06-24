@@ -1,0 +1,33 @@
+name: Bug or feedback
+description: Report a bug, incorrect stats, or suggest an improvement
+title: "[Feedback] "
+labels:
+  - feedback
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. Include your **account ID**, **hero**, and what you expected vs what you saw.
+        The app runs in your browser — nothing is stored on our side.
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: Steps to reproduce, error messages, or suggestions
+      placeholder: e.g. Lane position shows Unknown for most matches…
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: App version
+      description: Shown in the footer (e.g. v0.0.13)
+    validations:
+      required: false
+  - type: input
+    id: share-link
+    attributes:
+      label: Share link
+      description: Optional — use Copy share link in the app footer
+    validations:
+      required: false
