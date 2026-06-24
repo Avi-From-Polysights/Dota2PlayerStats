@@ -83,7 +83,7 @@
                 <span class="field__label">Request delay (ms)</span>
                 <span class="info-tip">
                   <button type="button" class="info-tip__btn" aria-label="About Request delay">i</button>
-                  <span class="info-tip__panel" role="tooltip">Milliseconds to wait between OpenDota API requests. Increase this (e.g. 250 to 500) if fetches fail or feel throttled.</span>
+                  <span class="info-tip__panel" role="tooltip">Extra milliseconds between match fetches. The app also auto-paces to OpenDota's 60 requests/minute limit (parse requests count as 10). Increase this if you still see 429 errors.</span>
                 </span>
               </div>
               <input type="number" id="request-delay" name="delay" value="150" min="0" max="2000" step="50" />
@@ -157,7 +157,7 @@
               <span class="field__label">Request OpenDota parse</span>
               <span class="info-tip">
                 <button type="button" class="info-tip__btn" aria-label="About Request OpenDota parse">i</button>
-                <span class="info-tip__panel" role="tooltip">Queue OpenDota replay parses for matches missing lane data (slow — each request uses heavy API quota). Parsed matches are cached in your browser; re-run later to parse more without redoing finished games.</span>
+                <span class="info-tip__panel" role="tooltip">Queue OpenDota replay parses for matches missing lane data. Each parse uses 10 of your 60 requests/minute — large jobs are paced automatically and may take a while. Parsed matches are cached in your browser; re-run later to continue without redoing finished games.</span>
               </span>
             </div>
           </label>

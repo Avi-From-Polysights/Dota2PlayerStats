@@ -22,13 +22,16 @@ export async function ensureMatchParsed(
     pollMs = 8000,
     maxWaitMs = 120000,
     onPoll,
+    onRateLimitWait,
     initialDetails = null,
   } = {}
 ) {
-  let details = initialDetails ?? (await loadMatchDetails(matchId, signal));
+  let details =
+    initialDetails ??
+    (await loadMatchDetails(matchId, signal, { onRateLimitWait }));
   if (isMatchParsedForPlayer(details, accountId)) return details;
 
-  await requestMatchParse(matchId, signal);
+  await requestMatchParse(matchId, signal, { onRateLimitWait });
 
   const started = Date.now();
   while (Date.now() - started < maxWaitMs) {
@@ -38,14 +41,14 @@ export async function ensureMatchParsed(
     if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
 
     try {
-      details = await loadMatchDetails(matchId, signal);
+      details = await loadMatchDetails(matchId, signal, { onRateLimitWait });
     } catch (error) {
       if (error?.rateLimited) throw error;
-      onPoll?.(details);
+      onPoll?.(details, { phase: "poll-error" });
       continue;
     }
 
-    onPoll?.(details);
+    onPoll?.(details, { phase: "poll" });
 
     if (isMatchParsedForPlayer(details, accountId)) return details;
   }

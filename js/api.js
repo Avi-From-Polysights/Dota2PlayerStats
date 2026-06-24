@@ -1,4 +1,9 @@
 import { GAMEMODE_TURBO } from "./game-modes.js";
+import {
+  OPENDOTA_PARSE_COST,
+  OPENDOTA_REQUEST_COST,
+  acquireOpenDotaQuota,
+} from "./rate-limit.js";
 
 const BASE_URL = "https://api.opendota.com/api";
 
@@ -28,12 +33,18 @@ export class OpenDotaRateLimitError extends Error {
   }
 }
 
-export async function fetchJson(url, { signal } = {}) {
+export async function fetchJson(url, { signal, onRateLimitWait, quotaCost, label } = {}) {
   let lastError = null;
   let saw429 = false;
 
   for (let attempt = 1; attempt <= RETRIES; attempt += 1) {
     try {
+      await acquireOpenDotaQuota(quotaCost ?? OPENDOTA_REQUEST_COST, {
+        signal,
+        onWait: onRateLimitWait,
+        label,
+      });
+
       const response = await fetch(url, { signal });
 
       if ([429, 500, 502, 503, 504].includes(response.status)) {
@@ -58,8 +69,12 @@ export async function fetchJson(url, { signal } = {}) {
   throw lastError ?? new Error(`Failed to fetch: ${url}`);
 }
 
-export async function loadPlayerProfile(accountId, signal) {
-  return fetchJson(`${BASE_URL}/players/${accountId}`, { signal });
+export async function loadPlayerProfile(accountId, signal, options = {}) {
+  return fetchJson(`${BASE_URL}/players/${accountId}`, {
+    signal,
+    ...options,
+    label: "profile",
+  });
 }
 
 export function profileFromPlayerResponse(data, accountId) {
@@ -77,8 +92,11 @@ export function profileFromPlayerResponse(data, accountId) {
   };
 }
 
-export async function loadHeroes() {
-  const heroes = await fetchJson(`${BASE_URL}/heroes`);
+export async function loadHeroes(options = {}) {
+  const heroes = await fetchJson(`${BASE_URL}/heroes`, {
+    ...options,
+    label: "heroes",
+  });
   return heroes
     .map((h) => ({ id: h.id, name: h.localized_name }))
     .sort((a, b) => a.name.localeCompare(b.name));
@@ -113,7 +131,7 @@ export async function loadPlayerMatchesFiltered(
   limit,
   significant,
   patchId = null,
-  { excludeTurbo = true, signal } = {}
+  { excludeTurbo = true, signal, onRateLimitWait } = {}
 ) {
   const matches = [];
   let offset = 0;
@@ -135,7 +153,7 @@ export async function loadPlayerMatchesFiltered(
 
     const batch = await fetchJson(
       `${BASE_URL}/players/${accountId}/matches?${params}`,
-      { signal }
+      { signal, onRateLimitWait, label: "match-list" }
     );
 
     if (!batch.length) break;
@@ -156,20 +174,35 @@ export async function loadPlayerMatchesFiltered(
   return { matches, turboSkipped };
 }
 
-export async function loadMatchDetails(matchId, signal) {
-  return fetchJson(`${BASE_URL}/matches/${matchId}`, { signal });
+export async function loadMatchDetails(matchId, signal, options = {}) {
+  return fetchJson(`${BASE_URL}/matches/${matchId}`, {
+    signal,
+    ...options,
+    label: "match",
+  });
 }
 
-export async function requestMatchParse(matchId, signal) {
-  return postJson(`${BASE_URL}/request/${matchId}`, { signal });
+export async function requestMatchParse(matchId, signal, options = {}) {
+  return postJson(`${BASE_URL}/request/${matchId}`, {
+    signal,
+    ...options,
+    quotaCost: OPENDOTA_PARSE_COST,
+    label: "parse-request",
+  });
 }
 
-async function postJson(url, { signal } = {}) {
+async function postJson(url, { signal, onRateLimitWait, quotaCost, label } = {}) {
   let lastError = null;
   let saw429 = false;
 
   for (let attempt = 1; attempt <= RETRIES; attempt += 1) {
     try {
+      await acquireOpenDotaQuota(quotaCost ?? OPENDOTA_REQUEST_COST, {
+        signal,
+        onWait: onRateLimitWait,
+        label,
+      });
+
       const response = await fetch(url, { method: "POST", signal });
 
       if ([429, 500, 502, 503, 504].includes(response.status)) {
