@@ -1,0 +1,344 @@
+import {
+  loadHeroes,
+  loadMatchDetails,
+  loadPlayerMatches,
+} from "./api.js";
+import { renderLaneChart, renderWinrateChart } from "./charts.js";
+import {
+  analyzeMatches,
+  rollingWinRate,
+  trendDirection,
+} from "./stats.js";
+import { formatCi, formatPct } from "./wilson.js";
+
+const form = document.getElementById("stats-form");
+const heroSearch = document.getElementById("hero-search");
+const heroIdInput = document.getElementById("hero-id");
+const heroList = document.getElementById("hero-list");
+const progressEl = document.getElementById("progress");
+const progressFill = document.getElementById("progress-fill");
+const progressText = document.getElementById("progress-text");
+const errorBanner = document.getElementById("error-banner");
+const resultsEl = document.getElementById("results");
+const summaryCards = document.getElementById("summary-cards");
+const matchupTableBody = document.querySelector("#matchup-table tbody");
+const matchupHeaders = document.querySelectorAll("#matchup-table th[data-sort]");
+const laneTable = document.getElementById("lane-table");
+const exportBtn = document.getElementById("export-btn");
+const fetchBtn = document.getElementById("fetch-btn");
+
+let heroes = [];
+let heroByName = new Map();
+let lastMatchupRows = [];
+let sortState = { key: "games", dir: "desc" };
+let abortController = null;
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function showError(message) {
+  errorBanner.textContent = message;
+  errorBanner.classList.remove("hidden");
+}
+
+function hideError() {
+  errorBanner.classList.add("hidden");
+}
+
+function setProgress(visible, pct = 0, text = "") {
+  progressEl.classList.toggle("hidden", !visible);
+  progressFill.style.width = `${pct}%`;
+  progressText.textContent = text;
+}
+
+function populateHeroes(list) {
+  heroes = list;
+  heroByName = new Map(list.map((h) => [h.name.toLowerCase(), h]));
+  heroList.innerHTML = list.map((h) => `<option value="${h.name}"></option>`).join("");
+}
+
+function resolveHeroId() {
+  const query = heroSearch.value.trim().toLowerCase();
+  const hero = heroByName.get(query);
+  if (hero) {
+    heroIdInput.value = String(hero.id);
+    return hero.id;
+  }
+  return null;
+}
+
+heroSearch.addEventListener("input", resolveHeroId);
+
+function renderSummary(analysis, heroName, trend, rollingWindow) {
+  const trendLabels = {
+    improving: "Trending up",
+    declining: "Trending down",
+    stable: "Holding steady",
+    insufficient: "Need more matches",
+  };
+
+  const trendClass =
+    trend === "improving" ? "positive" : trend === "declining" ? "negative" : "";
+
+  summaryCards.innerHTML = `
+    <div class="summary-card">
+      <div class="summary-card__label">Overall win rate</div>
+      <div class="summary-card__value ${analysis.overallWinrate >= 50 ? "positive" : "negative"}">${formatPct(analysis.overallWinrate)}</div>
+      <div class="summary-card__sub">Wilson ${formatCi(analysis.overallCi.lower, analysis.overallCi.upper)}</div>
+    </div>
+    <div class="summary-card">
+      <div class="summary-card__label">Record</div>
+      <div class="summary-card__value">${analysis.totalWins}W – ${analysis.totalLosses}L</div>
+      <div class="summary-card__sub">${analysis.totalGames} matches analyzed</div>
+    </div>
+    <div class="summary-card">
+      <div class="summary-card__label">Hero</div>
+      <div class="summary-card__value">${heroName}</div>
+      <div class="summary-card__sub">${analysis.processed} processed · ${analysis.skipped} skipped</div>
+    </div>
+    <div class="summary-card">
+      <div class="summary-card__label">Recent trend</div>
+      <div class="summary-card__value ${trendClass}">${trendLabels[trend]}</div>
+      <div class="summary-card__sub">${rollingWindow}-match rolling window</div>
+    </div>
+  `;
+}
+
+function winrateClass(value) {
+  if (value >= 55) return "winrate-good";
+  if (value <= 45) return "winrate-bad";
+  return "";
+}
+
+function renderMatchupTable(rows) {
+  lastMatchupRows = rows;
+  matchupTableBody.innerHTML = rows
+    .map(
+      (row) => `
+      <tr>
+        <td>${row.hero}</td>
+        <td>${row.games}</td>
+        <td>${row.wins}</td>
+        <td>${row.losses}</td>
+        <td class="winrate-cell ${winrateClass(row.winrate)}">${formatPct(row.winrate)}</td>
+        <td>${formatPct(row.wilsonLower)}</td>
+        <td>${formatPct(row.wilsonUpper)}</td>
+        <td>${row.avgDuration.toFixed(1)} min</td>
+        <td>${row.avgKills.toFixed(1)}</td>
+        <td>${row.avgDeaths.toFixed(1)}</td>
+      </tr>
+    `
+    )
+    .join("");
+}
+
+function sortRows(rows, key, dir) {
+  const sorted = [...rows];
+  const factor = dir === "asc" ? 1 : -1;
+
+  sorted.sort((a, b) => {
+    const av = a[key];
+    const bv = b[key];
+    if (typeof av === "string") return factor * av.localeCompare(bv);
+    return factor * (av - bv);
+  });
+
+  return sorted;
+}
+
+function updateSortHeaders() {
+  matchupHeaders.forEach((th) => {
+    th.classList.remove("sorted-asc", "sorted-desc");
+    if (th.dataset.sort === sortState.key) {
+      th.classList.add(sortState.dir === "asc" ? "sorted-asc" : "sorted-desc");
+    }
+  });
+}
+
+matchupHeaders.forEach((th) => {
+  th.addEventListener("click", () => {
+    const key = th.dataset.sort;
+    if (sortState.key === key) {
+      sortState.dir = sortState.dir === "asc" ? "desc" : "asc";
+    } else {
+      sortState.key = key;
+      sortState.dir = key === "hero" ? "asc" : "desc";
+    }
+    updateSortHeaders();
+    renderMatchupTable(sortRows(lastMatchupRows, sortState.key, sortState.dir));
+  });
+});
+
+function renderLaneTable(laneRows) {
+  laneTable.innerHTML = laneRows
+    .filter((r) => r.games > 0)
+    .map(
+      (row) => `
+      <div class="lane-row">
+        <span>${row.label}</span>
+        <div class="lane-bar"><div class="lane-bar__fill" style="width:${row.winrate}%"></div></div>
+        <span>${formatPct(row.winrate)} (${row.games}g)</span>
+      </div>
+    `
+    )
+    .join("");
+}
+
+function exportCsv(rows) {
+  const headers = [
+    "hero",
+    "games",
+    "wins",
+    "losses",
+    "winrate",
+    "wilson_lower",
+    "wilson_upper",
+    "avg_duration_min",
+    "avg_kills",
+    "avg_deaths",
+  ];
+
+  const lines = [
+    headers.join(","),
+    ...rows.map((r) =>
+      [
+        `"${r.hero.replace(/"/g, '""')}"`,
+        r.games,
+        r.wins,
+        r.losses,
+        r.winrate.toFixed(2),
+        r.wilsonLower.toFixed(2),
+        r.wilsonUpper.toFixed(2),
+        r.avgDuration.toFixed(2),
+        r.avgKills.toFixed(2),
+        r.avgDeaths.toFixed(2),
+      ].join(",")
+    ),
+  ];
+
+  const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "dota2_matchups.csv";
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+exportBtn.addEventListener("click", () => {
+  if (lastMatchupRows.length) exportCsv(lastMatchupRows);
+});
+
+form.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  hideError();
+
+  if (abortController) abortController.abort();
+  abortController = new AbortController();
+  const { signal } = abortController;
+
+  const accountId = Number(document.getElementById("account-id").value);
+  const heroId = resolveHeroId();
+  const limit = Number(document.getElementById("match-limit").value);
+  const delayMs = Number(document.getElementById("request-delay").value);
+  const significant = document.getElementById("significant-only").checked;
+  const confidence = Number(document.getElementById("confidence-level").value);
+  const rollingWindow = Number(document.getElementById("rolling-window").value);
+
+  if (!accountId || accountId < 1) {
+    showError("Enter a valid account ID.");
+    return;
+  }
+
+  if (!heroId) {
+    showError("Pick a hero from the list.");
+    return;
+  }
+
+  const heroName = heroSearch.value.trim();
+  fetchBtn.disabled = true;
+  exportBtn.disabled = true;
+  resultsEl.classList.add("hidden");
+  setProgress(true, 0, "Loading match list…");
+
+  try {
+    const heroMap = new Map(heroes.map((h) => [h.id, h.name]));
+    const matchList = await loadPlayerMatches(accountId, heroId, limit, significant);
+
+    if (!matchList.length) {
+      showError("No matches found for that account, hero, and filter combination.");
+      setProgress(false);
+      fetchBtn.disabled = false;
+      return;
+    }
+
+    const detailsList = [];
+    const total = matchList.length;
+
+    for (let i = 0; i < total; i += 1) {
+      if (signal.aborted) return;
+
+      const matchId = matchList[i].match_id;
+      setProgress(
+        true,
+        ((i + 1) / total) * 100,
+        `Fetching match ${i + 1} of ${total} (ID ${matchId})…`
+      );
+
+      try {
+        const details = await loadMatchDetails(matchId, signal);
+        detailsList.push(details);
+      } catch {
+        detailsList.push(null);
+      }
+
+      if (delayMs > 0 && i < total - 1) await sleep(delayMs);
+    }
+
+    const analysis = analyzeMatches(detailsList, accountId, heroMap, confidence);
+    const rolling = rollingWinRate(analysis.timeline, rollingWindow);
+    const trend = trendDirection(rolling);
+
+    renderSummary(analysis, heroName, trend, rollingWindow);
+    renderWinrateChart(
+      document.getElementById("winrate-chart"),
+      rolling,
+      analysis.overallWinrate
+    );
+    renderLaneChart(document.getElementById("lane-chart"), analysis.laneRows);
+    renderLaneTable(analysis.laneRows);
+
+    sortState = { key: "games", dir: "desc" };
+    updateSortHeaders();
+    renderMatchupTable(analysis.matchupRows);
+
+    resultsEl.classList.remove("hidden");
+    exportBtn.disabled = false;
+    setProgress(false);
+  } catch (error) {
+    if (error.name !== "AbortError") {
+      showError(error.message || "Something went wrong while fetching data.");
+      setProgress(false);
+    }
+  } finally {
+    fetchBtn.disabled = false;
+  }
+});
+
+async function init() {
+  try {
+    const list = await loadHeroes();
+    populateHeroes(list);
+
+    const kez = list.find((h) => h.name === "Kez");
+    if (kez) {
+      heroSearch.value = kez.name;
+      heroIdInput.value = String(kez.id);
+    }
+  } catch (error) {
+    showError(`Could not load hero list: ${error.message}`);
+  }
+}
+
+init();

@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dota 2 Player Stats</title>
+  <meta name="description" content="Hero matchup stats, lane win rates, and win rate trends from OpenDota." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Source+Sans+3:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js" defer></script>
+  <script type="module" src="js/app.js"></script>
+</head>
+<body>
+  <div class="page">
+    <header class="hero-header">
+      <div class="hero-header__inner">
+        <div>
+          <p class="eyebrow">OpenDota powered</p>
+          <h1>Dota 2 Player Stats</h1>
+          <p class="subtitle">Matchup tables with Wilson confidence intervals, lane win rates, and win-rate trends over time.</p>
+        </div>
+        <a class="github-link" href="https://github.com/Avi-From-Polysights/Dota2PlayerStats" target="_blank" rel="noopener">View on GitHub</a>
+      </div>
+    </header>
+
+    <main>
+      <section class="panel config-panel">
+        <h2>Parameters</h2>
+        <form id="stats-form" class="config-grid">
+          <label>
+            <span>Account ID</span>
+            <input type="number" id="account-id" name="accountId" required placeholder="e.g. 427824243" min="1" />
+          </label>
+
+          <label>
+            <span>Hero</span>
+            <input type="text" id="hero-search" list="hero-list" placeholder="Search hero..." autocomplete="off" required />
+            <input type="hidden" id="hero-id" name="heroId" />
+            <datalist id="hero-list"></datalist>
+          </label>
+
+          <label>
+            <span>Match limit</span>
+            <input type="number" id="match-limit" name="limit" value="100" min="1" max="500" />
+          </label>
+
+          <label>
+            <span>Request delay (ms)</span>
+            <input type="number" id="request-delay" name="delay" value="150" min="0" max="2000" step="50" />
+          </label>
+
+          <label class="checkbox-label">
+            <input type="checkbox" id="significant-only" name="significant" />
+            <span>Significant matches only</span>
+          </label>
+
+          <label>
+            <span>Wilson confidence</span>
+            <select id="confidence-level" name="confidence">
+              <option value="0.90">90%</option>
+              <option value="0.95" selected>95%</option>
+              <option value="0.99">99%</option>
+            </select>
+          </label>
+
+          <label>
+            <span>Rolling window (matches)</span>
+            <input type="number" id="rolling-window" name="rollingWindow" value="20" min="3" max="100" />
+          </label>
+
+          <div class="form-actions">
+            <button type="submit" id="fetch-btn">Analyze matches</button>
+            <button type="button" id="export-btn" class="secondary" disabled>Export CSV</button>
+          </div>
+        </form>
+
+        <div id="progress" class="progress hidden" aria-live="polite">
+          <div class="progress__bar"><div id="progress-fill" class="progress__fill"></div></div>
+          <p id="progress-text" class="progress__text">Starting…</p>
+        </div>
+      </section>
+
+      <section id="error-banner" class="error-banner hidden" role="alert"></section>
+
+      <section id="results" class="results hidden">
+        <div class="summary-grid" id="summary-cards"></div>
+
+        <div class="charts-row">
+          <article class="panel chart-panel">
+            <h2>Win rate over time</h2>
+            <p class="panel-note">Rolling win rate by match date. A rising line suggests improvement.</p>
+            <div class="chart-wrap">
+              <canvas id="winrate-chart"></canvas>
+            </div>
+          </article>
+
+          <article class="panel chart-panel">
+            <h2>Lane win %</h2>
+            <p class="panel-note">Win rate grouped by lane assignment in each match.</p>
+            <div class="chart-wrap chart-wrap--short">
+              <canvas id="lane-chart"></canvas>
+            </div>
+            <div id="lane-table" class="lane-table"></div>
+          </article>
+        </div>
+
+        <article class="panel">
+          <div class="panel-header">
+            <h2>Enemy hero matchups</h2>
+            <p class="panel-note">Sorted by games played. Wilson CI shows statistically plausible win-rate range.</p>
+          </div>
+          <div class="table-wrap">
+            <table id="matchup-table">
+              <thead>
+                <tr>
+                  <th data-sort="hero">Enemy hero</th>
+                  <th data-sort="games">Games</th>
+                  <th data-sort="wins">Wins</th>
+                  <th data-sort="losses">Losses</th>
+                  <th data-sort="winrate">Win %</th>
+                  <th data-sort="wilsonLower">Wilson low</th>
+                  <th data-sort="wilsonUpper">Wilson high</th>
+                  <th data-sort="avgDuration">Avg duration</th>
+                  <th data-sort="avgKills">Avg K</th>
+                  <th data-sort="avgDeaths">Avg D</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </article>
+      </section>
+    </main>
+
+    <footer>
+      <p>Data from <a href="https://www.opendota.com/" target="_blank" rel="noopener">OpenDota</a>. Runs entirely in your browser — no account data is stored.</p>
+    </footer>
+  </div>
+</body>
+</html>
