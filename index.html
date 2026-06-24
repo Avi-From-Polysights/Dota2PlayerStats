@@ -36,9 +36,16 @@
 
         <form id="stats-form" class="config-grid">
           <div class="field-group field-group--primary">
-            <label class="field">
+            <label class="field field--with-hint">
               <span class="field__label">Account ID</span>
               <input type="number" id="account-id" name="accountId" required placeholder="427824243" min="1" />
+              <p class="field__hint">
+                Find it on your
+                <a href="https://www.opendota.com/" target="_blank" rel="noopener">OpenDota</a>
+                profile: search your Steam name, open your player page, and use the number in the URL
+                (<code>opendota.com/players/<strong>123456789</strong></code>).
+                This is not your Steam ID64.
+              </p>
             </label>
 
             <label class="field">

@@ -41,7 +41,8 @@ const patchFilter = document.getElementById("patch-filter");
 const patchBreakdown = document.getElementById("patch-breakdown");
 const patchTableBody = document.querySelector("#patch-table tbody");
 
-let heroes = [];
+const ACCOUNT_ID_HINT =
+  "Check your Account ID on OpenDota: search your Steam name, open your profile, and copy the number from the URL (opendota.com/players/123456789). Use that ID, not Steam ID64.";
 let patches = [];
 let heroByName = new Map();
 let lastMatchupRows = [];
@@ -373,7 +374,9 @@ form.addEventListener("submit", async (event) => {
 
     if (!matchList.length) {
       const patchMsg = selectedPatchLabel ? ` on ${selectedPatchLabel}` : "";
-      showError(`No matches found for that account, hero, and filters${patchMsg}.`);
+      showError(
+        `No matches found for that account, hero, and filters${patchMsg}. ${ACCOUNT_ID_HINT}`
+      );
       setProgress(false);
       fetchBtn.disabled = false;
       return;
