@@ -16,6 +16,10 @@ import {
   parseAgeSkipMessage,
 } from "./parse-age.js";
 import { enrichMatchFromStratz } from "./stratz.js";
+import {
+  createStratzRateLimitWaitHandler,
+  STRATZ_LIMIT_PER_SECOND,
+} from "./stratz-rate-limit.js";
 
 export function createLoadStats() {
   return {
@@ -31,6 +35,7 @@ export function createLoadStats() {
     parseSkippedTooOld: 0,
     stratzEnriched: 0,
     stratzFailed: 0,
+    stratzThrottlePauses: 0,
     rateLimited: 0,
     throttlePauses: 0,
     unparsed: 0,
@@ -58,6 +63,9 @@ export function formatLoadStats(loadStats) {
   }
   if (loadStats.stratzEnriched) parts.push(`${loadStats.stratzEnriched} via STRATZ`);
   if (loadStats.stratzFailed) parts.push(`${loadStats.stratzFailed} STRATZ miss`);
+  if (loadStats.stratzThrottlePauses) {
+    parts.push(`${loadStats.stratzThrottlePauses} STRATZ rate-limit pause(s)`);
+  }
   if (loadStats.parseFailed) parts.push(`${loadStats.parseFailed} parse failed`);
   if (loadStats.throttlePauses) {
     parts.push(`${loadStats.throttlePauses} rate-limit pause(s)`);
@@ -150,6 +158,7 @@ export async function resolveMatchDetails(
     matchListItem = null,
     useStratzFallback = false,
     stratzToken = "",
+    onStratzRateLimitWait = null,
   }
 ) {
   let details = hasCachedEntry ? cachedDetails : null;
@@ -323,7 +332,7 @@ export async function resolveMatchDetails(
       matchId,
       accountId,
       stratzToken,
-      { signal, log }
+      { signal, log, onRateLimitWait: onStratzRateLimitWait }
     );
     details = stratzResult.details;
     if (stratzResult.enriched) {
@@ -388,12 +397,18 @@ export async function loadMatchDetailsBatch({
   }
 
   if (useStratzFallback && stratzToken) {
-    multiLog?.info("STRATZ fallback enabled for matches still missing lane data after OpenDota");
+    multiLog?.info(
+      `STRATZ fallback enabled — throttled to ~${STRATZ_LIMIT_PER_SECOND - 2} req/s (OpenDota parallel lanes share this cap)`
+    );
   } else if (useStratzFallback) {
     multiLog?.warn("STRATZ fallback checked but no API token — add one from stratz.com/api");
   }
 
   const onRateLimitWait = createRateLimitWaitHandler(loadStats, multiLog?.overview());
+  const onStratzRateLimitWait = createStratzRateLimitWaitHandler(
+    loadStats,
+    multiLog?.overview()
+  );
 
   let completed = 0;
 
@@ -425,6 +440,7 @@ export async function loadMatchDetailsBatch({
           matchListItem: match,
           useStratzFallback,
           stratzToken,
+          onStratzRateLimitWait,
         });
 
         completed += 1;

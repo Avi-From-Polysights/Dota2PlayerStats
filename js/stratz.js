@@ -1,6 +1,26 @@
 import { LANE_GOLD_MINUTE } from "./lane.js";
+import {
+  acquireStratzQuota,
+} from "./stratz-rate-limit.js";
 
 const STRATZ_GRAPHQL_URL = "https://api.stratz.com/graphql";
+const STRATZ_RETRIES = 8;
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function parseRetryAfterMs(response) {
+  const retryAfter = Number(response.headers.get("Retry-After"));
+  if (Number.isFinite(retryAfter) && retryAfter > 0) {
+    return Math.min(retryAfter * 1000, 30_000);
+  }
+  const resetSec = Number(response.headers.get("ratelimit-reset"));
+  if (Number.isFinite(resetSec) && resetSec > 0) {
+    return Math.min(resetSec * 1000, 30_000);
+  }
+  return 1000;
+}
 
 const MATCH_LANE_QUERY = `
 query MatchLane($matchId: Long!) {
@@ -138,48 +158,72 @@ export function mergeStratzLaneIntoOpenDota(details, stratzMatch, accountId) {
   return enrichedAccount;
 }
 
-export async function fetchStratzMatchLane(matchId, apiToken, { signal } = {}) {
+export async function fetchStratzMatchLane(matchId, apiToken, { signal, onRateLimitWait } = {}) {
   if (!apiToken?.trim()) {
     throw new StratzApiError("STRATZ API token required — get one at stratz.com/api");
   }
 
-  const response = await fetch(STRATZ_GRAPHQL_URL, {
-    method: "POST",
-    signal,
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiToken.trim()}`,
-      "User-Agent": "Dota2PlayerStats/1.0",
-    },
-    body: JSON.stringify({
-      query: MATCH_LANE_QUERY,
-      variables: { matchId: Number(matchId) },
-    }),
-  });
+  let lastError = null;
 
-  if (response.status === 429) {
-    throw new StratzApiError("STRATZ rate limit (429)", { status: 429, rateLimited: true });
+  for (let attempt = 1; attempt <= STRATZ_RETRIES; attempt += 1) {
+    if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
+
+    await acquireStratzQuota({ signal, onWait: onRateLimitWait });
+
+    const response = await fetch(STRATZ_GRAPHQL_URL, {
+      method: "POST",
+      signal,
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiToken.trim()}`,
+        "User-Agent": "Dota2PlayerStats/1.0",
+      },
+      body: JSON.stringify({
+        query: MATCH_LANE_QUERY,
+        variables: { matchId: Number(matchId) },
+      }),
+    });
+
+    if (response.status === 429) {
+      const waitMs = parseRetryAfterMs(response);
+      onRateLimitWait?.({ waitMs, rateLimited: true });
+      lastError = new StratzApiError("STRATZ rate limit (429)", {
+        status: 429,
+        rateLimited: true,
+      });
+
+      let elapsed = 0;
+      const step = Math.min(waitMs, 250);
+      while (elapsed < waitMs) {
+        if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
+        await sleep(step);
+        elapsed += step;
+      }
+      continue;
+    }
+
+    if (!response.ok) {
+      throw new StratzApiError(`STRATZ HTTP ${response.status}`, { status: response.status });
+    }
+
+    const payload = await response.json();
+    if (payload.errors?.length) {
+      const msg = payload.errors.map((e) => e.message).join("; ");
+      throw new StratzApiError(msg || "STRATZ GraphQL error");
+    }
+
+    return payload.data?.match ?? null;
   }
 
-  if (!response.ok) {
-    throw new StratzApiError(`STRATZ HTTP ${response.status}`, { status: response.status });
-  }
-
-  const payload = await response.json();
-  if (payload.errors?.length) {
-    const msg = payload.errors.map((e) => e.message).join("; ");
-    throw new StratzApiError(msg || "STRATZ GraphQL error");
-  }
-
-  return payload.data?.match ?? null;
+  throw lastError ?? new StratzApiError("STRATZ rate limit (429)", { status: 429, rateLimited: true });
 }
 
 export async function enrichMatchFromStratz(details, matchId, accountId, apiToken, options = {}) {
-  const { signal, log } = options;
+  const { signal, log, onRateLimitWait } = options;
   if (!details || !apiToken?.trim()) return { details, enriched: false };
 
   try {
-    const stratzMatch = await fetchStratzMatchLane(matchId, apiToken, { signal });
+    const stratzMatch = await fetchStratzMatchLane(matchId, apiToken, { signal, onRateLimitWait });
     if (!stratzMatch) {
       log?.warn(`STRATZ has no data for match ${matchId}`);
       return { details, enriched: false };
