@@ -33,8 +33,6 @@ query MatchLane($matchId: Long!) {
       stats {
         lastHitsPerMinute
         networthPerMinute
-        observerWardsPlaced
-        sentryWardsPlaced
       }
     }
   }
@@ -139,9 +137,6 @@ export function mergeStratzLaneIntoOpenDota(details, stratzMatch, accountId) {
         player.lane_last_hits = lhSeries.atMinute;
       }
     }
-
-    player.obs_placed = stats.observerWardsPlaced ?? player.obs_placed ?? 0;
-    player.sen_placed = stats.sentryWardsPlaced ?? player.sen_placed ?? 0;
 
     if (player.account_id === accountId) {
       enrichedAccount = Boolean(

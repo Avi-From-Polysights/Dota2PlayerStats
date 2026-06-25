@@ -16,8 +16,6 @@ const stratzMatch = {
       stats: {
         networthPerMinute: Array.from({ length: 11 }, (_, i) => 4000 + i * 100),
         lastHitsPerMinute: Array.from({ length: 11 }, (_, i) => i * 3),
-        observerWardsPlaced: 0,
-        sentryWardsPlaced: 0,
       },
     },
   ],
