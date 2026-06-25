@@ -6,6 +6,8 @@ import {
 } from "./rate-limit.js";
 
 const BASE_URL = "https://api.opendota.com/api";
+const HEROES_FALLBACK_URL =
+  "https://raw.githubusercontent.com/odota/dotaconstants/master/build/heroes.json";
 
 const RETRIES = 8;
 const RETRY_SLEEP_MS = 2500;
@@ -33,11 +35,15 @@ export class OpenDotaRateLimitError extends Error {
   }
 }
 
-export async function fetchJson(url, { signal, onRateLimitWait, quotaCost, label } = {}) {
+export async function fetchJson(
+  url,
+  { signal, onRateLimitWait, quotaCost, label, maxRetries = RETRIES } = {}
+) {
   let lastError = null;
   let saw429 = false;
+  const attempts = Math.max(1, Math.min(maxRetries, RETRIES));
 
-  for (let attempt = 1; attempt <= RETRIES; attempt += 1) {
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
     try {
       await acquireOpenDotaQuota(quotaCost ?? OPENDOTA_REQUEST_COST, {
         signal,
@@ -62,6 +68,8 @@ export async function fetchJson(url, { signal, onRateLimitWait, quotaCost, label
     } catch (error) {
       if (error.name === "AbortError") throw error;
       lastError = error;
+      const isNetwork = error instanceof TypeError;
+      if (isNetwork && attempt >= Math.min(2, attempts)) break;
       await sleep(RETRY_SLEEP_MS * attempt);
     }
   }
@@ -93,14 +101,43 @@ export function profileFromPlayerResponse(data, accountId) {
   };
 }
 
-export async function loadHeroes(options = {}) {
-  const heroes = await fetchJson(`${BASE_URL}/heroes`, {
-    ...options,
-    label: "heroes",
-  });
+function mapHeroList(heroes) {
   return heroes
     .map((h) => ({ id: h.id, name: h.localized_name }))
+    .filter((h) => h.id && h.name)
     .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+async function loadHeroesFromDotaconstants(signal) {
+  const response = await fetch(HEROES_FALLBACK_URL, { signal });
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status} for hero fallback`);
+  }
+  const data = await response.json();
+  const heroes = Array.isArray(data) ? data : Object.values(data);
+  return mapHeroList(heroes);
+}
+
+export async function loadHeroes(options = {}) {
+  try {
+    const heroes = await fetchJson(`${BASE_URL}/heroes`, {
+      ...options,
+      label: "heroes",
+      maxRetries: 2,
+    });
+    return mapHeroList(heroes);
+  } catch (primaryError) {
+    try {
+      const fallback = await loadHeroesFromDotaconstants(options.signal);
+      if (fallback.length) {
+        console.warn("OpenDota heroes unavailable — using dotaconstants fallback.", primaryError);
+        return fallback;
+      }
+    } catch {
+      // fall through to primary error
+    }
+    throw primaryError;
+  }
 }
 
 export async function loadPlayerMatches(

@@ -899,7 +899,13 @@ async function init() {
       form.requestSubmit();
     }
   } catch (error) {
-    showError(`Could not load hero list: ${error.message}`);
+    const message = error.message || String(error);
+    const opendotaDown = /failed to fetch|network|521|502|503|504/i.test(message);
+    showError(
+      opendotaDown
+        ? `Could not reach OpenDota (${message}). Hero list may use a cached fallback; match analysis still needs OpenDota when their API is back.`
+        : `Could not load hero list: ${message}`
+    );
     fetchBtn.disabled = true;
   }
 

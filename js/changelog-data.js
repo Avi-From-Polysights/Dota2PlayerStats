@@ -38,6 +38,30 @@ export const SECTION_ICONS = {
  */
 export const CHANGELOGS = [
   {
+    version: "0.0.39",
+    date: "2026-06-25",
+    title: "Startup Resilience",
+    tagline: "Survives OpenDota outages and GSAP hiccups.",
+    heroImage: DOTA_IMG.items.tp,
+    accent: "#42d68c",
+    sections: [
+      {
+        id: "fixes",
+        title: "Bug Fixes",
+        items: [
+          {
+            type: "fixed",
+            text: "App no longer appears frozen when OpenDota is down: hero list falls back to dotaconstants, network errors fail fast, and the footer version renders even before JS boots.",
+          },
+          {
+            type: "fixed",
+            text: "GSAP intro animations clear opacity/transform after running so cards cannot stay invisible; scroll-trigger reveals removed (CSS handles motion).",
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: "0.0.38",
     date: "2026-06-25",
     title: "Lane Filter Fix",

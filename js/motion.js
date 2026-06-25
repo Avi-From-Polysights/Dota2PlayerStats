@@ -1,9 +1,15 @@
 let gsapModule = null;
-let scrollTriggerModule = null;
-let ready = false;
 
 export function prefersReducedMotion() {
   return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
+
+function resetMotionStyles(selectors) {
+  document.querySelectorAll(selectors).forEach((el) => {
+    el.style.removeProperty("opacity");
+    el.style.removeProperty("transform");
+    el.style.removeProperty("visibility");
+  });
 }
 
 async function loadGsap() {
@@ -15,12 +21,7 @@ async function loadGsap() {
       "https://cdn.jsdelivr.net/npm/gsap@3.12.5/+esm"
     );
     gsapModule = gsapImport.gsap ?? gsapImport.default;
-    scrollTriggerModule = gsapImport.ScrollTrigger;
-    if (scrollTriggerModule && gsapModule?.registerPlugin) {
-      gsapModule.registerPlugin(scrollTriggerModule);
-    }
-    ready = Boolean(gsapModule);
-    return gsapModule;
+    return gsapModule ?? null;
   } catch {
     return null;
   }
@@ -30,54 +31,48 @@ export async function initAppMotion() {
   const gsap = await loadGsap();
   if (!gsap) return;
 
-  gsap.from(".site-header", {
-    y: -18,
+  const targets = gsap.utils.toArray(
+    ".site-header, .main-tabs__tab, .tab-panel:not(.hidden) .card, .tab-panel:not(.hidden) .changelog-page"
+  );
+  if (!targets.length) return;
+
+  gsap.from(targets, {
+    y: 18,
     opacity: 0,
     duration: 0.55,
+    stagger: 0.06,
     ease: "power3.out",
+    clearProps: "opacity,transform,visibility",
   });
 
-  gsap.from(".main-tabs__tab", {
-    y: 14,
-    opacity: 0,
-    duration: 0.45,
-    stagger: 0.07,
-    delay: 0.12,
-    ease: "power3.out",
-  });
-
-  const activePanel = document.querySelector(".tab-panel:not(.hidden)");
-  if (activePanel) {
-    gsap.from(activePanel.querySelector(".card, .changelog-page"), {
-      y: 22,
-      opacity: 0,
-      duration: 0.5,
-      delay: 0.2,
-      ease: "power3.out",
-    });
-  }
+  window.setTimeout(() => {
+    resetMotionStyles(
+      ".site-header, .main-tabs__tab, .tab-panel:not(.hidden) .card, .tab-panel:not(.hidden) .changelog-page"
+    );
+  }, 2000);
 }
 
 export async function animateTabPanel(panel) {
   const gsap = await loadGsap();
-  if (!gsap || !panel) return;
+  if (!gsap || !panel || panel.hidden) return;
 
   gsap.fromTo(
     panel,
     { opacity: 0, y: 12 },
-    { opacity: 1, y: 0, duration: 0.35, ease: "power2.out" }
+    { opacity: 1, y: 0, duration: 0.35, ease: "power2.out", clearProps: "opacity,transform" }
   );
 }
 
 export function animateChangelogPatch(container) {
   if (!gsapModule || prefersReducedMotion() || !container) return;
 
-  gsap.from(container.querySelectorAll(".changelog-section, .changelog-change"), {
+  gsapModule.from(container.querySelectorAll(".changelog-section, .changelog-change"), {
     y: 16,
     opacity: 0,
     duration: 0.4,
     stagger: 0.04,
     ease: "power2.out",
+    clearProps: "opacity,transform",
   });
 }
 
@@ -91,26 +86,9 @@ export async function animateResultsReveal(container) {
     duration: 0.45,
     stagger: 0.06,
     ease: "power2.out",
-    clearProps: "transform",
+    clearProps: "opacity,transform",
   });
 }
 
-export async function initScrollReveals() {
-  const gsap = await loadGsap();
-  if (!gsap || !scrollTriggerModule) return;
-
-  gsap.utils.toArray(".card").forEach((card) => {
-    if (card.closest("#changelog-root")) return;
-    gsap.from(card, {
-      scrollTrigger: {
-        trigger: card,
-        start: "top 92%",
-        once: true,
-      },
-      y: 24,
-      opacity: 0,
-      duration: 0.5,
-      ease: "power2.out",
-    });
-  });
-}
+/** CSS handles scroll reveals; GSAP scroll triggers were leaving hidden cards invisible. */
+export async function initScrollReveals() {}
