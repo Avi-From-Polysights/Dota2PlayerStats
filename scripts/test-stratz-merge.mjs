@@ -36,6 +36,27 @@ assert("position map", parseStratzPosition("POSITION_4") === 4);
 assert("merge", mergeStratzLaneIntoOpenDota(details, stratzMatch, accountId));
 assert("parsed after merge", isMatchParsedForPlayer(details, accountId));
 assert("lane set", details.players[0].lane === 2);
+assert("stratz position stored", details.players[0].stratz_position === 2);
+assert("lane_role not overwritten", details.players[0].lane_role === undefined);
+
+const offlaneDetails = {
+  players: [{ account_id: 999, hero_id: 42, player_slot: 128, lane: 3, lane_role: 3 }],
+};
+const offlaneStratz = {
+  players: [
+    {
+      steamAccountId: 999,
+      heroId: 42,
+      lane: "SAFE_LANE",
+      position: "POSITION_1",
+      stats: { networthPerMinute: [0], lastHitsPerMinute: [0] },
+    },
+  ],
+};
+mergeStratzLaneIntoOpenDota(offlaneDetails, offlaneStratz, 999);
+assert("opendota lane preserved", offlaneDetails.players[0].lane === 3);
+assert("opendota lane_role preserved", offlaneDetails.players[0].lane_role === 3);
+assert("stratz pos on offlaner", offlaneDetails.players[0].stratz_position === 1);
 
 if (!ok) process.exit(1);
 console.log("STRATZ merge tests passed");

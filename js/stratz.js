@@ -115,10 +115,14 @@ export function mergeStratzLaneIntoOpenDota(details, stratzMatch, accountId) {
     if (!player) continue;
 
     const lane = parseStratzLane(sp.lane);
-    if (lane != null && lane > 0) player.lane = lane;
+    const hasOpenDotaLane =
+      typeof player.lane === "number" && player.lane >= 1 && player.lane <= 5;
+    if (lane != null && lane > 0 && !hasOpenDotaLane) {
+      player.lane = lane;
+    }
 
     const position = parseStratzPosition(sp.position);
-    if (position != null) player.lane_role = position;
+    if (position != null) player.stratz_position = position;
 
     const stats = sp.stats ?? {};
     const goldSeries = minuteSeries(stats.networthPerMinute);

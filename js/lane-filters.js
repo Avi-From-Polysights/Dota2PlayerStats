@@ -95,11 +95,18 @@ export function formatLaneFilterSummary(filters) {
   return parts.join(" · ");
 }
 
+/** Dota position 1–5 for role filters: STRATZ when merged, else parsed-replay inference. */
+function resolveFilterPosition(player, allPlayers) {
+  const stratz = player?.stratz_position;
+  if (typeof stratz === "number" && stratz >= 1 && stratz <= 5) return stratz;
+  return resolveDotaPosition(player, allPlayers);
+}
+
 function matchRoleFilter(player, roleValue, allPlayers) {
   if (!roleValue) return true;
 
   const normalized = LEGACY_ROLE_MAP[roleValue] ?? String(roleValue);
-  const position = resolveDotaPosition(player, allPlayers);
+  const position = resolveFilterPosition(player, allPlayers);
   if (position === 0) return false;
 
   return String(position) === normalized;

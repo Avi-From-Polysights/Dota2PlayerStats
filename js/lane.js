@@ -125,13 +125,13 @@ export function resolveOpenDotaLaneRole(player) {
 }
 
 /**
- * Lane assignment from OpenDota match player object.
+ * Lane assignment from OpenDota match player object (map lane, not Dota position).
  * Primary `lane` and lane win % (`gold_t`) only exist on parsed replays.
- * Falls back to `lane_role` for position grouping when lane is missing.
+ * Falls back to OpenDota geographic `lane_role` (1 safe, 2 mid, 3 off, 4 jungle, 5 roam).
  */
 export function resolvePlayerLane(player) {
   const lane = player?.lane;
-  if (typeof lane === "number" && lane >= 1 && lane <= 4) {
+  if (typeof lane === "number" && lane >= 1 && lane <= 5) {
     return {
       lane,
       label: laneLabel(lane),

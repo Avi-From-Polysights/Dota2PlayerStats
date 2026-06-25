@@ -56,6 +56,29 @@ assert("pos 4 filter", matchMyLaneFilter(teamRadiant[3], { myRole: "4" }, all));
 assert("pos 5 filter", matchMyLaneFilter(teamRadiant[4], { myRole: "5" }, all));
 assert("pos 4 rejects pos 5", !matchMyLaneFilter(teamRadiant[4], { myRole: "4" }, all));
 
+// Enemy lane filter uses OpenDota map lane, not STRATZ Dota position
+const offlaner = { player_slot: 130, lane: 3, lane_role: 3, stratz_position: 1 };
+assert(
+  "enemy offlane filter (lane=3)",
+  matchEnemyLaneFilter(offlaner, { enemyLane: "3" }, all)
+);
+assert(
+  "enemy offlane rejects safelane filter",
+  !matchEnemyLaneFilter(offlaner, { enemyLane: "1" }, all)
+);
+assert(
+  "lane_role fallback when lane missing",
+  matchEnemyLaneFilter({ player_slot: 130, lane_role: 3 }, { enemyLane: "3" }, all)
+);
+assert(
+  "stratz pos 1 must not map to safelane without lane",
+  !matchEnemyLaneFilter({ player_slot: 130, stratz_position: 1 }, { enemyLane: "1" }, all)
+);
+assert(
+  "stratz pos 1 matches role filter",
+  matchEnemyLaneFilter(offlaner, { enemyRole: "1" }, all)
+);
+
 // Per-hero lane outcome
 const me = player(1, 2, 70, 0, { gold: 5200 });
 const enemyMid = player(129, 2, 50, 0, { gold: 4100 });

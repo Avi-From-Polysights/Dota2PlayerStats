@@ -38,6 +38,26 @@ export const SECTION_ICONS = {
  */
 export const CHANGELOGS = [
   {
+    version: "0.0.38",
+    date: "2026-06-25",
+    title: "Lane Filter Fix",
+    tagline: "OpenDota lanes stay OpenDota lanes.",
+    heroImage: DOTA_IMG.items.ward,
+    accent: "#5b9fd4",
+    sections: [
+      {
+        id: "fixes",
+        title: "Bug Fixes",
+        items: [
+          {
+            type: "fixed",
+            text: "Enemy lane/role filters now use OpenDota map lane data directly. STRATZ position is stored separately and no longer overwrites OpenDota lane_role (which caused offlaners to show as safelane).",
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: "0.0.37",
     date: "2026-06-25",
     title: "Support Lane Outcomes",
