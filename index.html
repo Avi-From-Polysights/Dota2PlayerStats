@@ -9,6 +9,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,100..900&family=Pragati+Narrow:wght@700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="css/style.css?v=__VERSION__" />
+  <link rel="stylesheet" href="css/changelog.css?v=__VERSION__" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js" defer></script>
   <script type="module" src="js/app.js?v=__VERSION__"></script>
 </head>
@@ -27,6 +28,7 @@
     <nav class="main-tabs" role="tablist" aria-label="App sections">
       <button type="button" class="main-tabs__tab main-tabs__tab--active" role="tab" aria-selected="true" data-tab="analyze">Analyze</button>
       <button type="button" class="main-tabs__tab" role="tab" aria-selected="false" data-tab="tools">Tools</button>
+      <button type="button" class="main-tabs__tab" role="tab" aria-selected="false" data-tab="changelogs">Changelogs</button>
     </nav>
 
     <main>
@@ -582,6 +584,12 @@
         </section>
 
         <section id="tools-error-banner" class="alert alert--error hidden" role="alert"></section>
+      </section>
+
+      <section data-tab-panel="changelogs" class="tab-panel hidden" hidden>
+        <section class="card changelog-panel">
+          <div id="changelog-root" class="changelog-root"></div>
+        </section>
       </section>
     </main>
   </div>

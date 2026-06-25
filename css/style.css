@@ -683,7 +683,7 @@ input[type="checkbox"] {
 /* Main navigation tabs */
 .main-tabs {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, 1fr);
   gap: 0.5rem;
   margin: 0 0 1.5rem;
   padding: 0;
@@ -731,6 +731,13 @@ input[type="checkbox"] {
   box-shadow: 0 0 24px rgba(21, 93, 252, 0.3);
 }
 
+.main-tabs__tab[data-tab="changelogs"].main-tabs__tab--active {
+  background: linear-gradient(135deg, #c59a2f 0%, #8b6914 100%);
+  border-color: rgba(197, 154, 47, 0.55);
+  color: #fff;
+  box-shadow: 0 0 24px rgba(197, 154, 47, 0.35);
+}
+
 .main-tabs__tab:not(.main-tabs__tab--active)[data-tab="analyze"]:hover {
   border-color: rgba(66, 214, 140, 0.35);
   color: var(--primary);
@@ -739,6 +746,11 @@ input[type="checkbox"] {
 .main-tabs__tab:not(.main-tabs__tab--active)[data-tab="tools"]:hover {
   border-color: rgba(21, 93, 252, 0.35);
   color: #6b9cff;
+}
+
+.main-tabs__tab:not(.main-tabs__tab--active)[data-tab="changelogs"]:hover {
+  border-color: rgba(197, 154, 47, 0.45);
+  color: #e8b84a;
 }
 
 .tab-panel.hidden {

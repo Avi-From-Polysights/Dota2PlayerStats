@@ -53,6 +53,8 @@ import {
   recordConfigIngestion,
   restoreSessionConfigToForm,
 } from "./saved-configs.js";
+import { initChangelogs } from "./changelogs.js";
+import { initAppMotion, initScrollReveals, animateResultsReveal } from "./motion.js";
 import { initMainTabs } from "./tabs.js";
 import { initTools } from "./tools.js";
 import { initConfigUi, getParallelConcurrency } from "./config-ui.js";
@@ -159,6 +161,7 @@ function renderAnalysisResults(analysis, meta) {
     void el.offsetHeight;
     el.style.animation = "";
   });
+  animateResultsReveal(resultsEl);
   exportBtn.disabled = false;
 }
 
@@ -841,6 +844,7 @@ form.addEventListener("submit", async (event) => {
 async function init() {
   document.getElementById("app-version").textContent = `v${APP_VERSION}`;
   initFieldTooltips();
+  initChangelogs();
   initMainTabs();
   initStratzTokenPersistence();
   initConfigUi();
@@ -898,6 +902,9 @@ async function init() {
     showError(`Could not load hero list: ${error.message}`);
     fetchBtn.disabled = true;
   }
+
+  initAppMotion();
+  initScrollReveals();
 }
 
 init();

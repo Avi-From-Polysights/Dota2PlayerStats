@@ -1,0 +1,334 @@
+/* Changelog tab — Dota patch-note inspired layout */
+
+.changelog-root {
+  min-height: 40vh;
+}
+
+.changelog-page {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.changelog-page__head {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.changelog-page__logo {
+  flex-shrink: 0;
+  filter: drop-shadow(0 0 16px rgba(66, 214, 140, 0.35));
+}
+
+.changelog-page__title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--foreground);
+}
+
+.changelog-page__desc {
+  margin: 0.35rem 0 0;
+  font-size: 0.8125rem;
+  color: var(--muted-foreground);
+  line-height: 1.5;
+  max-width: 42ch;
+}
+
+.changelog-page__footer {
+  margin: 0.5rem 0 0;
+  font-size: 0.6875rem;
+  color: var(--disabled);
+  text-align: center;
+}
+
+.changelog-page__footer a {
+  color: var(--accent);
+}
+
+/* Version nav pills (Dota patch selector) */
+.changelog-nav {
+  position: relative;
+  margin: 0 -0.25rem;
+}
+
+.changelog-nav__scroll {
+  display: flex;
+  gap: 0.4rem;
+  overflow-x: auto;
+  padding: 0.25rem 0.25rem 0.75rem;
+  scroll-snap-type: x proximity;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-input) transparent;
+}
+
+.changelog-nav__pill {
+  flex-shrink: 0;
+  scroll-snap-align: start;
+  appearance: none;
+  border: 1px solid var(--border-input);
+  border-radius: 999px;
+  background: var(--card);
+  color: var(--muted-foreground);
+  font-family: var(--font-display);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 0.4rem 0.85rem;
+  cursor: pointer;
+  transition:
+    background var(--motion-fast) ease,
+    border-color var(--motion-fast) ease,
+    color var(--motion-fast) ease,
+    box-shadow var(--motion-fast) ease;
+}
+
+.changelog-nav__pill:hover {
+  border-color: var(--pill-accent, var(--primary));
+  color: var(--foreground);
+}
+
+.changelog-nav__pill--active {
+  background: color-mix(in srgb, var(--pill-accent, var(--primary)) 18%, var(--card));
+  border-color: var(--pill-accent, var(--primary));
+  color: var(--foreground);
+  box-shadow: 0 0 20px color-mix(in srgb, var(--pill-accent, var(--primary)) 35%, transparent);
+}
+
+/* Patch hero banner */
+.changelog-patch__hero {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 1.25rem;
+  align-items: center;
+  padding: 1.5rem;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--patch-accent, var(--primary)) 35%, var(--border));
+  margin-bottom: 1rem;
+}
+
+.changelog-patch__hero-bg {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+  opacity: 0.35;
+}
+
+.changelog-patch__hero-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    135deg,
+    rgba(11, 11, 11, 0.92) 0%,
+    rgba(11, 11, 11, 0.75) 45%,
+    color-mix(in srgb, var(--patch-accent, var(--primary)) 12%, rgba(11, 11, 11, 0.88)) 100%
+  );
+}
+
+.changelog-patch__hero-icon,
+.changelog-patch__hero-text {
+  position: relative;
+  z-index: 1;
+}
+
+.changelog-patch__hero-icon {
+  width: 5.5rem;
+  height: 5.5rem;
+  object-fit: contain;
+  filter: drop-shadow(0 8px 24px rgba(0, 0, 0, 0.55));
+}
+
+.changelog-patch__label {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--patch-accent, var(--primary));
+}
+
+.changelog-patch__version {
+  margin: 0.15rem 0 0;
+  font-family: var(--font-display);
+  font-size: clamp(2rem, 6vw, 2.75rem);
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  color: var(--foreground);
+  text-shadow: 0 2px 24px color-mix(in srgb, var(--patch-accent, var(--primary)) 50%, transparent);
+}
+
+.changelog-patch__title {
+  margin: 0.35rem 0 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--foreground);
+}
+
+.changelog-patch__tagline {
+  margin: 0.25rem 0 0;
+  font-size: 0.8125rem;
+  font-style: italic;
+  color: var(--tertiary);
+}
+
+.changelog-patch__date {
+  display: block;
+  margin-top: 0.5rem;
+  font-size: 0.6875rem;
+  color: var(--muted-foreground);
+}
+
+.changelog-patch__body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+/* Expandable sections */
+.changelog-section {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.02);
+  overflow: hidden;
+}
+
+.changelog-section__summary {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.85rem 1rem;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+  transition: background var(--motion-fast) ease;
+}
+
+.changelog-section__summary::-webkit-details-marker {
+  display: none;
+}
+
+.changelog-section__summary:hover {
+  background: var(--hover);
+}
+
+.changelog-section__icon {
+  flex-shrink: 0;
+  width: 2rem;
+  height: 2rem;
+  object-fit: contain;
+  border-radius: var(--radius-sm);
+  background: rgba(0, 0, 0, 0.35);
+  padding: 0.15rem;
+}
+
+.changelog-section__title {
+  flex: 1;
+  font-family: var(--font-display);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--foreground);
+}
+
+.changelog-section__chevron {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-right: 2px solid var(--muted-foreground);
+  border-bottom: 2px solid var(--muted-foreground);
+  transform: rotate(45deg);
+  transition: transform var(--motion-fast) ease;
+}
+
+.changelog-section[open] .changelog-section__chevron {
+  transform: rotate(-135deg) translate(-2px, -2px);
+}
+
+.changelog-section__list {
+  list-style: none;
+  margin: 0;
+  padding: 0 1rem 0.85rem 3.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.changelog-change {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--foreground);
+}
+
+.changelog-change__badge {
+  flex-shrink: 0;
+  margin-top: 0.1rem;
+  font-family: var(--font-display);
+  font-size: 0.5625rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 0.15rem 0.4rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+}
+
+.changelog-change--added .changelog-change__badge {
+  color: var(--primary);
+  background: var(--primary-dim);
+  border-color: rgba(66, 214, 140, 0.35);
+}
+
+.changelog-change--changed .changelog-change__badge {
+  color: var(--accent);
+  background: var(--accent-dim);
+  border-color: rgba(21, 93, 252, 0.35);
+}
+
+.changelog-change--fixed .changelog-change__badge {
+  color: #e8b84a;
+  background: rgba(232, 184, 74, 0.12);
+  border-color: rgba(232, 184, 74, 0.35);
+}
+
+.changelog-change--removed .changelog-change__badge {
+  color: var(--destructive);
+  background: var(--destructive-dim);
+  border-color: rgba(255, 100, 103, 0.35);
+}
+
+.changelog-change__text {
+  flex: 1;
+}
+
+@media (max-width: 560px) {
+  .changelog-patch__hero {
+    grid-template-columns: 1fr;
+    text-align: center;
+    justify-items: center;
+  }
+
+  .changelog-section__list {
+    padding-inline: 1rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .changelog-nav__pill,
+  .changelog-section__summary,
+  .changelog-section__chevron {
+    transition: none;
+  }
+}

@@ -31,6 +31,7 @@ jobs:
           sed "s/__VERSION__/${VERSION}/g" index.html > _site/index.html
           cp .nojekyll _site/
           cp -r css js _site/
+          test -f _site/css/changelog.css
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
