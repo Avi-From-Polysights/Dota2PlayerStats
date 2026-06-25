@@ -1,4 +1,5 @@
 import { GAMEMODE_TURBO } from "./game-modes.js";
+import { isRankedLobby } from "./lobby-types.js";
 import {
   OPENDOTA_PARSE_COST,
   OPENDOTA_REQUEST_COST,
@@ -169,11 +170,12 @@ export async function loadPlayerMatchesFiltered(
   limit,
   significant,
   patchId = null,
-  { excludeTurbo = true, signal, onRateLimitWait } = {}
+  { excludeTurbo = true, rankedOnly = false, signal, onRateLimitWait } = {}
 ) {
   const matches = [];
   let offset = 0;
   let turboSkipped = 0;
+  let rankedSkipped = 0;
   const maxScan = Math.min(Math.max(limit * 6, limit), 99_999);
 
   while (matches.length < limit && offset < maxScan) {
@@ -201,6 +203,10 @@ export async function loadPlayerMatchesFiltered(
         turboSkipped += 1;
         continue;
       }
+      if (rankedOnly && match.lobby_type != null && !isRankedLobby(match.lobby_type)) {
+        rankedSkipped += 1;
+        continue;
+      }
       matches.push(match);
       if (matches.length >= limit) break;
     }
@@ -209,7 +215,7 @@ export async function loadPlayerMatchesFiltered(
     if (batch.length < batchLimit) break;
   }
 
-  return { matches, turboSkipped };
+  return { matches, turboSkipped, rankedSkipped };
 }
 
 /**
@@ -218,12 +224,13 @@ export async function loadPlayerMatchesFiltered(
 export async function loadPlayerMatchesAll(
   accountId,
   limit,
-  { excludeTurbo = true, significant = false, signal, onRateLimitWait, onBatch } = {}
+  { excludeTurbo = true, rankedOnly = false, significant = false, signal, onRateLimitWait, onBatch } = {}
 ) {
   const matches = [];
   const seen = new Set();
   let offset = 0;
   let turboSkipped = 0;
+  let rankedSkipped = 0;
   const maxScan = limit > 0 ? limit : 10_000;
 
   while (matches.length < maxScan) {
@@ -252,6 +259,10 @@ export async function loadPlayerMatchesAll(
         turboSkipped += 1;
         continue;
       }
+      if (rankedOnly && match.lobby_type != null && !isRankedLobby(match.lobby_type)) {
+        rankedSkipped += 1;
+        continue;
+      }
 
       matches.push(match);
       if (matches.length >= maxScan) break;
@@ -261,7 +272,7 @@ export async function loadPlayerMatchesAll(
     if (batch.length < batchLimit) break;
   }
 
-  return { matches, turboSkipped };
+  return { matches, turboSkipped, rankedSkipped };
 }
 
 export async function loadMatchDetails(matchId, signal, options = {}) {

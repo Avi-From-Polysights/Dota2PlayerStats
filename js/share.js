@@ -29,6 +29,7 @@ export function buildShareUrl(params, { autoRun = false } = {}) {
     url.searchParams.set("window", params.window);
   }
   if (params.turbo === "1") url.searchParams.set("turbo", "1");
+  if (params.ranked === "1") url.searchParams.set("ranked", "1");
   if (params.parse === "0") url.searchParams.set("parse", "0");
   if (params.parsemax && params.parsemax !== FORM_DEFAULTS.parsemax) {
     url.searchParams.set("parsemax", params.parsemax);
@@ -99,6 +100,10 @@ export function applyUrlParams(heroes) {
   }
   if (params.has("turbo")) {
     document.getElementById("exclude-turbo").checked = params.get("turbo") !== "1";
+    hasParams = true;
+  }
+  if (params.has("ranked")) {
+    document.getElementById("ranked-only").checked = params.get("ranked") === "1";
     hasParams = true;
   }
   if (params.has("parse")) {

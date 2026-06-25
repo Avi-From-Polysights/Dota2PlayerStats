@@ -1066,6 +1066,38 @@ input[type="checkbox"] {
   color: var(--destructive);
 }
 
+.alert--warning {
+  background: rgba(197, 154, 47, 0.12);
+  border: 1px solid rgba(197, 154, 47, 0.35);
+  color: #e8c468;
+}
+
+.data-quality-panel {
+  margin-bottom: 1rem;
+  border-color: rgba(197, 154, 47, 0.25);
+}
+
+.data-quality-list {
+  margin: 0;
+  padding: 0 0 0 1.1rem;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.data-quality-list__item {
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  color: var(--tertiary);
+}
+
+.data-quality-list__item--high {
+  color: #ffb4b6;
+}
+
+.data-quality-list__item--medium {
+  color: #e8c468;
+}
+
 .hidden {
   display: none !important;
 }

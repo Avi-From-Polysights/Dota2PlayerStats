@@ -3,6 +3,7 @@ import { didPlayerWin, isRadiant } from "./api.js";
 import { computeLaneOutcome, computeLaneOutcomeVsOpponent, laneLabel, resolvePlayerLane } from "./lane.js";
 import { matchEnemyLaneFilter, matchMyLaneFilter } from "./lane-filters.js";
 import { GAMEMODE_TURBO } from "./game-modes.js";
+import { isRankedLobby } from "./lobby-types.js";
 
 function emptyBucket() {
   return {
@@ -45,7 +46,7 @@ export function analyzeMatches(
   accountId,
   heroNames,
   confidence,
-  { turboSkippedList = 0, laneFilters = {} } = {}
+  { turboSkippedList = 0, rankedSkippedList = 0, rankedOnly = false, laneFilters = {} } = {}
 ) {
   const filterMyPosition = Boolean(laneFilters.myLane || laneFilters.myRole);
   const filterEnemyPosition = Boolean(laneFilters.enemyLane || laneFilters.enemyRole);
@@ -67,6 +68,7 @@ export function analyzeMatches(
   let lanePositionUnknown = 0;
   let parsedReplayCount = 0;
   let turboSkipped = 0;
+  let rankedSkipped = 0;
   let gameWinsWhenLaneWon = 0;
   let gameWinsWhenLaneLost = 0;
   let gameWinsWhenLaneDraw = 0;
@@ -101,6 +103,12 @@ export function analyzeMatches(
     if (details.game_mode === GAMEMODE_TURBO) {
       skipped += 1;
       turboSkipped += 1;
+      continue;
+    }
+
+    if (rankedOnly && !isRankedLobby(details.lobby_type)) {
+      skipped += 1;
+      rankedSkipped += 1;
       continue;
     }
 
@@ -285,6 +293,7 @@ export function analyzeMatches(
     lanePositionUnknown,
     parsedReplayCount,
     turboSkipped: turboSkippedList + turboSkipped,
+    rankedSkipped: rankedSkippedList + rankedSkipped,
     overallLaneWinrate,
     overallLaneCi,
     gameWinWhenLaneWon: laneWon ? (gameWinsWhenLaneWon / laneWon) * 100 : null,

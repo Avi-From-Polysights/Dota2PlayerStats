@@ -130,6 +130,17 @@
                 </label>
 
                 <label class="field field--checkbox">
+                  <input type="checkbox" id="ranked-only" name="rankedOnly" />
+                  <div class="field__label-row">
+                    <span class="field__label">Ranked only</span>
+                    <span class="info-tip">
+                      <button type="button" class="info-tip__btn" aria-label="About Ranked only">i</button>
+                      <span class="info-tip__panel" role="tooltip">Keep only OpenDota lobby_type ranked matchmaking games (lobby 7). Unranked All Pick and other modes are skipped when scanning history.</span>
+                    </span>
+                  </div>
+                </label>
+
+                <label class="field field--checkbox">
                   <input type="checkbox" id="significant-only" name="significant" />
                   <div class="field__label-row">
                     <span class="field__label">Significant matches only</span>
@@ -292,6 +303,14 @@
       <section id="error-banner" class="alert alert--error hidden" role="alert"></section>
 
       <section id="results" class="results hidden">
+        <article id="data-quality-panel" class="card data-quality-panel motion-rise hidden">
+          <div class="section-head section-head--compact">
+            <h2 class="section-title">Data quality</h2>
+            <p id="data-quality-desc" class="section-desc">Review these before trusting lane stats or narrow filters.</p>
+          </div>
+          <ul id="data-quality-list" class="data-quality-list" role="list"></ul>
+        </article>
+
         <div class="summary-grid motion-stagger" id="summary-cards"></div>
 
         <article id="parse-status-panel" class="card parse-status-panel motion-rise hidden">
@@ -459,6 +478,11 @@
                 <label class="field field--checkbox">
                   <input type="checkbox" id="tool-exclude-turbo" checked />
                   <span class="field__label">Exclude Turbo</span>
+                </label>
+
+                <label class="field field--checkbox">
+                  <input type="checkbox" id="tool-ranked-only" />
+                  <span class="field__label">Ranked only</span>
                 </label>
 
                 <label class="field field--checkbox">

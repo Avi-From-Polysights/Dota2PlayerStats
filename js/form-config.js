@@ -8,6 +8,7 @@ export const FORM_DEFAULTS = {
   sig: "0",
   patch: "",
   turbo: "0",
+  ranked: "0",
   parse: "1",
   parsemax: "0",
   parseparallel: "0",
@@ -30,6 +31,7 @@ export function captureFormConfig() {
     patch: document.getElementById("patch-filter")?.value ?? "",
     window: document.getElementById("rolling-window")?.value ?? FORM_DEFAULTS.window,
     turbo: document.getElementById("exclude-turbo")?.checked ? "0" : "1",
+    ranked: document.getElementById("ranked-only")?.checked ? "1" : "0",
     parse: document.getElementById("request-parse")?.checked ? "1" : "0",
     parsemax: document.getElementById("parse-max")?.value ?? FORM_DEFAULTS.parsemax,
     parseparallel: document.getElementById("parse-parallel-enabled")?.checked ? "1" : "0",
@@ -74,6 +76,7 @@ export function applyFormConfig(values, { heroes = [], heroPicker = null } = {})
   if (values.parsemaxretries != null) setValue("parse-max-retries", values.parsemaxretries);
 
   if (values.turbo != null) setCheckbox("exclude-turbo", values.turbo !== "1");
+  if (values.ranked != null) setCheckbox("ranked-only", values.ranked === "1");
   if (values.sig != null) setCheckbox("significant-only", values.sig === "1");
   if (values.parse != null) setCheckbox("request-parse", values.parse === "1");
   if (values.parseparallel != null) {

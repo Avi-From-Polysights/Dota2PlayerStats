@@ -38,6 +38,30 @@ export const SECTION_ICONS = {
  */
 export const CHANGELOGS = [
   {
+    version: "0.0.42",
+    date: "2026-06-25",
+    title: "Data Quality & Ranked Filter",
+    tagline: "Warn when stats lie; filter ranked only.",
+    heroImage: DOTA_IMG.items.aghanim,
+    accent: "#c59a2f",
+    sections: [
+      {
+        id: "features",
+        title: "Feature Updates",
+        items: [
+          {
+            type: "added",
+            text: "Data quality panel after analysis — warns when parse/STRATZ is off, lane data is sparse, Wilson intervals are wide, or lane filters lack assignments.",
+          },
+          {
+            type: "added",
+            text: "Ranked only filter (OpenDota lobby_type 7) alongside Exclude Turbo, in Analyze and Tools.",
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: "0.0.41",
     date: "2026-06-25",
     title: "Significant Filter Tooltip",

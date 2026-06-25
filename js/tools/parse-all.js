@@ -37,6 +37,7 @@ export async function runBatchParseTool({
   maxMatches,
   excludeTurbo,
   significant,
+  rankedOnly = false,
   parseIgnoreAgeLimit = false,
   toolLabel = "Parse-all",
   signal,
@@ -76,9 +77,10 @@ export async function runBatchParseTool({
   try {
     multiLog?.info(`Scanning OpenDota for matches (all heroes, limit ${scanLimit})…`);
 
-    const { matches, turboSkipped } = await loadPlayerMatchesAll(accountId, scanLimit, {
+    const { matches, turboSkipped, rankedSkipped } = await loadPlayerMatchesAll(accountId, scanLimit, {
       excludeTurbo,
       significant,
+      rankedOnly,
       signal,
       onRateLimitWait: (info) => {
         loadStats.throttlePauses += 1;
@@ -106,7 +108,7 @@ export async function runBatchParseTool({
     }
 
     multiLog?.info(
-      `Found ${matches.length} matches${turboSkipped ? ` (${turboSkipped} turbo skipped)` : ""}. Checking cache…`
+      `Found ${matches.length} matches${turboSkipped ? ` (${turboSkipped} turbo skipped)` : ""}${rankedSkipped ? ` (${rankedSkipped} non-ranked skipped)` : ""}. Checking cache…`
     );
 
     const matchIds = matches.map((m) => m.match_id);
@@ -270,6 +272,7 @@ function bindBatchParseForm({
       accountId,
       maxMatches: Number(document.getElementById(maxMatchesInputId)?.value),
       excludeTurbo: document.getElementById("tool-exclude-turbo")?.checked ?? true,
+      rankedOnly: document.getElementById("tool-ranked-only")?.checked ?? false,
       significant: document.getElementById("tool-significant-only")?.checked ?? false,
       parseIgnoreAgeLimit,
       toolLabel,

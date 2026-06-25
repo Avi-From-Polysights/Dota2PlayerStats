@@ -68,6 +68,7 @@ import {
   populateLaneFilterSelects,
   readLaneFiltersFromDom,
 } from "./lane-filters.js";
+import { assessAnalysisQuality } from "./data-quality.js";
 
 const form = document.getElementById("stats-form");
 const heroSearch = document.getElementById("hero-search");
@@ -127,6 +128,7 @@ function renderAnalysisResults(analysis, meta) {
   const trend = trendDirection(rolling);
 
   renderSummary(analysis, heroName, trend, rollingWindow, selectedPatchLabel, loadStats, laneFilters);
+  renderDataQualityPanel(analysis, loadStats, meta);
   renderParseStatusPanel(loadStats, meta.requestParse);
   renderMatchupFilterNote(laneFilters);
   renderLaneVsGameStats(analysis);
@@ -178,6 +180,8 @@ function refilterCachedAnalysis() {
     cachedAnalysisSession.confidence,
     {
       turboSkippedList: cachedAnalysisSession.turboSkippedList,
+      rankedSkippedList: cachedAnalysisSession.rankedSkippedList,
+      rankedOnly: cachedAnalysisSession.rankedOnly,
       laneFilters,
     }
   );
@@ -288,7 +292,7 @@ function renderSummary(analysis, heroName, trend, rollingWindow, selectedPatchLa
     <div class="summary-card">
       <div class="summary-card__label">Hero</div>
       <div class="summary-card__value" style="font-size:1.35rem">${heroName}</div>
-      <div class="summary-card__sub">${analysis.processed} processed · ${analysis.skipped} skipped${analysis.turboSkipped ? ` · ${analysis.turboSkipped} turbo excluded` : ""}${laneSkipNote ? ` · ${laneSkipNote}` : ""}${laneFilterNote ? ` · ${laneFilterNote}` : ""}${loadNote ? ` · ${loadNote}` : ""}</div>
+      <div class="summary-card__sub">${analysis.processed} processed · ${analysis.skipped} skipped${analysis.turboSkipped ? ` · ${analysis.turboSkipped} turbo excluded` : ""}${analysis.rankedSkipped ? ` · ${analysis.rankedSkipped} non-ranked excluded` : ""}${laneSkipNote ? ` · ${laneSkipNote}` : ""}${laneFilterNote ? ` · ${laneFilterNote}` : ""}${loadNote ? ` · ${loadNote}` : ""}</div>
     </div>
     <div class="summary-card">
       <div class="summary-card__label">Recent trend</div>
@@ -296,6 +300,41 @@ function renderSummary(analysis, heroName, trend, rollingWindow, selectedPatchLa
       <div class="summary-card__sub">${rollingWindow}-match rolling window</div>
     </div>
   `;
+}
+
+function renderDataQualityPanel(analysis, loadStats, meta) {
+  const panel = document.getElementById("data-quality-panel");
+  const list = document.getElementById("data-quality-list");
+  const desc = document.getElementById("data-quality-desc");
+  if (!panel || !list) return;
+
+  const { warnings } = assessAnalysisQuality(analysis, loadStats, {
+    requestParse: meta.requestParse ?? true,
+    useStratzFallback: meta.useStratzFallback ?? false,
+    hasLaneFilters: hasActiveLaneFilters(meta.laneFilters ?? {}),
+  });
+
+  if (!warnings.length) {
+    panel.classList.add("hidden");
+    list.innerHTML = "";
+    return;
+  }
+
+  const highCount = warnings.filter((w) => w.severity === "high").length;
+  if (desc) {
+    desc.textContent =
+      highCount > 0
+        ? `${highCount} serious issue(s) — lane and filter stats may not match your sample.`
+        : "Some metrics have limited data — interpret with caution.";
+  }
+
+  list.innerHTML = warnings
+    .map(
+      (w) =>
+        `<li class="data-quality-list__item data-quality-list__item--${w.severity}" role="listitem">${w.text}</li>`
+    )
+    .join("");
+  panel.classList.remove("hidden");
 }
 
 function renderMatchupFilterNote(laneFilters) {
@@ -637,6 +676,7 @@ form.addEventListener("submit", async (event) => {
   const limit = Number(document.getElementById("match-limit").value);
   const significant = document.getElementById("significant-only").checked;
   const excludeTurbo = document.getElementById("exclude-turbo").checked;
+  const rankedOnly = document.getElementById("ranked-only").checked;
   const requestParse = requestParseCheckbox.checked;
   const parseMaxRaw = Number(parseMaxInput.value);
   const parseParallelism = clampParseConcurrency(parseParallelismInput?.value);
@@ -710,15 +750,18 @@ form.addEventListener("submit", async (event) => {
       significant,
       patchId,
       excludeTurbo,
+      rankedOnly,
     });
 
     let matchList;
     let turboSkipped;
+    let rankedSkipped;
     const cachedList = await getCachedMatchList(matchListKey);
 
     if (cachedList) {
       matchList = cachedList.matches;
       turboSkipped = cachedList.turboSkipped;
+      rankedSkipped = cachedList.rankedSkipped ?? 0;
       loadStats.matchListFromCache = true;
       analyzeMultiLog?.cache(`Match list from cache (${matchList.length} games)`);
       setProgress(true, 2, `Match list loaded from cache (${matchList.length} games)…`);
@@ -730,11 +773,12 @@ form.addEventListener("submit", async (event) => {
         limit,
         significant,
         patchId,
-        { excludeTurbo, signal, onRateLimitWait }
+        { excludeTurbo, rankedOnly, signal, onRateLimitWait }
       );
       matchList = result.matches;
       turboSkipped = result.turboSkipped;
-      await setCachedMatchList(matchListKey, { matches: matchList, turboSkipped });
+      rankedSkipped = result.rankedSkipped;
+      await setCachedMatchList(matchListKey, { matches: matchList, turboSkipped, rankedSkipped });
     }
 
     if (!matchList.length) {
@@ -811,15 +855,20 @@ form.addEventListener("submit", async (event) => {
       heroMap,
       confidence,
       turboSkippedList: turboSkipped,
+      rankedSkippedList: rankedSkipped,
+      rankedOnly,
       heroName,
       rollingWindow,
       selectedPatchLabel,
       loadStats,
       requestParse,
+      useStratzFallback,
     };
 
     const analysis = analyzeMatches(detailsList, accountId, heroMap, confidence, {
       turboSkippedList: turboSkipped,
+      rankedSkippedList: rankedSkipped,
+      rankedOnly,
       laneFilters,
     });
 
