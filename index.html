@@ -10,6 +10,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,100..900&family=Pragati+Narrow:wght@700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="css/style.css?v=__VERSION__" />
   <link rel="stylesheet" href="css/changelog.css?v=__VERSION__" />
+  <link rel="stylesheet" href="css/onboarding.css?v=__VERSION__" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js" defer></script>
   <script type="module" src="js/app.js?v=__VERSION__"></script>
 </head>
@@ -86,7 +87,7 @@
             </div>
           </details>
 
-          <details class="config-section" open>
+          <details class="config-section" id="match-scope-section" open>
             <summary class="config-section__summary">
               <span class="config-section__title">Sample &amp; filters</span>
             </summary>
@@ -445,6 +446,19 @@
             <h2 class="section-title">Batch tools</h2>
             <p class="section-desc">Long-running jobs with local caching. Expand a tool to configure and run it.</p>
           </div>
+
+          <details class="tool-accordion" id="tutorial-tool-accordion" open>
+            <summary class="tool-accordion__summary">
+              <span class="tool-accordion__title">Guided tour</span>
+              <span class="tool-accordion__badge tool-accordion__badge--accent">Help</span>
+            </summary>
+            <div class="tool-accordion__body">
+              <p class="tool-accordion__desc">Replay the first-run walkthrough that highlights account setup, filters, parsing, results, and footer actions.</p>
+              <div class="form-actions">
+                <button type="button" id="tutorial-restart-btn" class="btn btn--outline">Restart guided tour</button>
+              </div>
+            </div>
+          </details>
 
           <details class="tool-accordion">
             <summary class="tool-accordion__summary">

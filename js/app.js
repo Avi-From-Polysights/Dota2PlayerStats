@@ -56,6 +56,7 @@ import {
 import { initChangelogs } from "./changelogs.js";
 import { initAppMotion, initScrollReveals, animateResultsReveal } from "./motion.js";
 import { initMainTabs } from "./tabs.js";
+import { initOnboarding } from "./onboarding.js";
 import { initTools } from "./tools.js";
 import { initConfigUi, getParallelConcurrency } from "./config-ui.js";
 import { readStratzSettingsFromDom, initStratzTokenPersistence } from "./stratz-token.js";
@@ -915,12 +916,15 @@ async function init() {
     // IndexedDB unavailable (private mode, etc.)
   }
 
+  let skipTourAutoRun = false;
+
   try {
     const [list, patchList] = await Promise.all([loadHeroes(), loadPatches()]);
     populateHeroes(list);
     populatePatches(patchList);
 
     const { hasParams, shouldAutoRun } = applyUrlParams(list);
+    skipTourAutoRun = shouldAutoRun;
     heroPicker.resolveHeroId({ fuzzy: true });
 
     const configCtx = { heroes: list, heroPicker };
@@ -960,6 +964,12 @@ async function init() {
 
   initAppMotion();
   initScrollReveals();
+
+  if (!skipTourAutoRun) {
+    initOnboarding({ autoStart: true });
+  } else {
+    initOnboarding({ autoStart: false });
+  }
 }
 
 init();

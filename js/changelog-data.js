@@ -38,6 +38,30 @@ export const SECTION_ICONS = {
  */
 export const CHANGELOGS = [
   {
+    version: "0.0.43",
+    date: "2026-06-25",
+    title: "Guided Tour",
+    tagline: "First-run walkthrough with spotlight steps.",
+    heroImage: DOTA_IMG.heroes.crystal_maiden,
+    accent: "#42d68c",
+    sections: [
+      {
+        id: "features",
+        title: "Feature Updates",
+        items: [
+          {
+            type: "added",
+            text: "First-run guided tour — step-by-step spotlight modals for account, hero, filters, parsing, results, tabs, and footer actions.",
+          },
+          {
+            type: "added",
+            text: "Restart guided tour button in Tools → Guided tour for replaying the walkthrough anytime.",
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: "0.0.42",
     date: "2026-06-25",
     title: "Data Quality & Ranked Filter",

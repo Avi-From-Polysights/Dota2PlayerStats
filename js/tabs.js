@@ -3,6 +3,14 @@ import { animateTabPanel } from "./motion.js";
 const TAB_KEY = "dota2stats-tab";
 const VALID_TABS = new Set(["analyze", "tools", "changelogs"]);
 
+/** @type {((name: string) => void) | null} */
+let activateTabFn = null;
+
+/** Switch main tab programmatically (Analyze, Tools, Changelogs). */
+export function activateMainTab(name) {
+  activateTabFn?.(name);
+}
+
 export function initMainTabs() {
   const tabs = document.querySelectorAll(".main-tabs__tab");
   const panels = document.querySelectorAll("[data-tab-panel]");
@@ -60,5 +68,6 @@ export function initMainTabs() {
     }
   }
 
+  activateTabFn = activate;
   activate(initial);
 }

@@ -1,0 +1,112 @@
+body.tutorial-active {
+  overflow: hidden;
+}
+
+.tutorial {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  pointer-events: none;
+}
+
+.tutorial.hidden {
+  display: none;
+}
+
+.tutorial__backdrop {
+  position: absolute;
+  inset: 0;
+  background: transparent;
+  pointer-events: auto;
+}
+
+.tutorial__spotlight {
+  position: fixed;
+  border-radius: var(--radius-md);
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.78);
+  pointer-events: none;
+  transition:
+    top var(--motion-base) var(--motion-ease),
+    left var(--motion-base) var(--motion-ease),
+    width var(--motion-base) var(--motion-ease),
+    height var(--motion-base) var(--motion-ease);
+  z-index: 301;
+}
+
+.tutorial__spotlight.hidden {
+  opacity: 0;
+}
+
+.tutorial__popover {
+  position: fixed;
+  z-index: 302;
+  width: min(calc(100vw - 2rem), 22rem);
+  padding: 1rem 1.125rem 1.125rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--card);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+  pointer-events: auto;
+}
+
+.tutorial__popover--center {
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.tutorial__step {
+  margin: 0 0 0.35rem;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--primary);
+}
+
+.tutorial__title {
+  margin: 0 0 0.5rem;
+  font-family: var(--font-display);
+  font-size: 0.9375rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--foreground);
+}
+
+.tutorial__body {
+  margin: 0 0 1rem;
+  font-size: 0.8125rem;
+  line-height: 1.55;
+  color: var(--muted-foreground);
+}
+
+.tutorial__actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.tutorial__nav {
+  display: flex;
+  gap: 0.5rem;
+  margin-left: auto;
+}
+
+.tutorial__back:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+@media (max-width: 480px) {
+  .tutorial__actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .tutorial__nav {
+    margin-left: 0;
+    justify-content: flex-end;
+  }
+}
