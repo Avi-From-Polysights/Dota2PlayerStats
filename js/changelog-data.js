@@ -38,6 +38,26 @@ export const SECTION_ICONS = {
  */
 export const CHANGELOGS = [
   {
+    version: "0.0.41",
+    date: "2026-06-25",
+    title: "Significant Filter Tooltip",
+    tagline: "OpenDota significant ≠ ranked-only.",
+    heroImage: DOTA_IMG.heroes.crystal_maiden,
+    accent: "#9a9a9a",
+    sections: [
+      {
+        id: "ui",
+        title: "UI Updates",
+        items: [
+          {
+            type: "changed",
+            text: "“Significant matches only” tooltip now explains OpenDota’s significant=1 API filter (excludes casual modes like Turbo), not ranked-only or Wilson confidence.",
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: "0.0.40",
     date: "2026-06-25",
     title: "Lane Filters & Chart Confidence",

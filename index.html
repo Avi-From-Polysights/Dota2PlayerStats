@@ -135,7 +135,7 @@
                     <span class="field__label">Significant matches only</span>
                     <span class="info-tip">
                       <button type="button" class="info-tip__btn" aria-label="About Significant matches only">i</button>
-                      <span class="info-tip__panel" role="tooltip">Typically ranked games only.</span>
+                      <span class="info-tip__panel" role="tooltip">Passes OpenDota&apos;s <code>significant=1</code> filter on the match list. Excludes modes OpenDota marks as insignificant (Turbo and other casual/event games). Standard unranked All Pick is usually still included. Unrelated to Wilson confidence intervals.</span>
                     </span>
                   </div>
                 </label>
@@ -463,7 +463,13 @@
 
                 <label class="field field--checkbox">
                   <input type="checkbox" id="tool-significant-only" />
-                  <span class="field__label">Significant matches only</span>
+                  <div class="field__label-row">
+                    <span class="field__label">Significant matches only</span>
+                    <span class="info-tip">
+                      <button type="button" class="info-tip__btn" aria-label="About Significant matches only">i</button>
+                      <span class="info-tip__panel" role="tooltip">OpenDota <code>significant=1</code> — excludes casual modes like Turbo, not ranked-only and not statistical confidence.</span>
+                    </span>
+                  </div>
                 </label>
 
                 <label class="field field--checkbox">
