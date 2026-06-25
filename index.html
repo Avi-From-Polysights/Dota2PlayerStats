@@ -70,9 +70,11 @@
                       <span class="info-tip__panel" role="tooltip">The hero you played in these games. The matchup table shows enemy heroes you faced while on this pick.</span>
                     </span>
                   </div>
-                  <input type="text" id="hero-search" list="hero-list" placeholder="Search hero…" autocomplete="off" required />
+                  <div class="hero-combobox" id="hero-combobox">
+                    <input type="text" id="hero-search" placeholder="Loading heroes…" autocomplete="off" required disabled />
+                    <ul id="hero-suggestions" class="hero-combobox__list hidden" role="listbox" aria-label="Hero suggestions"></ul>
+                  </div>
                   <input type="hidden" id="hero-id" name="heroId" />
-                  <datalist id="hero-list"></datalist>
                 </label>
               </div>
             </div>
@@ -264,7 +266,7 @@
           </details>
 
           <div class="form-actions">
-            <button type="submit" id="fetch-btn" class="btn btn--primary">Analyze matches</button>
+            <button type="submit" id="fetch-btn" class="btn btn--primary" disabled>Analyze matches</button>
             <button type="button" id="export-btn" class="btn btn--outline" disabled>Export CSV</button>
           </div>
         </form>

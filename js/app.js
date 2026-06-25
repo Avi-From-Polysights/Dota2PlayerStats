@@ -52,6 +52,7 @@ import { initTools } from "./tools.js";
 import { initConfigUi, getParallelConcurrency } from "./config-ui.js";
 import { readStratzSettingsFromDom, initStratzTokenPersistence } from "./stratz-token.js";
 import { parseFailureLabel } from "./parse-failures.js";
+import { createHeroPicker } from "./hero-picker.js";
 import {
   applyLaneFiltersToDom,
   formatLaneFilterSummary,
@@ -63,7 +64,11 @@ import {
 const form = document.getElementById("stats-form");
 const heroSearch = document.getElementById("hero-search");
 const heroIdInput = document.getElementById("hero-id");
-const heroList = document.getElementById("hero-list");
+const heroPicker = createHeroPicker({
+  input: heroSearch,
+  hiddenInput: heroIdInput,
+  suggestionsEl: document.getElementById("hero-suggestions"),
+});
 const progressEl = document.getElementById("progress");
 const progressFill = document.getElementById("progress-fill");
 const progressText = document.getElementById("progress-text");
@@ -93,7 +98,6 @@ const ACCOUNT_ID_HINT =
   "Check your Account ID on OpenDota: search your Steam name, open your profile, and copy the number from the URL (opendota.com/players/123456789). Use that ID, not Steam ID64.";
 let patches = [];
 let heroes = [];
-let heroByName = new Map();
 let lastMatchupRows = [];
 let sortState = { key: "games", dir: "desc" };
 let abortController = null;
@@ -203,21 +207,13 @@ function setProgress(visible, pct = 0, text = "") {
 
 function populateHeroes(list) {
   heroes = list;
-  heroByName = new Map(list.map((h) => [h.name.toLowerCase(), h]));
-  heroList.innerHTML = list.map((h) => `<option value="${h.name}"></option>`).join("");
+  heroPicker.setHeroes(list);
+  fetchBtn.disabled = false;
 }
 
 function resolveHeroId() {
-  const query = heroSearch.value.trim().toLowerCase();
-  const hero = heroByName.get(query);
-  if (hero) {
-    heroIdInput.value = String(hero.id);
-    return hero.id;
-  }
-  return null;
+  return heroPicker.resolveHeroId({ fuzzy: true });
 }
-
-heroSearch.addEventListener("input", resolveHeroId);
 
 function populatePatches(list) {
   patches = list;
@@ -655,7 +651,11 @@ form.addEventListener("submit", async (event) => {
   }
 
   if (!heroId) {
-    showError("Pick a hero from the list.");
+    showError(
+      heroes.length
+        ? "Pick a hero from the list."
+        : "Hero list still loading — wait a moment and try again."
+    );
     return;
   }
 
@@ -848,6 +848,7 @@ async function init() {
     populatePatches(patchList);
 
     const { hasParams, shouldAutoRun } = applyUrlParams(list);
+    heroPicker.resolveHeroId({ fuzzy: true });
     const accountFromUrl = document.getElementById("account-id").value;
     if (accountFromUrl) {
       rememberAccountFromApi(Number(accountFromUrl)).catch(() => {});
@@ -855,10 +856,7 @@ async function init() {
 
     if (!hasParams) {
       const kez = list.find((h) => h.name === "Kez");
-      if (kez) {
-        heroSearch.value = kez.name;
-        heroIdInput.value = String(kez.id);
-      }
+      if (kez) heroPicker.setHeroById(kez.id);
     }
 
     if (shouldAutoRun && document.getElementById("account-id").value && resolveHeroId()) {
@@ -866,6 +864,7 @@ async function init() {
     }
   } catch (error) {
     showError(`Could not load hero list: ${error.message}`);
+    fetchBtn.disabled = true;
   }
 }
 

@@ -320,6 +320,38 @@ a:hover {
   max-width: 12rem;
 }
 
+.hero-combobox {
+  position: relative;
+}
+
+.hero-combobox__list {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 0.25rem);
+  left: 0;
+  right: 0;
+  max-height: 14rem;
+  overflow-y: auto;
+  margin: 0;
+  padding: 0.25rem 0;
+  list-style: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--popover);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+.hero-combobox__option {
+  padding: 0.5rem 0.75rem;
+  cursor: pointer;
+  font-size: 0.875rem;
+}
+
+.hero-combobox__option:hover,
+.hero-combobox__option:focus {
+  background: rgba(66, 214, 140, 0.12);
+}
+
 .field--disabled {
   opacity: 0.45;
   pointer-events: none;
