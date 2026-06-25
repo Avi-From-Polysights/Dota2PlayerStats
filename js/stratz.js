@@ -203,7 +203,17 @@ export async function fetchStratzMatchLane(matchId, apiToken, { signal, onRateLi
     }
 
     if (!response.ok) {
-      throw new StratzApiError(`STRATZ HTTP ${response.status}`, { status: response.status });
+      let detail = "";
+      try {
+        const errBody = await response.json();
+        detail = errBody?.errors?.map((e) => e.message).join("; ") ?? errBody?.message ?? "";
+      } catch {
+        // ignore non-JSON body
+      }
+      const suffix = detail ? `: ${detail}` : "";
+      throw new StratzApiError(`STRATZ HTTP ${response.status}${suffix}`, {
+        status: response.status,
+      });
     }
 
     const payload = await response.json();

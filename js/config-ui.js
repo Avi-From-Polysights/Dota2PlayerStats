@@ -1,4 +1,6 @@
 /** Toggle dependent form fields for parse / parallel / retry sections. */
+import { syncStratzTokenToInput } from "./stratz-token.js";
+
 export function initConfigUi() {
   const requestParse = document.getElementById("request-parse");
   const parseSection = document.getElementById("parse-options");
@@ -61,6 +63,7 @@ export function initConfigUi() {
 
   const syncStratzFields = () => {
     const on = stratzFallback?.checked ?? false;
+    if (on) syncStratzTokenToInput();
     if (stratzToken instanceof HTMLInputElement) {
       stratzToken.disabled = !on;
     }

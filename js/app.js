@@ -307,6 +307,11 @@ function winrateClass(value) {
   return "";
 }
 
+function formatLaneWld(row) {
+  if (!row.laneGames) return "—";
+  return `<span class="lane-wld"><span class="lane-wld__w">${row.laneWon}</span>-<span class="lane-wld__l">${row.laneLost}</span>-<span class="lane-wld__d">${row.laneDraw}</span></span>`;
+}
+
 function renderMatchupTable(rows) {
   lastMatchupRows = rows;
   matchupTableBody.innerHTML = rows
@@ -319,7 +324,7 @@ function renderMatchupTable(rows) {
         <td>${row.losses}</td>
         <td class="winrate-cell ${winrateClass(row.winrate)}">${formatPct(row.winrate)}</td>
         <td>${row.laneGames ?? 0}</td>
-        <td>${row.laneGames ? `${row.laneWon}-${row.laneLost}-${row.laneDraw}` : "—"}</td>
+        <td>${formatLaneWld(row)}</td>
         <td class="winrate-cell ${row.laneWinrate != null ? winrateClass(row.laneWinrate) : ""}">${row.laneWinrate != null ? formatPct(row.laneWinrate) : "—"}</td>
         <td>${formatPct(row.wilsonLower)}</td>
         <td>${formatPct(row.wilsonUpper)}</td>
@@ -659,6 +664,13 @@ form.addEventListener("submit", async (event) => {
     return;
   }
 
+  if (useStratzFallback && !stratzToken) {
+    showError(
+      "STRATZ fallback is on but no API token was found. Paste your token from stratz.com/api in Parameters (it is saved in this browser only)."
+    );
+    return;
+  }
+
   const heroName = heroSearch.value.trim();
   syncUrlFromForm();
   cachedAnalysisSession = null;
@@ -822,8 +834,8 @@ async function init() {
   document.getElementById("app-version").textContent = `v${APP_VERSION}`;
   initFieldTooltips();
   initMainTabs();
-  initConfigUi();
   initStratzTokenPersistence();
+  initConfigUi();
   populateLaneFilterSelects();
   initLaneFilterListeners();
   analyzeMultiLog = initMultiActivityLog("activity-log-panel");

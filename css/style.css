@@ -1253,6 +1253,20 @@ input[type="checkbox"] {
   color: var(--destructive);
 }
 
+.lane-wld__w {
+  color: var(--primary);
+  font-weight: 600;
+}
+
+.lane-wld__l {
+  color: var(--destructive);
+  font-weight: 600;
+}
+
+.lane-wld__d {
+  color: var(--muted-foreground);
+}
+
 /* Lane breakdown */
 .lane-table {
   margin-top: 1rem;

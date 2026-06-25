@@ -18,24 +18,42 @@ export function writeStratzTokenToStorage(token) {
   }
 }
 
+/** Prefer typed value, then localStorage (survives reload / share links). */
+export function resolveStratzToken(tokenInput = document.getElementById("stratz-api-token")) {
+  const fromInput = tokenInput?.value?.trim() ?? "";
+  if (fromInput) return fromInput;
+  return readStratzTokenFromStorage().trim();
+}
+
+export function syncStratzTokenToInput() {
+  const tokenInput = document.getElementById("stratz-api-token");
+  if (!(tokenInput instanceof HTMLInputElement)) return;
+  const stored = readStratzTokenFromStorage().trim();
+  if (stored && !tokenInput.value.trim()) {
+    tokenInput.value = stored;
+  }
+}
+
 export function readStratzSettingsFromDom() {
   const enabled = document.getElementById("stratz-fallback")?.checked ?? false;
-  const tokenInput = document.getElementById("stratz-api-token");
-  const token = tokenInput?.value?.trim() || readStratzTokenFromStorage();
-  return { enabled, token };
+  return { enabled, token: resolveStratzToken() };
 }
 
 export function initStratzTokenPersistence() {
   const tokenInput = document.getElementById("stratz-api-token");
   const checkbox = document.getElementById("stratz-fallback");
-  if (!tokenInput) return;
+  if (!(tokenInput instanceof HTMLInputElement)) return;
 
-  const saved = readStratzTokenFromStorage();
-  if (saved) tokenInput.value = saved;
+  syncStratzTokenToInput();
 
-  tokenInput.addEventListener("change", () => writeStratzTokenToStorage(tokenInput.value));
-  tokenInput.addEventListener("blur", () => writeStratzTokenToStorage(tokenInput.value));
+  const persist = () => writeStratzTokenToStorage(tokenInput.value);
+  tokenInput.addEventListener("input", persist);
+  tokenInput.addEventListener("change", persist);
+  tokenInput.addEventListener("blur", persist);
   checkbox?.addEventListener("change", () => {
-    if (checkbox.checked) writeStratzTokenToStorage(tokenInput.value);
+    if (checkbox.checked) {
+      syncStratzTokenToInput();
+      persist();
+    }
   });
 }
