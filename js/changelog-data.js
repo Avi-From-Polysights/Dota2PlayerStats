@@ -38,6 +38,26 @@ export const SECTION_ICONS = {
  */
 export const CHANGELOGS = [
   {
+    version: "0.0.37",
+    date: "2026-06-25",
+    title: "Support Lane Outcomes",
+    tagline: "2v2 lanes use team gold, not solo LH@10.",
+    heroImage: DOTA_IMG.heroes.crystal_maiden,
+    accent: "#42d68c",
+    sections: [
+      {
+        id: "fixes",
+        title: "Bug Fixes",
+        items: [
+          {
+            type: "fixed",
+            text: "Safelane and offlane lane won/lost now compares combined ally gold vs combined enemy gold (OpenDota 2v2 lanes). Supports share the same outcome as their lane partner.",
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: "0.0.36",
     date: "2026-06-25",
     title: "Patch Notes Tab",

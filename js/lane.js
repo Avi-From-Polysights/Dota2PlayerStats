@@ -189,6 +189,39 @@ export function findLaneOpponents(me, players, laneInfo) {
   );
 }
 
+/** Safelane and offlane are 2v2 — OpenDota compares combined team gold in the lane. */
+export function isDualLane(lane) {
+  return lane === 1 || lane === 3;
+}
+
+export function findLaneAllies(me, players, laneInfo) {
+  const lane = laneInfo.lane;
+  if (!lane || lane === 4 || lane === 5) return [];
+
+  return players.filter(
+    (p) =>
+      isRadiant(p.player_slot) === isRadiant(me.player_slot) &&
+      p.player_slot !== me.player_slot &&
+      resolvePlayerLane(p).lane === lane
+  );
+}
+
+function sumLaneGold(players) {
+  if (!players.length) return null;
+  let total = 0;
+  for (const p of players) {
+    const gold = goldAtMinute(p);
+    if (gold == null) return null;
+    total += gold;
+  }
+  return total;
+}
+
+function outcomeFromGoldDiff(diff) {
+  if (Math.abs(diff) <= LANE_DRAW_THRESHOLD) return "draw";
+  return diff > 0 ? "won" : "lost";
+}
+
 export function isLaneOpponent(me, enemy, players, laneInfo = resolvePlayerLane(me)) {
   return findLaneOpponents(me, players, laneInfo).some(
     (p) => p.player_slot === enemy.player_slot
@@ -203,23 +236,38 @@ export function computeLaneOutcomeVsOpponent(me, opponent, players) {
   const laneInfo = resolvePlayerLane(me);
   if (!isLaneOpponent(me, opponent, players, laneInfo)) return null;
 
+  const lane = laneInfo.lane;
+  if (isDualLane(lane)) {
+    return computeLaneOutcome(me, players);
+  }
+
   const myGold = goldAtMinute(me);
   const oppGold = goldAtMinute(opponent);
   if (myGold == null || oppGold == null) return null;
 
-  const diff = myGold - oppGold;
-  if (Math.abs(diff) <= LANE_DRAW_THRESHOLD) return "draw";
-  return diff > 0 ? "won" : "lost";
+  return outcomeFromGoldDiff(myGold - oppGold);
 }
 
 /**
  * Lane outcome from gold at 10 min vs lane opponent(s).
- * Requires parsed replay (`gold_t` or `lane_total_gold`). Returns null when unavailable.
+ * Safelane/offlane: sum ally gold vs sum enemy gold (OpenDota 2v2 lanes).
+ * Mid: 1v1 gold comparison. Requires parsed replay data.
  */
 export function computeLaneOutcome(me, players) {
   const laneInfo = resolvePlayerLane(me);
+  const lane = laneInfo.lane;
+  if (!lane || lane === 4 || lane === 5) return null;
+
   const opponents = findLaneOpponents(me, players, laneInfo);
   if (!opponents.length) return null;
+
+  if (isDualLane(lane)) {
+    const allies = findLaneAllies(me, players, laneInfo);
+    const teamGold = sumLaneGold([me, ...allies]);
+    const enemyGold = sumLaneGold(opponents);
+    if (teamGold == null || enemyGold == null) return null;
+    return outcomeFromGoldDiff(teamGold - enemyGold);
+  }
 
   const myGold = goldAtMinute(me);
   if (myGold == null) return null;
@@ -227,13 +275,9 @@ export function computeLaneOutcome(me, players) {
   const oppGolds = opponents
     .map((o) => goldAtMinute(o))
     .filter((g) => g != null);
-  if (!oppGolds.length) return null;
+  if (oppGolds.length !== 1) return null;
 
-  const oppGold = oppGolds.reduce((sum, g) => sum + g, 0) / oppGolds.length;
-  const diff = myGold - oppGold;
-
-  if (Math.abs(diff) <= LANE_DRAW_THRESHOLD) return "draw";
-  return diff > 0 ? "won" : "lost";
+  return outcomeFromGoldDiff(myGold - oppGolds[0]);
 }
 
 export function laneOutcomeLabel(outcome) {

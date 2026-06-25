@@ -1,10 +1,8 @@
 import {
   resolveDotaPosition,
-  isSupportPlayer,
-  lastHitsAt10,
+  computeLaneOutcome,
   computeLaneOutcomeVsOpponent,
   isLaneOpponent,
-  goldAtMinute,
 } from "../js/lane.js";
 import { matchMyLaneFilter, matchEnemyLaneFilter } from "../js/lane-filters.js";
 
@@ -68,6 +66,31 @@ assert("mid is lane opponent", isLaneOpponent(me, enemyMid, players));
 assert("off is not lane opponent", !isLaneOpponent(me, enemyOff, players));
 assert("won lane vs mid", computeLaneOutcomeVsOpponent(me, enemyMid, players) === "won");
 assert("null vs off", computeLaneOutcomeVsOpponent(me, enemyOff, players) === null);
+
+// Dual-lane team gold (OpenDota-style): support shares carry lane outcome
+const carry = player(0, 1, 80, 0, { gold: 5000 });
+const support = player(4, 1, 4, 5, { gold: 1500 });
+const enemyCarry = player(128, 1, 75, 0, { gold: 3000 });
+const enemySupport = player(132, 1, 3, 6, { gold: 2500 });
+const dualLane = [carry, support, enemyCarry, enemySupport];
+
+assert("carry won dual lane", computeLaneOutcome(carry, dualLane) === "won");
+assert("support won dual lane", computeLaneOutcome(support, dualLane) === "won");
+assert(
+  "support same as carry",
+  computeLaneOutcome(support, dualLane) === computeLaneOutcome(carry, dualLane)
+);
+assert(
+  "vs opponent uses team outcome",
+  computeLaneOutcomeVsOpponent(support, enemyCarry, dualLane) === "won"
+);
+
+const losingSupport = player(4, 1, 4, 5, { gold: 1200 });
+const losingDual = [carry, losingSupport, enemyCarry, enemySupport];
+assert(
+  "support not solo-lost when team won",
+  computeLaneOutcome(losingSupport, losingDual) === "won"
+);
 
 if (!ok) process.exit(1);
 console.log("All tests passed");
