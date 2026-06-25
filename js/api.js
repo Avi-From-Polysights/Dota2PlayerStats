@@ -137,7 +137,7 @@ export async function loadPlayerMatchesFiltered(
   const matches = [];
   let offset = 0;
   let turboSkipped = 0;
-  const maxScan = Math.min(Math.max(limit * 6, limit), 500);
+  const maxScan = Math.min(Math.max(limit * 6, limit), 99_999);
 
   while (matches.length < limit && offset < maxScan) {
     const batchLimit = Math.min(100, maxScan - offset);

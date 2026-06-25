@@ -1,7 +1,7 @@
 import { applyLaneFiltersToDom, readLaneFiltersFromDom } from "./lane-filters.js";
 
 export const FORM_DEFAULTS = {
-  limit: "100",
+  limit: "250",
   delay: "150",
   conf: "0.95",
   window: "20",
