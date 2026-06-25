@@ -172,6 +172,21 @@ a:hover {
   margin-bottom: 1.25rem;
 }
 
+.section-head--row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.config-session-banner {
+  margin: 0.5rem 0 0;
+  font-size: 0.75rem;
+  color: var(--tertiary);
+  font-weight: var(--weight-body);
+}
+
 .section-head--compact {
   margin-bottom: 1rem;
 }
@@ -572,6 +587,21 @@ input[type="checkbox"] {
 .btn--footer {
   padding: 0.4rem 0.75rem;
   font-size: 0.6875rem;
+}
+
+.btn--sm {
+  padding: 0.4rem 0.75rem;
+  font-size: 0.75rem;
+}
+
+.btn--danger {
+  color: var(--destructive);
+  border-color: rgba(255, 100, 103, 0.35);
+}
+
+.btn--danger:hover:not(:disabled) {
+  background: var(--destructive-dim);
+  border-color: rgba(255, 100, 103, 0.5);
 }
 
 .btn:disabled {
@@ -1265,6 +1295,185 @@ input[type="checkbox"] {
 
 .lane-wld__d {
   color: var(--muted-foreground);
+}
+
+/* Saved config modal */
+body.modal-open {
+  overflow: hidden;
+}
+
+.modal {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.modal.hidden {
+  display: none;
+}
+
+.modal__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.72);
+  backdrop-filter: blur(2px);
+}
+
+.modal__panel {
+  position: relative;
+  z-index: 1;
+  width: min(100%, 32rem);
+  max-height: min(88vh, 640px);
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--card);
+  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.45);
+}
+
+.modal__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.modal__title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 0.875rem;
+  font-weight: 700;
+  letter-spacing: 0.045em;
+  text-transform: uppercase;
+  color: var(--foreground);
+}
+
+.modal__close {
+  flex-shrink: 0;
+  width: 2rem;
+  height: 2rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--muted-foreground);
+  font-size: 1.25rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: background var(--motion-fast) ease, color var(--motion-fast) ease;
+}
+
+.modal__close:hover {
+  background: var(--hover);
+  color: var(--foreground);
+}
+
+.modal__body {
+  padding: 1.25rem;
+  overflow-y: auto;
+}
+
+.modal__lede {
+  margin: 0 0 1rem;
+  font-size: 0.8125rem;
+  color: var(--muted-foreground);
+  line-height: 1.5;
+}
+
+.modal__divider {
+  height: 1px;
+  margin: 1.25rem 0;
+  background: var(--border);
+}
+
+.config-save-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.config-list__heading {
+  margin: 0 0 0.75rem;
+  font-family: var(--font-display);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.63px;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+}
+
+.config-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.config-list__empty {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--disabled);
+}
+
+.config-item {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.config-item--active {
+  border-color: rgba(66, 214, 140, 0.35);
+  background: var(--primary-dim);
+}
+
+.config-item__main {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.config-item__name {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--foreground);
+}
+
+.config-item__summary {
+  font-size: 0.75rem;
+  color: var(--tertiary);
+}
+
+.config-item__meta {
+  font-size: 0.6875rem;
+  color: var(--muted-foreground);
+  line-height: 1.45;
+}
+
+.config-item__actions {
+  display: flex;
+  flex-shrink: 0;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+@media (min-width: 480px) {
+  .config-item__actions {
+    flex-direction: row;
+  }
 }
 
 /* Lane breakdown */

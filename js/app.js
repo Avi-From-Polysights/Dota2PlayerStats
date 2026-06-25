@@ -47,6 +47,12 @@ import {
   copyShareLink,
   syncUrlFromForm,
 } from "./share.js";
+import {
+  initSavedConfigs,
+  persistSessionConfig,
+  recordConfigIngestion,
+  restoreSessionConfigToForm,
+} from "./saved-configs.js";
 import { initMainTabs } from "./tabs.js";
 import { initTools } from "./tools.js";
 import { initConfigUi, getParallelConcurrency } from "./config-ui.js";
@@ -631,7 +637,7 @@ form.addEventListener("submit", async (event) => {
   const requestParse = requestParseCheckbox.checked;
   const parseMaxRaw = Number(parseMaxInput.value);
   const parseParallelism = clampParseConcurrency(parseParallelismInput?.value);
-  const parseParallelEnabled = parseParallelEnabledCheckbox?.checked ?? true;
+  const parseParallelEnabled = parseParallelEnabledCheckbox?.checked ?? false;
   const parseRetry = parseRetryCheckbox?.checked ?? false;
   const parseMaxRetries = Math.max(0, Number(parseMaxRetriesInput?.value) || 0);
   const parseBudget = {
@@ -673,6 +679,7 @@ form.addEventListener("submit", async (event) => {
 
   const heroName = heroSearch.value.trim();
   syncUrlFromForm();
+  persistSessionConfig();
   cachedAnalysisSession = null;
   fetchBtn.disabled = true;
   exportBtn.disabled = true;
@@ -818,6 +825,7 @@ form.addEventListener("submit", async (event) => {
     analyzeMultiLog?.info(
       `Analysis complete — ${analysis.totalGames} games, ${loadStats.cacheHits} cache hits, ${loadStats.fetched} API fetches`
     );
+    recordConfigIngestion();
     setProgress(false);
   } catch (error) {
     if (error.name !== "AbortError") {
@@ -861,14 +869,26 @@ async function init() {
 
     const { hasParams, shouldAutoRun } = applyUrlParams(list);
     heroPicker.resolveHeroId({ fuzzy: true });
+
+    const configCtx = { heroes: list, heroPicker };
+    if (!hasParams) {
+      const restored = restoreSessionConfigToForm(configCtx);
+      heroPicker.resolveHeroId({ fuzzy: true });
+      if (!restored && !document.getElementById("hero-id").value) {
+        const kez = list.find((h) => h.name === "Kez");
+        if (kez) heroPicker.setHeroById(kez.id);
+      }
+    } else if (!document.getElementById("hero-id").value) {
+      const kez = list.find((h) => h.name === "Kez");
+      if (kez) heroPicker.setHeroById(kez.id);
+    }
+
+    initSavedConfigs(configCtx);
+    persistSessionConfig();
+
     const accountFromUrl = document.getElementById("account-id").value;
     if (accountFromUrl) {
       rememberAccountFromApi(Number(accountFromUrl)).catch(() => {});
-    }
-
-    if (!hasParams) {
-      const kez = list.find((h) => h.name === "Kez");
-      if (kez) heroPicker.setHeroById(kez.id);
     }
 
     if (shouldAutoRun && document.getElementById("account-id").value && resolveHeroId()) {

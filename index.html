@@ -32,9 +32,13 @@
     <main>
       <section data-tab-panel="analyze" class="tab-panel">
       <section class="card config-panel">
-        <div class="section-head">
-          <h2 class="section-title">Parameters</h2>
-          <p class="section-desc">Configure your account, hero filter, and analysis settings.</p>
+        <div class="section-head section-head--row">
+          <div>
+            <h2 class="section-title">Parameters</h2>
+            <p class="section-desc">Configure your account, hero filter, and analysis settings.</p>
+            <p id="config-session-banner" class="config-session-banner hidden" aria-live="polite"></p>
+          </div>
+          <button type="button" id="saved-configs-open" class="btn btn--outline btn--sm">Saved configs</button>
         </div>
 
         <form id="stats-form" class="config-form">
@@ -182,14 +186,14 @@
             </div>
           </details>
 
-          <details class="config-section" id="parse-options">
+          <details class="config-section config-section--parse" id="parse-options" open>
             <summary class="config-section__summary">
               <span class="config-section__title">OpenDota replay parse</span>
-              <span class="config-section__badge config-section__badge--optional">Optional</span>
+              <span class="config-section__badge config-section__badge--optional">OpenDota only</span>
             </summary>
             <div class="config-section__body">
               <label class="field field--checkbox field--parse-master">
-                <input type="checkbox" id="request-parse" name="requestParse" />
+                <input type="checkbox" id="request-parse" name="requestParse" checked />
                 <div class="field__label-row">
                   <span class="field__label">Request OpenDota parse</span>
                   <span class="info-tip">
@@ -212,7 +216,7 @@
                 </label>
 
                 <label class="field field--checkbox" data-parse-field>
-                  <input type="checkbox" id="parse-parallel-enabled" name="parseParallelEnabled" checked data-parse-field disabled />
+                  <input type="checkbox" id="parse-parallel-enabled" name="parseParallelEnabled" data-parse-field />
                   <span class="field__label">Parallel parsing</span>
                 </label>
 
@@ -608,5 +612,29 @@
       <p id="share-toast" class="footer-bar__toast hidden" aria-live="polite"></p>
     </div>
   </footer>
+
+  <div id="config-modal" class="modal hidden" aria-hidden="true" role="dialog" aria-labelledby="config-modal-title" aria-modal="true">
+    <div class="modal__backdrop" data-modal-close tabindex="-1"></div>
+    <div class="modal__panel motion-scale">
+      <header class="modal__header">
+        <h2 id="config-modal-title" class="modal__title">Saved configs</h2>
+        <button type="button" class="modal__close" data-modal-close aria-label="Close saved configs">×</button>
+      </header>
+      <div class="modal__body">
+        <p class="modal__lede">Settings auto-save in this browser. Name a preset to keep multiple setups.</p>
+        <form id="config-save-form" class="config-save-form">
+          <label class="field">
+            <span class="field__label">Preset name</span>
+            <input type="text" id="config-save-name" maxlength="64" placeholder="e.g. Kez ranked parse" autocomplete="off" required />
+          </label>
+          <button type="submit" class="btn btn--primary">Save current setup</button>
+        </form>
+        <div class="modal__divider"></div>
+        <p class="config-list__heading">Named presets</p>
+        <ul id="config-list" class="config-list"></ul>
+        <p id="config-list-empty" class="config-list__empty hidden">No named presets yet. Save your current parameters above.</p>
+      </div>
+    </div>
+  </div>
 </body>
 </html>

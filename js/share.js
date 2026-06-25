@@ -1,37 +1,10 @@
-import { readLaneFiltersFromDom, applyLaneFiltersToDom } from "./lane-filters.js";
+import { applyLaneFiltersToDom } from "./lane-filters.js";
+import { captureFormConfig, FORM_DEFAULTS } from "./form-config.js";
 
-const DEFAULTS = {
-  limit: "100",
-  delay: "150",
-  conf: "0.95",
-  window: "20",
-  sig: "0",
-  patch: "",
-  turbo: "0",
-  parse: "0",
-  parsemax: "0",
-};
+export { FORM_DEFAULTS as DEFAULTS };
 
 export function readFormParams() {
-  const laneFilters = readLaneFiltersFromDom();
-  return {
-    account: document.getElementById("account-id").value.trim(),
-    hero: document.getElementById("hero-id").value.trim(),
-    limit: document.getElementById("match-limit").value,
-    delay: document.getElementById("request-delay").value,
-    sig: document.getElementById("significant-only").checked ? "1" : "0",
-    conf: document.getElementById("confidence-level").value,
-    patch: document.getElementById("patch-filter").value,
-    window: document.getElementById("rolling-window").value,
-    turbo: document.getElementById("exclude-turbo").checked ? "0" : "1",
-    parse: document.getElementById("request-parse").checked ? "1" : "0",
-    parsemax: document.getElementById("parse-max").value,
-    stratz: document.getElementById("stratz-fallback")?.checked ? "1" : "0",
-    mylane: laneFilters.myLane,
-    myrole: laneFilters.myRole,
-    enemylane: laneFilters.enemyLane,
-    enemyrole: laneFilters.enemyRole,
-  };
+  return captureFormConfig();
 }
 
 export function buildShareUrl(params, { autoRun = false } = {}) {
@@ -41,24 +14,32 @@ export function buildShareUrl(params, { autoRun = false } = {}) {
   if (params.account) url.searchParams.set("account", params.account);
   if (params.hero) url.searchParams.set("hero", params.hero);
 
-  if (params.limit && params.limit !== DEFAULTS.limit) {
+  if (params.limit && params.limit !== FORM_DEFAULTS.limit) {
     url.searchParams.set("limit", params.limit);
   }
-  if (params.delay && params.delay !== DEFAULTS.delay) {
+  if (params.delay && params.delay !== FORM_DEFAULTS.delay) {
     url.searchParams.set("delay", params.delay);
   }
   if (params.sig === "1") url.searchParams.set("sig", "1");
-  if (params.conf && params.conf !== DEFAULTS.conf) {
+  if (params.conf && params.conf !== FORM_DEFAULTS.conf) {
     url.searchParams.set("conf", params.conf);
   }
   if (params.patch) url.searchParams.set("patch", params.patch);
-  if (params.window && params.window !== DEFAULTS.window) {
+  if (params.window && params.window !== FORM_DEFAULTS.window) {
     url.searchParams.set("window", params.window);
   }
   if (params.turbo === "1") url.searchParams.set("turbo", "1");
-  if (params.parse === "1") url.searchParams.set("parse", "1");
-  if (params.parsemax && params.parsemax !== DEFAULTS.parsemax) {
+  if (params.parse === "0") url.searchParams.set("parse", "0");
+  if (params.parsemax && params.parsemax !== FORM_DEFAULTS.parsemax) {
     url.searchParams.set("parsemax", params.parsemax);
+  }
+  if (params.parseparallel === "1") url.searchParams.set("parseparallel", "1");
+  if (params.parseparallelism && params.parseparallelism !== FORM_DEFAULTS.parseparallelism) {
+    url.searchParams.set("parselanes", params.parseparallelism);
+  }
+  if (params.parseretry === "1") url.searchParams.set("parseretry", "1");
+  if (params.parsemaxretries && params.parsemaxretries !== FORM_DEFAULTS.parsemaxretries) {
+    url.searchParams.set("parsemaxretries", params.parsemaxretries);
   }
   if (params.mylane) url.searchParams.set("mylane", params.mylane);
   if (params.myrole) url.searchParams.set("myrole", params.myrole);
@@ -121,11 +102,32 @@ export function applyUrlParams(heroes) {
     hasParams = true;
   }
   if (params.has("parse")) {
-    document.getElementById("request-parse").checked = params.get("parse") === "1";
+    document.getElementById("request-parse").checked = params.get("parse") !== "0";
+    document.getElementById("request-parse")?.dispatchEvent(new Event("change"));
     hasParams = true;
   }
   if (params.has("parsemax")) {
     document.getElementById("parse-max").value = params.get("parsemax");
+    hasParams = true;
+  }
+  if (params.has("parseparallel")) {
+    const el = document.getElementById("parse-parallel-enabled");
+    el.checked = params.get("parseparallel") === "1";
+    el?.dispatchEvent(new Event("change"));
+    hasParams = true;
+  }
+  if (params.has("parselanes")) {
+    document.getElementById("parse-parallelism").value = params.get("parselanes");
+    hasParams = true;
+  }
+  if (params.has("parseretry")) {
+    const el = document.getElementById("parse-retry");
+    el.checked = params.get("parseretry") === "1";
+    el?.dispatchEvent(new Event("change"));
+    hasParams = true;
+  }
+  if (params.has("parsemaxretries")) {
+    document.getElementById("parse-max-retries").value = params.get("parsemaxretries");
     hasParams = true;
   }
   if (params.has("stratz")) {
