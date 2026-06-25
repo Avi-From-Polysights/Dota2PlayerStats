@@ -16,6 +16,7 @@ import {
   parseAgeSkipMessage,
 } from "./parse-age.js";
 import { enrichMatchFromStratz } from "./stratz.js";
+import { snapshotOpenDotaLaneFields } from "./lane.js";
 import {
   createStratzRateLimitWaitHandler,
   STRATZ_LIMIT_PER_SECOND,
@@ -319,6 +320,10 @@ export async function resolveMatchDetails(
     loadStats.unparsed += 1;
   } else if (details && alreadyParsed) {
     await cacheMatchProgress(matchId, details, accountId, "complete", 0);
+  }
+
+  if (details) {
+    snapshotOpenDotaLaneFields(details);
   }
 
   if (

@@ -1,5 +1,6 @@
 import {
   resolveDotaPosition,
+  resolvePlayerLane,
   computeLaneOutcome,
   computeLaneOutcomeVsOpponent,
   isLaneOpponent,
@@ -77,6 +78,25 @@ assert(
 assert(
   "stratz pos 1 matches role filter",
   matchEnemyLaneFilter(offlaner, { enemyRole: "1" }, all)
+);
+
+assert(
+  "prefers lane_role heatmap over lane field",
+  resolvePlayerLane({ player_slot: 130, lane: 1, lane_role: 3 }).lane === 3
+);
+assert(
+  "stratz poison lane_role ignored when lane differs",
+  resolvePlayerLane({ player_slot: 130, lane: 3, lane_role: 1, stratz_position: 1 }).lane === 3
+);
+assert(
+  "opendota snapshot used for filter",
+  resolvePlayerLane({
+    player_slot: 130,
+    lane: 1,
+    lane_role: 1,
+    opendota_lane: 1,
+    opendota_lane_role: 3,
+  }).lane === 3
 );
 
 // Per-hero lane outcome

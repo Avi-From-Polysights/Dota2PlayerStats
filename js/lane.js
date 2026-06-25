@@ -124,46 +124,94 @@ export function resolveOpenDotaLaneRole(player) {
   return 0;
 }
 
+function isValidMapLane(value) {
+  return typeof value === "number" && value >= 1 && value <= 5;
+}
+
+function hasParsedReplay(player) {
+  return Boolean(
+    player?.gold_t?.length ||
+      player?.lane_pos ||
+      typeof player?.lane_total_gold === "number" ||
+      typeof player?.lane_efficiency === "number"
+  );
+}
+
+/**
+ * Preserve OpenDota lane fields before STRATZ merge (mutates player objects).
+ */
+export function snapshotOpenDotaLaneFields(details) {
+  for (const player of details?.players ?? []) {
+    if (player.opendota_lane_snapshotted) continue;
+    if (typeof player.lane === "number") player.opendota_lane = player.lane;
+    if (typeof player.lane_role === "number") player.opendota_lane_role = player.lane_role;
+    player.opendota_lane_snapshotted = true;
+  }
+}
+
+/** Map lane for filters — matches OpenDota laning (heatmap lane_role), not draft lane alone. */
+function pickMapLane(player) {
+  if (player?.is_roaming) return 5;
+
+  const lane = player?.opendota_lane ?? player?.lane;
+  const laneRole = player?.opendota_lane_role ?? player?.lane_role;
+  const hasLane = isValidMapLane(lane);
+  const hasRole = isValidMapLane(laneRole);
+
+  if (!hasLane && !hasRole) return 0;
+
+  const stratzPos = player?.stratz_position;
+  const rolePoisoned =
+    hasLane &&
+    hasRole &&
+    laneRole !== lane &&
+    typeof stratzPos === "number" &&
+    laneRole === stratzPos;
+
+  if (rolePoisoned) return lane;
+
+  // OpenDota's laning UI uses lane_role (position heatmap @10). Prefer over `lane` when both exist.
+  if (hasRole) return laneRole;
+  return lane;
+}
+
+function laneResult(lane, source, player) {
+  return {
+    lane,
+    label: laneLabel(lane),
+    source,
+    hasParsedReplay: hasParsedReplay(player),
+  };
+}
+
 /**
  * Lane assignment from OpenDota match player object (map lane, not Dota position).
- * Primary `lane` and lane win % (`gold_t`) only exist on parsed replays.
- * Falls back to OpenDota geographic `lane_role` (1 safe, 2 mid, 3 off, 4 jungle, 5 roam).
+ * Primary source is geographic `lane_role` (OpenDota laning tab / heatmap).
+ * Falls back to `lane` when lane_role is missing.
  */
 export function resolvePlayerLane(player) {
-  const lane = player?.lane;
-  if (typeof lane === "number" && lane >= 1 && lane <= 5) {
+  const mapLane = pickMapLane(player);
+  if (mapLane === 0) {
     return {
-      lane,
-      label: laneLabel(lane),
-      source: "lane",
-      hasParsedReplay: Boolean(player?.gold_t?.length || player?.lane_total_gold != null),
+      lane: 0,
+      label: laneLabel(0),
+      source: "none",
+      hasParsedReplay: false,
     };
   }
 
-  const role = player?.lane_role;
-  if (role === 5) {
-    return {
-      lane: 5,
-      label: laneLabel(5),
-      source: "lane_role",
-      hasParsedReplay: Boolean(player?.gold_t?.length || player?.lane_total_gold != null),
-    };
-  }
-  if (typeof role === "number" && role >= 1 && role <= 4) {
-    return {
-      lane: role,
-      label: laneLabel(role),
-      source: "lane_role",
-      hasParsedReplay: Boolean(player?.gold_t?.length || player?.lane_total_gold != null),
-    };
-  }
+  const laneRole = player?.opendota_lane_role ?? player?.lane_role;
+  const lane = player?.opendota_lane ?? player?.lane;
+  const source =
+    isValidMapLane(laneRole) && mapLane === laneRole
+      ? "lane_role"
+      : isValidMapLane(lane) && mapLane === lane
+        ? "lane"
+        : player?.is_roaming
+          ? "is_roaming"
+          : "lane_role";
 
-  return {
-    lane: 0,
-    label: laneLabel(0),
-    source: "none",
-    hasParsedReplay: false,
-  };
+  return laneResult(mapLane, source, player);
 }
 
 export function goldAtMinute(player, minute = LANE_GOLD_MINUTE) {

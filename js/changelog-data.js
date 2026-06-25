@@ -38,6 +38,30 @@ export const SECTION_ICONS = {
  */
 export const CHANGELOGS = [
   {
+    version: "0.0.40",
+    date: "2026-06-25",
+    title: "Lane Filters & Chart Confidence",
+    tagline: "Match OpenDota laning; hide noisy lane trends.",
+    heroImage: DOTA_IMG.items.ward,
+    accent: "#155dfc",
+    sections: [
+      {
+        id: "fixes",
+        title: "Bug Fixes",
+        items: [
+          {
+            type: "fixed",
+            text: "Enemy lane filters now use OpenDota lane_role (heatmap @10 min — same as the laning tab) instead of the draft lane field. Snapshots lane data before STRATZ merge; clears poisoned match cache (v5).",
+          },
+          {
+            type: "fixed",
+            text: "Rolling lane win % line is hidden when half or fewer matches in the window have lane outcomes (low confidence).",
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: "0.0.39",
     date: "2026-06-25",
     title: "Startup Resilience",

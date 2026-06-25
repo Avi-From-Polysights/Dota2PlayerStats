@@ -1,4 +1,4 @@
-import { LANE_GOLD_MINUTE } from "./lane.js";
+import { LANE_GOLD_MINUTE, snapshotOpenDotaLaneFields } from "./lane.js";
 import {
   acquireStratzQuota,
 } from "./stratz-rate-limit.js";
@@ -107,6 +107,8 @@ function findOpenDotaPlayer(players, stratzPlayer) {
 export function mergeStratzLaneIntoOpenDota(details, stratzMatch, accountId) {
   const stratzPlayers = stratzMatch?.players;
   if (!details?.players || !Array.isArray(stratzPlayers)) return false;
+
+  snapshotOpenDotaLaneFields(details);
 
   let enrichedAccount = false;
 

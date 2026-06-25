@@ -1,5 +1,5 @@
 export const DB_NAME = "dota2-player-stats";
-export const DB_VERSION = 4;
+export const DB_VERSION = 5;
 export const MATCH_STORE = "matches";
 export const MATCH_LIST_STORE = "matchLists";
 export const ACCOUNT_STORE = "accounts";
@@ -18,6 +18,15 @@ export function openDb() {
 
     request.onupgradeneeded = (event) => {
       const db = event.target.result;
+
+      if (event.oldVersion > 0 && event.oldVersion < 5) {
+        for (const store of [MATCH_STORE, MATCH_LIST_STORE]) {
+          if (db.objectStoreNames.contains(store)) {
+            db.deleteObjectStore(store);
+          }
+        }
+      }
+
       if (!db.objectStoreNames.contains(MATCH_STORE)) {
         db.createObjectStore(MATCH_STORE, { keyPath: "matchId" });
       }

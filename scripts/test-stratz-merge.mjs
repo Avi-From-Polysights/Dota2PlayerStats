@@ -57,6 +57,7 @@ mergeStratzLaneIntoOpenDota(offlaneDetails, offlaneStratz, 999);
 assert("opendota lane preserved", offlaneDetails.players[0].lane === 3);
 assert("opendota lane_role preserved", offlaneDetails.players[0].lane_role === 3);
 assert("stratz pos on offlaner", offlaneDetails.players[0].stratz_position === 1);
+assert("snapshot lane_role kept", offlaneDetails.players[0].opendota_lane_role === 3);
 
 if (!ok) process.exit(1);
 console.log("STRATZ merge tests passed");

@@ -337,10 +337,12 @@ export function rollingLaneVsGame(timeline, windowSize) {
     const laneSlice = slice.filter(
       (m) => m.laneOutcome === "won" || m.laneOutcome === "lost"
     );
+    const laneKnown = laneSlice.length;
     const laneWins = laneSlice.filter((m) => m.laneOutcome === "won").length;
-    const laneWinrate = laneSlice.length
-      ? (laneWins / laneSlice.length) * 100
-      : null;
+    const laneWinrate =
+      laneKnown > slice.length / 2
+        ? (laneWins / laneKnown) * 100
+        : null;
 
     points.push({
       index: i + 1,
