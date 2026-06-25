@@ -1,4 +1,5 @@
-# Dota 2 Player Stats
+# Open Source Dota 2 Player Stats
+Made with love by KezualThrower, TheDucktator, Rare (Avi-from-Polysights) and AI. Mostly AI. A little bit of love though.
 
 A static web app that pulls match data from [OpenDota](https://www.opendota.com/) and shows hero matchup stats with Wilson confidence intervals, lane win rates, and win-rate trends over time.
 
