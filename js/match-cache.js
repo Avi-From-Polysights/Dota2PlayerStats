@@ -138,3 +138,31 @@ export async function getMatchCacheCount() {
     request.onsuccess = () => resolve(request.result);
   });
 }
+
+/** All cached match details where the account appears in the player list. */
+export async function getCachedMatchesForAccount(accountId) {
+  const id = Number(accountId);
+  if (!id) return [];
+
+  const db = await openDb();
+  const rows = await new Promise((resolve, reject) => {
+    const tx = db.transaction(MATCH_STORE, "readonly");
+    const request = tx.objectStore(MATCH_STORE).getAll();
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => resolve(request.result ?? []);
+  });
+
+  const details = [];
+  const seen = new Set();
+  for (const row of rows) {
+    if (!row?.data?.match_id) continue;
+    const me = (row.data.players ?? []).find((p) => p.account_id === id);
+    if (!me) continue;
+    const matchId = Number(row.matchId ?? row.data.match_id);
+    if (seen.has(matchId)) continue;
+    seen.add(matchId);
+    details.push(row.data);
+  }
+
+  return details;
+}

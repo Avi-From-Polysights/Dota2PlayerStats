@@ -38,6 +38,30 @@ export const SECTION_ICONS = {
  */
 export const CHANGELOGS = [
   {
+    version: "0.0.44",
+    date: "2026-06-26",
+    title: "All Heroes Tab",
+    tagline: "Cross-hero stats from your local cache.",
+    heroImage: DOTA_IMG.items.bloodstone,
+    accent: "#155dfc",
+    sections: [
+      {
+        id: "features",
+        title: "Feature Updates",
+        items: [
+          {
+            type: "added",
+            text: "All Heroes tab — aggregate game win %, lane win %, Wilson intervals, and K/D from every hero with cached matches for your account.",
+          },
+          {
+            type: "added",
+            text: "Sortable hero table, top-N bar chart (win/lane/games), game-vs-lane comparison chart, and CSV export with Turbo/ranked/min-games filters.",
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: "0.0.43",
     date: "2026-06-25",
     title: "Guided Tour",

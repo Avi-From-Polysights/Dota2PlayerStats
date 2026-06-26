@@ -11,6 +11,8 @@ const CHART = {
 let winrateChart = null;
 let laneChart = null;
 let laneVsGameChart = null;
+let allHeroesBarChart = null;
+let allHeroesCompareChart = null;
 
 function destroyChart(chart) {
   if (chart) chart.destroy();
@@ -281,4 +283,193 @@ export function renderLaneChart(canvas, laneRows) {
   });
 
   return laneChart;
+}
+
+function horizontalBarScale() {
+  return {
+    x: {
+      min: 0,
+      max: 100,
+      ticks: {
+        color: CHART.muted,
+        callback: (v) => `${v}%`,
+        font: chartFont(),
+      },
+      grid: { color: CHART.grid },
+      border: { display: false },
+    },
+    y: {
+      ticks: {
+        color: CHART.muted,
+        font: chartFont(),
+      },
+      grid: { display: false },
+      border: { display: false },
+    },
+  };
+}
+
+/**
+ * Horizontal bar chart for top heroes by win rate, lane rate, or games.
+ * @param {HTMLCanvasElement} canvas
+ * @param {object[]} rows filtered hero rows
+ * @param {{ metric?: 'winrate' | 'laneWinrate' | 'games', limit?: number }} [options]
+ */
+export function renderAllHeroesBarChart(canvas, rows, { metric = "winrate", limit = 15 } = {}) {
+  destroyChart(allHeroesBarChart);
+
+  let sorted = [...rows];
+  if (metric === "games") {
+    sorted.sort((a, b) => b.games - a.games);
+  } else if (metric === "laneWinrate") {
+    sorted = sorted.filter((r) => r.laneWinrate != null);
+    sorted.sort((a, b) => (b.laneWinrate ?? 0) - (a.laneWinrate ?? 0));
+  } else {
+    sorted.sort((a, b) => b.winrate - a.winrate);
+  }
+
+  const top = sorted.slice(0, Math.max(1, limit)).reverse();
+  const labels = top.map((r) => r.hero);
+  const isGames = metric === "games";
+  const data = top.map((r) => {
+    if (metric === "games") return r.games;
+    if (metric === "laneWinrate") return r.laneWinrate;
+    return r.winrate;
+  });
+
+  const label =
+    metric === "games" ? "Games played" : metric === "laneWinrate" ? "Lane win %" : "Game win %";
+
+  allHeroesBarChart = new Chart(canvas, {
+    type: "bar",
+    data: {
+      labels,
+      datasets: [
+        {
+          label,
+          data,
+          backgroundColor:
+            metric === "laneWinrate"
+              ? "rgba(66, 214, 140, 0.85)"
+              : metric === "games"
+                ? "rgba(154, 154, 154, 0.85)"
+                : "rgba(21, 93, 252, 0.85)",
+          borderRadius: 3,
+          barThickness: 14,
+        },
+      ],
+    },
+    options: {
+      indexAxis: "y",
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          ...baseTooltip(),
+          callbacks: {
+            label(ctx) {
+              const row = top[ctx.dataIndex];
+              if (metric === "games") return `${row.games} games · ${row.wins}W-${row.losses}L`;
+              if (metric === "laneWinrate") {
+                return `${row.laneWinrate?.toFixed(1)}% lane (${row.laneRecord})`;
+              }
+              return `${row.winrate.toFixed(1)}% game (${row.wins}W-${row.losses}L)`;
+            },
+          },
+        },
+      },
+      scales: isGames
+        ? {
+            x: {
+              min: 0,
+              ticks: { color: CHART.muted, font: chartFont() },
+              grid: { color: CHART.grid },
+              border: { display: false },
+            },
+            y: {
+              ticks: { color: CHART.muted, font: chartFont() },
+              grid: { display: false },
+              border: { display: false },
+            },
+          }
+        : horizontalBarScale(),
+    },
+  });
+
+  return allHeroesBarChart;
+}
+
+/** Grouped bar chart comparing game vs lane win % per hero. */
+export function renderAllHeroesCompareChart(canvas, rows, { limit = 12 } = {}) {
+  destroyChart(allHeroesCompareChart);
+
+  const eligible = rows
+    .filter((r) => r.laneWinrate != null && r.laneDecided >= 3)
+    .sort((a, b) => b.games - a.games)
+    .slice(0, Math.max(1, limit));
+
+  allHeroesCompareChart = new Chart(canvas, {
+    type: "bar",
+    data: {
+      labels: eligible.map((r) => r.hero),
+      datasets: [
+        {
+          label: "Game win %",
+          data: eligible.map((r) => r.winrate),
+          backgroundColor: "rgba(21, 93, 252, 0.85)",
+          borderRadius: 3,
+          barThickness: 10,
+        },
+        {
+          label: "Lane win %",
+          data: eligible.map((r) => r.laneWinrate),
+          backgroundColor: "rgba(66, 214, 140, 0.85)",
+          borderRadius: 3,
+          barThickness: 10,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: baseLegend(),
+        tooltip: {
+          ...baseTooltip(),
+          callbacks: {
+            afterBody(ctx) {
+              const row = eligible[ctx[0].dataIndex];
+              return [`${row.games} games · lane ${row.laneRecord}`];
+            },
+          },
+        },
+      },
+      scales: {
+        x: {
+          ticks: {
+            color: CHART.muted,
+            font: chartFont(),
+            maxRotation: 45,
+            minRotation: 45,
+          },
+          grid: { display: false },
+          border: { display: false },
+        },
+        y: {
+          min: 0,
+          max: 100,
+          ticks: {
+            color: CHART.muted,
+            callback: (v) => `${v}%`,
+            font: chartFont(),
+          },
+          grid: { color: CHART.grid },
+          border: { display: false },
+        },
+      },
+    },
+  });
+
+  return allHeroesCompareChart;
 }

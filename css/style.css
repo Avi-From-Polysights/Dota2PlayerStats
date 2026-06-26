@@ -1243,6 +1243,28 @@ input[type="checkbox"] {
   height: 196px;
 }
 
+.chart-wrap--tall {
+  height: min(520px, 70vh);
+}
+
+.all-heroes-status {
+  margin: 0.75rem 0 0;
+  font-size: 0.8125rem;
+  color: var(--muted-foreground);
+}
+
+.all-heroes-status--error {
+  color: var(--destructive);
+}
+
+.all-heroes-results {
+  margin-top: 1.25rem;
+}
+
+.all-heroes-form__actions {
+  grid-column: 1 / -1;
+}
+
 /* Table */
 .table-wrap {
   overflow-x: auto;

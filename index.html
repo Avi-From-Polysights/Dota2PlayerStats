@@ -29,6 +29,7 @@
     <nav class="main-tabs" role="tablist" aria-label="App sections">
       <button type="button" class="main-tabs__tab main-tabs__tab--active" role="tab" aria-selected="true" data-tab="analyze">Analyze</button>
       <button type="button" class="main-tabs__tab" role="tab" aria-selected="false" data-tab="tools">Tools</button>
+      <button type="button" class="main-tabs__tab" role="tab" aria-selected="false" data-tab="all-heroes">All Heroes</button>
       <button type="button" class="main-tabs__tab" role="tab" aria-selected="false" data-tab="changelogs">Changelogs</button>
     </nav>
 
@@ -628,6 +629,122 @@
         </section>
 
         <section id="tools-error-banner" class="alert alert--error hidden" role="alert"></section>
+      </section>
+
+      <section data-tab-panel="all-heroes" class="tab-panel hidden" hidden>
+        <section class="card all-heroes-panel">
+          <div class="section-head">
+            <h2 class="section-title">All Heroes</h2>
+            <p class="section-desc">Compare win rates, lane rates, and sample sizes across every hero with cached match data for your account. Run Analyze or batch parse tools first to populate the cache.</p>
+          </div>
+
+          <form id="all-heroes-form" class="config-grid all-heroes-form">
+            <label class="field field--with-hint">
+              <span class="field__label">Account ID</span>
+              <input type="number" id="all-heroes-account-id" required placeholder="427824243" min="1" />
+              <p class="field__hint">Same Steam32 ID used on the Analyze tab.</p>
+            </label>
+
+            <label class="field">
+              <span class="field__label">Min games per hero</span>
+              <input type="number" id="all-heroes-min-games" value="5" min="1" max="999" />
+            </label>
+
+            <label class="field">
+              <span class="field__label">Wilson confidence</span>
+              <select id="all-heroes-confidence">
+                <option value="0.90">90%</option>
+                <option value="0.95" selected>95%</option>
+                <option value="0.99">99%</option>
+              </select>
+            </label>
+
+            <label class="field">
+              <span class="field__label">Chart metric</span>
+              <select id="all-heroes-chart-metric">
+                <option value="winrate" selected>Game win %</option>
+                <option value="laneWinrate">Lane win %</option>
+                <option value="games">Games played</option>
+              </select>
+            </label>
+
+            <label class="field">
+              <span class="field__label">Chart top N heroes</span>
+              <input type="number" id="all-heroes-chart-limit" value="15" min="3" max="30" />
+            </label>
+
+            <label class="field field--checkbox">
+              <input type="checkbox" id="all-heroes-exclude-turbo" checked />
+              <span class="field__label">Exclude Turbo</span>
+            </label>
+
+            <label class="field field--checkbox">
+              <input type="checkbox" id="all-heroes-ranked-only" />
+              <span class="field__label">Ranked only</span>
+            </label>
+
+            <div class="form-actions all-heroes-form__actions">
+              <button type="submit" id="all-heroes-load" class="btn btn--primary">Load from cache</button>
+              <button type="button" id="all-heroes-export" class="btn btn--outline" disabled>Export CSV</button>
+            </div>
+          </form>
+
+          <p id="all-heroes-status" class="all-heroes-status" aria-live="polite"></p>
+
+          <div id="all-heroes-results" class="all-heroes-results hidden">
+            <div class="summary-grid motion-stagger" id="all-heroes-summary"></div>
+
+            <div class="charts-row">
+              <article class="card chart-panel motion-rise">
+                <div class="section-head section-head--compact">
+                  <h3 class="section-title">Top heroes</h3>
+                  <p class="section-desc">Ranked by the selected chart metric (respects min games filter).</p>
+                </div>
+                <div class="chart-wrap chart-wrap--tall">
+                  <canvas id="all-heroes-bar-chart"></canvas>
+                </div>
+              </article>
+
+              <article class="card chart-panel motion-rise">
+                <div class="section-head section-head--compact">
+                  <h3 class="section-title">Game vs lane win %</h3>
+                  <p class="section-desc">Heroes with at least 3 decided lane outcomes, sorted by games played.</p>
+                </div>
+                <div class="chart-wrap">
+                  <canvas id="all-heroes-compare-chart"></canvas>
+                </div>
+              </article>
+            </div>
+
+            <article class="card motion-rise">
+              <div class="section-head section-head--compact">
+                <h3 class="section-title">Hero breakdown</h3>
+                <p class="section-desc">Click column headers to sort. Lane stats need parsed replays in cache.</p>
+              </div>
+              <div class="table-wrap">
+                <table id="all-heroes-table" class="data-table">
+                  <thead>
+                    <tr>
+                      <th data-sort="hero">Hero</th>
+                      <th data-sort="games">Games</th>
+                      <th data-sort="wins">Wins</th>
+                      <th data-sort="losses">Losses</th>
+                      <th data-sort="winrate">Win %</th>
+                      <th data-sort="laneRecord">Lane W-L-D</th>
+                      <th data-sort="laneWinrate">Lane win %</th>
+                      <th data-sort="wilsonLower">Wilson low</th>
+                      <th data-sort="wilsonUpper">Wilson high</th>
+                      <th data-sort="parsedReplayCount">Parsed</th>
+                      <th data-sort="avgKills">Avg K</th>
+                      <th data-sort="avgDeaths">Avg D</th>
+                    </tr>
+                  </thead>
+                  <tbody></tbody>
+                </table>
+              </div>
+            </article>
+          </div>
+        </section>
       </section>
 
       <section data-tab-panel="changelogs" class="tab-panel hidden" hidden>

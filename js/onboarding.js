@@ -93,7 +93,7 @@ export const TUTORIAL_STEPS = [
     placement: "bottom",
     title: "App sections",
     body:
-      "Switch tabs anytime: Analyze for stats, Tools for batch parse jobs, and Changelogs for release notes.",
+      "Switch tabs anytime: Analyze for single-hero stats, All Heroes for cached cross-hero comparison, Tools for batch jobs, and Changelogs for release notes.",
   },
   {
     id: "tools",

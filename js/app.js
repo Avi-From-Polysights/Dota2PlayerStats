@@ -57,6 +57,7 @@ import { initChangelogs } from "./changelogs.js";
 import { initAppMotion, initScrollReveals, animateResultsReveal } from "./motion.js";
 import { initMainTabs } from "./tabs.js";
 import { initOnboarding } from "./onboarding.js";
+import { initAllHeroes } from "./all-heroes.js";
 import { initTools } from "./tools.js";
 import { initConfigUi, getParallelConcurrency } from "./config-ui.js";
 import { readStratzSettingsFromDom, initStratzTokenPersistence } from "./stratz-token.js";
@@ -942,6 +943,11 @@ async function init() {
 
     initSavedConfigs(configCtx);
     persistSessionConfig();
+
+    initAllHeroes({
+      heroes: list,
+      getDefaultAccountId: () => document.getElementById("account-id")?.value || null,
+    });
 
     const accountFromUrl = document.getElementById("account-id").value;
     if (accountFromUrl) {
