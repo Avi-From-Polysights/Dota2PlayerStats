@@ -3,7 +3,8 @@
  * Valve publishes letter patches faster than the dotaconstants repo updates.
  */
 
-const VALVE_PATCH_BASE = "https://www.dota2.com/datafeed/patchnotes";
+import { fetchValveJson, valveDatafeedUrl } from "./valve-fetch.js";
+
 const PATCH_FLOOR = "7.41";
 
 const STAT_LABEL_TO_KEY = {
@@ -80,20 +81,24 @@ function parseCostNote(note) {
 }
 
 async function fetchPatchNotes(version) {
-  const url = `${VALVE_PATCH_BASE}?language=english&version=${encodeURIComponent(version)}`;
-  const response = await fetch(url);
-  if (!response.ok) return null;
-  return response.json();
+  const url = valveDatafeedUrl("patchnotes", { language: "english", version });
+  try {
+    return await fetchValveJson(url);
+  } catch {
+    return null;
+  }
 }
 
 async function listPatchesSinceFloor() {
-  const response = await fetch(`${VALVE_PATCH_BASE.replace("/patchnotes", "/patchnoteslist")}?language=english`);
-  if (!response.ok) return [PATCH_FLOOR];
-  const data = await response.json();
-  const patches = data.patches ?? data.result?.data?.patches ?? [];
-  const names = patches.map((p) => p.patch_name ?? p.patch_number).filter(Boolean);
-  const floorIdx = names.findIndex((n) => n === PATCH_FLOOR || n.startsWith(PATCH_FLOOR));
-  return floorIdx === -1 ? names.slice(-5) : names.slice(floorIdx);
+  try {
+    const data = await fetchValveJson(valveDatafeedUrl("patchnoteslist", { language: "english" }));
+    const patches = data.patches ?? data.result?.data?.patches ?? [];
+    const names = patches.map((p) => p.patch_name ?? p.patch_number).filter(Boolean);
+    const floorIdx = names.findIndex((n) => n === PATCH_FLOOR || n.startsWith(PATCH_FLOOR));
+    return floorIdx === -1 ? names.slice(-5) : names.slice(floorIdx);
+  } catch {
+    return [PATCH_FLOOR];
+  }
 }
 
 /**

@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>Dota 2 Player Stats</title>
-  <meta name="description" content="Hero matchup stats, lane win rates, and win rate trends from OpenDota." />
+  <meta name="app-version" content="__VERSION__" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,100..900&family=Pragati+Narrow:wght@700&display=swap" rel="stylesheet" />
@@ -816,13 +816,18 @@
                     <input type="number" id="builder-start-gold" min="0" max="5000" step="50" value="600" />
                   </label>
                 </div>
-                <div class="builder-gold-checkpoints" id="builder-gold-checkpoints"></div>
+                <div class="builder-gold-panel">
+                  <p class="builder-gold-panel__title">Estimated net gold (starting gold + GPM × minutes − item timeline)</p>
+                  <div class="builder-gold-checkpoints" id="builder-gold-checkpoints"></div>
+                  <p class="builder-gold-summary" id="builder-gold-summary"></p>
+                </div>
                 <div class="builder-slot-group">
                   <span class="builder-slot-label">Inventory</span>
                   <div class="builder-item-slots" id="builder-item-slots"></div>
                 </div>
                 <div class="builder-slot-group">
                   <span class="builder-slot-label">Upgrades (not inventory slots)</span>
+                  <p class="builder-slot-desc">Shard and Moon Shard are consumed for permanent upgrades. Scepter can be held or consumed.</p>
                   <div class="builder-consumable-slots" id="builder-consumable-slots"></div>
                 </div>
                 <div class="builder-slot-group">
@@ -886,6 +891,39 @@
             <div class="modal__body">
               <p class="builder-import-desc" id="builder-import-desc">Uses matches already stored for your account ID on the Analyze tab.</p>
               <ul class="builder-import-list" id="builder-import-list"></ul>
+            </div>
+          </div>
+        </div>
+
+        <div id="builder-timeline-modal" class="modal hidden" aria-hidden="true" role="dialog" aria-labelledby="builder-timeline-title" aria-modal="true">
+          <div class="modal__backdrop" data-timeline-close tabindex="-1"></div>
+          <div class="modal__panel motion-scale builder-timeline-modal__panel">
+            <header class="modal__header">
+              <h2 id="builder-timeline-title" class="modal__title">Add timeline event</h2>
+              <button type="button" class="modal__close" data-timeline-close aria-label="Close">×</button>
+            </header>
+            <div class="modal__body">
+              <form id="builder-timeline-form" class="builder-timeline-form">
+                <label class="field">
+                  <span class="field__label">Minute</span>
+                  <input type="number" id="builder-timeline-minute" min="0" max="120" value="10" required />
+                </label>
+                <label class="field">
+                  <span class="field__label">Action</span>
+                  <select id="builder-timeline-action">
+                    <option value="buy">Buy (spend gold)</option>
+                    <option value="sell">Sell (50% refund)</option>
+                  </select>
+                </label>
+                <label class="field">
+                  <span class="field__label">Item search</span>
+                  <input type="text" id="builder-timeline-item" placeholder="e.g. Power Treads" required />
+                </label>
+                <div class="builder-timeline-form__actions">
+                  <button type="button" class="btn btn--outline btn--sm" data-timeline-close>Cancel</button>
+                  <button type="submit" class="btn btn--primary btn--sm">Add event</button>
+                </div>
+              </form>
             </div>
           </div>
         </div>

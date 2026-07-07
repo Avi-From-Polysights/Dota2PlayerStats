@@ -40,6 +40,42 @@ export const SECTION_ICONS = {
  */
 export const CHANGELOGS = [
   {
+    version: "0.0.48",
+    date: "2026-07-07",
+    title: "Builder Fixes",
+    tagline: "Correct talents, Kez mirrors, gold display, and consumable upgrades.",
+    heroImage: DOTA_IMG.heroes.kez,
+    accent: "#42d68c",
+    sections: [
+      {
+        id: "fixes",
+        title: "Bug Fixes",
+        items: [
+          {
+            type: "fixed",
+            text: "Footer version no longer drops back to an older cached build — deploy now ships versioned JS bundles and respects the HTML/meta version.",
+          },
+          {
+            type: "fixed",
+            text: "Live talents and patch items load in the browser via a CORS-safe Valve datafeed proxy (fixes placeholder talent text on GitHub Pages).",
+          },
+          {
+            type: "fixed",
+            text: "Kez stance abilities mirror skill points (Echo Slash ↔ Falcon Rush, etc.).",
+          },
+          {
+            type: "fixed",
+            text: "Gold checkpoints and summary update live from GPM; item timeline uses a proper modal instead of blocked prompts.",
+          },
+          {
+            type: "fixed",
+            text: "All items tab in item picker; consumable upgrade slots with consume toggles and descriptions for Scepter, Shard, and Moon Shard.",
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: "0.0.47",
     date: "2026-07-07",
     title: "Builder Upgrades & Gold",

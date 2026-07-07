@@ -24,6 +24,23 @@ export const BACKPACK_SLOT_COUNT = 3;
 export const STARTING_GOLD_DEFAULT = 600;
 export const GPM_DEFAULT = 450;
 
+function emptyConsumableSlots() {
+  return {
+    scepter: { itemKey: null, consumed: false },
+    shard: { itemKey: null, consumed: false },
+    moonshard: { itemKey: null, consumed: false },
+  };
+}
+
+export function normalizeConsumableSlot(value) {
+  if (value == null) return { itemKey: null, consumed: false };
+  if (typeof value === "string") return { itemKey: value, consumed: false };
+  return {
+    itemKey: value.itemKey ?? null,
+    consumed: Boolean(value.consumed),
+  };
+}
+
 function uid() {
   if (typeof crypto !== "undefined" && crypto.randomUUID) return crypto.randomUUID();
   return `build-${Date.now()}-${Math.random().toString(16).slice(2)}`;
@@ -91,7 +108,7 @@ export function createEmptyBuild({ heroId, name = "" } = {}) {
     items: new Array(ITEM_SLOT_COUNT).fill(null),
     backpack: new Array(BACKPACK_SLOT_COUNT).fill(null),
     neutralItem: null,
-    consumables: { scepter: null, shard: null, moonshard: null },
+    consumables: emptyConsumableSlots(),
     bearItems: new Array(ITEM_SLOT_COUNT).fill(null),
     itemTimeline: [],
     upgradeTimings: { scepter: null, shard: null },
@@ -112,7 +129,11 @@ export function normalizeBuild(build) {
     items: [...(build.items ?? base.items)],
     backpack: [...(build.backpack ?? base.backpack)],
     bearItems: [...(build.bearItems ?? base.bearItems)],
-    consumables: { ...base.consumables, ...(build.consumables ?? {}) },
+    consumables: {
+      scepter: normalizeConsumableSlot(build.consumables?.scepter),
+      shard: normalizeConsumableSlot(build.consumables?.shard),
+      moonshard: normalizeConsumableSlot(build.consumables?.moonshard),
+    },
     itemTimeline: (build.itemTimeline ?? []).map((event) => ({ ...event })),
     upgradeTimings: { ...base.upgradeTimings, ...(build.upgradeTimings ?? {}) },
     gpm: build.gpm ?? GPM_DEFAULT,
@@ -148,9 +169,10 @@ function countPicks(build, predicate) {
   return build.skillOrder.filter((entry) => entry != null && predicate(entry)).length;
 }
 
-export function countAbilityPoints(build, abilityKey, { heroKey, linkedUltimates = [] } = {}) {
+export function countAbilityPoints(build, abilityKey, { heroKey, linkedUltimates = [], sharePoints } = {}) {
   return countPicks(build, (entry) => {
     if (entry.kind !== "ability") return false;
+    if (sharePoints?.(heroKey, entry.key, abilityKey)) return true;
     if (entry.key === abilityKey) return true;
     if (heroKey && linkedUltimates.length >= 2) {
       const linked = linkedUltimates.includes(abilityKey) && linkedUltimates.includes(entry.key);
@@ -169,7 +191,7 @@ export function isTalentLevel(level) {
   return TALENT_TIER_LEVELS.includes(level);
 }
 
-export function canAssignAbility(build, ctx, abilityKey, { heroKey, linkedUltimates = [] } = {}) {
+export function canAssignAbility(build, ctx, abilityKey, { heroKey, linkedUltimates = [], sharePoints, canonicalAbility } = {}) {
   const idx = nextOpenLevelIndex(build);
   if (idx === -1) return { ok: false, reason: "Build is already at level 25." };
   const level = idx + 1;
@@ -183,7 +205,7 @@ export function canAssignAbility(build, ctx, abilityKey, { heroKey, linkedUltima
 
   if (isUlt || linkedUltimates.includes(abilityKey)) {
     const ultimateKey = linkedUltimates.includes(abilityKey) ? linkedUltimates[0] : abilityKey;
-    const have = countAbilityPoints(build, ultimateKey, { heroKey, linkedUltimates });
+    const have = countAbilityPoints(build, ultimateKey, { heroKey, linkedUltimates, sharePoints });
     if (have >= ULTIMATE_MAX_POINTS) return { ok: false, reason: "Ultimate is already maxed." };
     const requiredLevel = ULTIMATE_UNLOCK_LEVELS[have];
     if (level < requiredLevel) {
@@ -192,10 +214,10 @@ export function canAssignAbility(build, ctx, abilityKey, { heroKey, linkedUltima
     return { ok: true, level };
   }
 
-  if (!ctx.regular.includes(abilityKey)) {
-    return { ok: false, reason: "Unknown ability for this hero." };
-  }
-  const have = countAbilityPoints(build, abilityKey, { heroKey, linkedUltimates });
+  const inRegular = ctx.regular.includes(abilityKey);
+  if (!inRegular) return { ok: false, reason: "Unknown ability for this hero." };
+
+  const have = countAbilityPoints(build, abilityKey, { heroKey, linkedUltimates, sharePoints });
   if (have >= REGULAR_MAX_POINTS) return { ok: false, reason: "Ability is already maxed." };
   return { ok: true, level };
 }
@@ -235,8 +257,9 @@ export function canAssignAttribute(build, heroKey) {
 export function assignAbility(build, ctx, abilityKey, options = {}) {
   const check = canAssignAbility(build, ctx, abilityKey, options);
   if (!check.ok) throw new Error(check.reason);
-  const storedKey =
-    options.linkedUltimates?.includes(abilityKey) ? options.linkedUltimates[0] : abilityKey;
+  let storedKey = abilityKey;
+  if (options.canonicalAbility) storedKey = options.canonicalAbility(abilityKey);
+  else if (options.linkedUltimates?.includes(abilityKey)) storedKey = options.linkedUltimates[0];
   build.skillOrder[check.level - 1] = { kind: "ability", key: storedKey };
   build.updatedAt = Date.now();
   return build;
@@ -326,8 +349,21 @@ export function setNeutralItem(build, itemKey) {
 }
 
 export function setConsumableSlot(build, kind, itemKey) {
-  build.consumables = build.consumables ?? { scepter: null, shard: null, moonshard: null };
-  build.consumables[kind] = itemKey || null;
+  build.consumables = build.consumables ?? emptyConsumableSlots();
+  const slot = normalizeConsumableSlot(build.consumables[kind]);
+  slot.itemKey = itemKey || null;
+  if (!itemKey) slot.consumed = false;
+  build.consumables[kind] = slot;
+  build.updatedAt = Date.now();
+  return build;
+}
+
+export function setConsumableConsumed(build, kind, consumed) {
+  build.consumables = build.consumables ?? emptyConsumableSlots();
+  const slot = normalizeConsumableSlot(build.consumables[kind]);
+  if (!slot.itemKey) throw new Error("Choose an item before marking it consumed.");
+  slot.consumed = Boolean(consumed);
+  build.consumables[kind] = slot;
   build.updatedAt = Date.now();
   return build;
 }
@@ -375,11 +411,14 @@ export function removeTimelineEvent(build, eventId) {
 
 /** Items that contribute to computed stats (main + neutral + consumables, not backpack). */
 export function equippedItemKeys(build) {
-  const keys = [...build.items, build.neutralItem];
-  for (const key of Object.values(build.consumables ?? {})) {
-    if (key) keys.push(key);
+  const keys = [...build.items, build.neutralItem].filter(Boolean);
+  for (const kind of ["scepter", "shard", "moonshard"]) {
+    const slot = normalizeConsumableSlot(build.consumables?.[kind]);
+    if (!slot.itemKey) continue;
+    if (kind === "scepter") keys.push(slot.itemKey);
+    if (kind === "moonshard" && slot.consumed) keys.push(slot.itemKey);
   }
-  return keys.filter(Boolean);
+  return keys;
 }
 
 export function totalItemCost(itemKeys, itemsData) {

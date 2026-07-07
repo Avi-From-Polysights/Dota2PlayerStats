@@ -27,10 +27,12 @@ jobs:
       - name: Prepare site
         run: |
           VERSION=$(grep 'APP_VERSION' js/version.js | sed 's/.*"\(.*\)".*/\1/')
-          mkdir -p _site
-          sed "s/__VERSION__/${VERSION}/g" index.html > _site/index.html
+          mkdir -p _site/js/${VERSION}
+          cp -r js/* _site/js/${VERSION}/
           cp .nojekyll _site/
-          cp -r css js _site/
+          cp -r css _site/css
+          sed -e "s/__VERSION__/${VERSION}/g" -e "s|js/app.js?v=${VERSION}|js/${VERSION}/app.js|g" index.html > _site/index.html
+          test -f _site/js/${VERSION}/app.js
           test -f _site/css/changelog.css
 
       - name: Upload Pages artifact

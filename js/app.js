@@ -894,7 +894,16 @@ form.addEventListener("submit", async (event) => {
 });
 
 async function init() {
-  document.getElementById("app-version").textContent = `v${APP_VERSION}`;
+  const versionEl = document.getElementById("app-version");
+  const metaVersion = document.querySelector('meta[name="app-version"]')?.getAttribute("content");
+  const htmlVersion = versionEl?.textContent?.match(/^v([\d.]+(?:[a-z])?)$/i)?.[1];
+  const deployed =
+    metaVersion && metaVersion !== "__VERSION__"
+      ? metaVersion
+      : htmlVersion && htmlVersion !== "__VERSION__"
+        ? htmlVersion
+        : null;
+  versionEl.textContent = `v${deployed || APP_VERSION}`;
   initFieldTooltips();
   initChangelogs();
   initMainTabs();

@@ -116,7 +116,7 @@ function assignFinalItems(build, player, itemKeyById, itemsData, heroKey) {
 
   for (const kind of CONSUMABLE_SLOT_KINDS) {
     const match = mainKeys.find((k) => classifyItemSlot(k) === kind);
-    if (match) build.consumables[kind] = match;
+    if (match) build.consumables[kind] = { itemKey: match, consumed: kind !== "scepter" };
   }
 
   if (heroUsesBearInventory(heroKey)) {

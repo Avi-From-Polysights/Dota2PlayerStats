@@ -18,7 +18,9 @@ import {
   clearValvePatchCache,
 } from "./valve-datafeed.js";
 import {
+  goldAtMinute,
   goldCheckpointTable,
+  itemCost,
   totalTimelineNetCost,
   timelineGoldDelta,
 } from "./build-gold.js";
@@ -29,6 +31,9 @@ import {
 import {
   CONSUMABLE_SLOT_KINDS,
   CONSUMABLE_ITEM_KEYS,
+  CONSUMABLE_SLOT_META,
+  abilitiesShareSkillPoints,
+  kezCanonicalAbility,
   heroUsesBearInventory,
   isConsumableSlotItem,
   isMainInventoryItem,
@@ -67,10 +72,12 @@ import {
   addTimelineEvent,
   removeTimelineEvent,
   setConsumableSlot,
+  setConsumableConsumed,
   setBearItemSlot,
   setUpgradeTiming,
   equippedItemKeys,
   normalizeBuild,
+  normalizeConsumableSlot,
   nextOpenLevelIndex,
   resetSkillOrder,
   setBackpackSlot,
@@ -171,10 +178,16 @@ export function initBuilder(options = {}) {
   const startGoldInput = document.getElementById("builder-start-gold");
   const goldCheckpointsEl = document.getElementById("builder-gold-checkpoints");
   const timelineListEl = document.getElementById("builder-timeline-list");
-  const timelineAddBtn = document.getElementById("builder-timeline-add");
+  const goldSummaryEl = document.getElementById("builder-gold-summary");
+  const timelineModal = document.getElementById("builder-timeline-modal");
+  const timelineForm = document.getElementById("builder-timeline-form");
+  const timelineMinuteInput = document.getElementById("builder-timeline-minute");
+  const timelineActionInput = document.getElementById("builder-timeline-action");
+  const timelineItemInput = document.getElementById("builder-timeline-item");
   const importModal = document.getElementById("builder-import-modal");
   const importListEl = document.getElementById("builder-import-list");
   const importDescEl = document.getElementById("builder-import-desc");
+  const timelineAddBtn = document.getElementById("builder-timeline-add");
   const nameInput = document.getElementById("builder-build-name");
   const portraitImg = document.getElementById("builder-hero-portrait");
   const heroMetaEl = document.getElementById("builder-hero-meta");
@@ -222,7 +235,12 @@ export function initBuilder(options = {}) {
   }
 
   function skillAssignOptions() {
-    return { heroKey, linkedUltimates: skillCtx.linkedUltimates ?? [] };
+    return {
+      heroKey,
+      linkedUltimates: skillCtx.linkedUltimates ?? [],
+      sharePoints: abilitiesShareSkillPoints,
+      canonicalAbility: heroKey === "npc_dota_hero_kez" ? kezCanonicalAbility : (key) => key,
+    };
   }
 
   async function ensureData({ force = false } = {}) {
@@ -390,9 +408,7 @@ export function initBuilder(options = {}) {
     renderAll();
     const suffix = dataStatusSuffix();
     setStatus(
-      fresh
-        ? `Building ${entry.name}. ${suffix}`
-        : `Loaded build for ${entry.name}. ${suffix}`
+      fresh ? `Building ${entry.name}. ${suffix}` : `Loaded build for ${entry.name}. ${suffix}`
     );
   }
 
@@ -450,11 +466,8 @@ export function initBuilder(options = {}) {
 
   function abilityMatchesRow(entry, row) {
     if (!entry || entry.kind !== "ability") return false;
-    if (entry.key === row.key) return true;
-    if (row.isUltimate && skillCtx.linkedUltimates?.includes(row.key)) {
-      return skillCtx.linkedUltimates.includes(entry.key);
-    }
-    return false;
+    if (abilitiesShareSkillPoints(heroKey, entry.key, row.key)) return true;
+    return entry.key === row.key;
   }
 
   function renderSkillGrid() {
@@ -584,7 +597,8 @@ export function initBuilder(options = {}) {
       if (!abilities.length) return "";
       const timing = build.upgradeTimings?.[slotKind];
       const owned = build.consumables?.[slotKind];
-      const active = owned || (timing != null && timing <= currentLevel);
+      const slot = typeof owned === "object" && owned ? owned : { itemKey: owned, consumed: false };
+      const active = (slot.itemKey && slot.consumed) || timing != null && timing <= currentLevel;
       const abilityCards = abilities
         .map(
           (a) =>
@@ -626,20 +640,37 @@ export function initBuilder(options = {}) {
     return `<button type="button" class="builder-item-slot${item ? " builder-item-slot--filled" : ""}" data-slot-kind="${kind}" data-slot-index="${index}" title="${escapeHtml(slotLabel)}">${img}${label && !item ? `<span class="builder-item-slot__hint">${escapeHtml(label)}</span>` : ""}</button>`;
   }
 
+  function renderConsumableSlots() {
+    if (!consumableSlotsEl) return;
+    consumableSlotsEl.innerHTML = CONSUMABLE_SLOT_KINDS.map((kind) => {
+      const meta = CONSUMABLE_SLOT_META[kind];
+      const slot = normalizeConsumableSlot(build.consumables?.[kind]);
+      const item = slot.itemKey ? data.items[slot.itemKey] : null;
+      const img = item
+        ? `<img src="${itemIconUrl(item)}" alt="${escapeHtml(item.dname)}" loading="lazy" />`
+        : `<span class="builder-item-slot__hint">${escapeHtml(meta.label)}</span>`;
+      const consumedToggle =
+        slot.itemKey && kind !== "scepter"
+          ? `<label class="builder-consumed-toggle"><input type="checkbox" data-consumed-kind="${kind}" ${slot.consumed ? "checked" : ""} /> Consumed</label>`
+          : slot.itemKey && kind === "scepter"
+            ? `<label class="builder-consumed-toggle"><input type="checkbox" data-consumed-kind="${kind}" ${slot.consumed ? "checked" : ""} /> Consumed (permanent)</label>`
+            : "";
+      const status = slot.consumed ? `<span class="builder-consumed-badge">Consumed</span>` : "";
+      return `
+        <div class="builder-consumable-slot-wrap">
+          <button type="button" class="builder-item-slot builder-item-slot--consumable${item ? " builder-item-slot--filled" : ""}${slot.consumed ? " builder-item-slot--consumed" : ""}" data-slot-kind="${kind}" data-slot-index="0" title="${escapeHtml(meta.label)}">${img}${status}</button>
+          ${consumedToggle}
+          <p class="builder-consumable-desc">${escapeHtml(slot.consumed ? meta.consumedLabel : meta.description)}</p>
+        </div>`;
+    }).join("");
+  }
+
   function renderItemSlots() {
     itemSlotsEl.innerHTML = build.items
       .map((key, i) => itemSlotHtml(key, { kind: "main", index: i }))
       .join("");
 
-    if (consumableSlotsEl) {
-      consumableSlotsEl.innerHTML = CONSUMABLE_SLOT_KINDS.map((kind) =>
-        itemSlotHtml(build.consumables?.[kind], {
-          kind,
-          index: 0,
-          label: CONSUMABLE_SLOT_LABELS[kind],
-        })
-      ).join("");
-    }
+    renderConsumableSlots();
 
     neutralSlotEl.innerHTML = itemSlotHtml(build.neutralItem, { kind: "neutral", index: 0 });
     backpackSlotsEl.innerHTML = build.backpack
@@ -658,7 +689,10 @@ export function initBuilder(options = {}) {
 
     const mainCost = totalItemCost(build.items, data.items);
     const neutralCost = totalItemCost([build.neutralItem], data.items);
-    const consumableCost = totalItemCost(Object.values(build.consumables ?? {}), data.items);
+    const consumableCost = CONSUMABLE_SLOT_KINDS.reduce((sum, kind) => {
+      const slot = normalizeConsumableSlot(build.consumables?.[kind]);
+      return sum + (slot.itemKey && !slot.consumed ? itemCost(slot.itemKey, data.items) : 0);
+    }, 0);
     const backpackCost = totalItemCost(build.backpack, data.items);
     const bearCost = totalItemCost(build.bearItems ?? [], data.items);
     const timelineNet = totalTimelineNetCost(build.itemTimeline, data.items);
@@ -668,7 +702,7 @@ export function initBuilder(options = {}) {
   }
 
   function renderGoldCheckpoints() {
-    if (!goldCheckpointsEl) return;
+    if (!goldCheckpointsEl || !build || !data) return;
     const rows = goldCheckpointTable({
       gpm: build.gpm,
       startingGold: build.startingGold,
@@ -678,9 +712,24 @@ export function initBuilder(options = {}) {
     goldCheckpointsEl.innerHTML = rows
       .map(
         (row) =>
-          `<div class="builder-gold-checkpoint"><span>${row.minute}m</span><strong>${Math.round(row.gold)}g</strong></div>`
+          `<div class="builder-gold-checkpoint" title="Spent by ${row.minute}m: ${row.spent}g"><span>${row.minute} min</span><strong>${Math.round(row.gold)}g</strong></div>`
       )
       .join("");
+
+    if (goldSummaryEl) {
+      const level = Math.max(1, currentHeroLevel(build));
+      const approxMinute = Math.min(60, level * 2);
+      const nowGold = goldAtMinute({
+        minute: approxMinute,
+        gpm: build.gpm,
+        startingGold: build.startingGold,
+        timeline: build.itemTimeline,
+        itemsData: data.items,
+      });
+      goldSummaryEl.textContent =
+        `At ~${approxMinute} min (level ${level}): ${Math.round(nowGold)}g remaining · ` +
+        `GPM ${build.gpm} · Start ${build.startingGold}g · Timeline spent ${totalTimelineNetCost(build.itemTimeline, data.items)}g`;
+    }
   }
 
   function renderTimeline() {
@@ -963,9 +1012,23 @@ export function initBuilder(options = {}) {
 
   // ---- Gold, timeline, upgrades ----
 
+  gpmInput?.addEventListener("input", () => {
+    if (!build) return;
+    build.gpm = Number(gpmInput.value) || 450;
+    renderGoldCheckpoints();
+    renderItemSlots();
+  });
+
   gpmInput?.addEventListener("change", () => {
     if (!build) return;
     build.gpm = Number(gpmInput.value) || 450;
+    renderGoldCheckpoints();
+    renderItemSlots();
+  });
+
+  startGoldInput?.addEventListener("input", () => {
+    if (!build) return;
+    build.startingGold = Number(startGoldInput.value) || 600;
     renderGoldCheckpoints();
     renderItemSlots();
   });
@@ -977,15 +1040,41 @@ export function initBuilder(options = {}) {
     renderItemSlots();
   });
 
-  timelineAddBtn?.addEventListener("click", () => {
+  function openTimelineModal() {
+    if (!build || !data) {
+      setStatus("Pick a hero and load item data first.");
+      return;
+    }
+    timelineMinuteInput.value = "10";
+    timelineActionInput.value = "buy";
+    timelineItemInput.value = "";
+    timelineModal?.classList.remove("hidden");
+    timelineModal?.setAttribute("aria-hidden", "false");
+    document.body.classList.add("modal-open");
+    timelineItemInput?.focus();
+  }
+
+  function closeTimelineModal() {
+    timelineModal?.classList.add("hidden");
+    timelineModal?.setAttribute("aria-hidden", "true");
+    document.body.classList.remove("modal-open");
+  }
+
+  timelineAddBtn?.addEventListener("click", () => openTimelineModal());
+
+  timelineModal?.addEventListener("click", (event) => {
+    if (event.target.closest("[data-timeline-close]")) closeTimelineModal();
+  });
+
+  timelineForm?.addEventListener("submit", (event) => {
+    event.preventDefault();
     if (!build || !data) return;
-    const minute = Number(window.prompt("Minute of game (0–60):", "10"));
-    if (!Number.isFinite(minute)) return;
-    const action = window.confirm("OK = Buy, Cancel = Sell (50% refund)") ? "buy" : "sell";
-    const query = window.prompt("Item name search (partial match):", "");
-    if (!query) return;
+    const minute = Number(timelineMinuteInput.value);
+    const action = timelineActionInput.value === "sell" ? "sell" : "buy";
+    const query = timelineItemInput.value.trim();
+    if (!Number.isFinite(minute) || !query) return;
     const match = Object.entries(data.items).find(([, item]) =>
-      item.dname?.toLowerCase().includes(query.trim().toLowerCase())
+      item.dname?.toLowerCase().includes(query.toLowerCase())
     );
     if (!match) {
       setStatus(`No item matching “${query}”.`, true);
@@ -997,9 +1086,26 @@ export function initBuilder(options = {}) {
       itemKey: match[0],
       slotKind: classifyTimelineSlot(match[0]),
     });
+    closeTimelineModal();
     renderTimeline();
     renderGoldCheckpoints();
     renderItemSlots();
+    setStatus(`Added ${action} ${data.items[match[0]].dname} at ${minute} min.`);
+  });
+
+  consumableSlotsEl?.addEventListener("change", (event) => {
+    const box = event.target.closest("[data-consumed-kind]");
+    if (!box || !build) return;
+    try {
+      setConsumableConsumed(build, box.dataset.consumedKind, box.checked);
+      renderConsumableSlots();
+      renderUpgradeGrants();
+      renderStats();
+      renderItemSlots();
+    } catch (error) {
+      box.checked = false;
+      setStatus(error.message, true);
+    }
   });
 
   function classifyTimelineSlot(itemKey) {

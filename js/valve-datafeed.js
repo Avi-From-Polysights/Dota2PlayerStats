@@ -1,5 +1,6 @@
 import { DOTA_DATA_STORE, openDb } from "./db.js";
 import { formatAbilityText } from "./valve-text.js";
+import { fetchValveJson, valveDatafeedUrl } from "./valve-fetch.js";
 
 const VALVE_BASE = "https://www.dota2.com/datafeed";
 const HERO_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
@@ -51,11 +52,8 @@ async function setCacheEntry(key, data) {
 }
 
 async function fetchValve(path, params = {}) {
-  const url = new URL(`${VALVE_BASE}/${path}`);
-  for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
-  const response = await fetch(url);
-  if (!response.ok) throw new Error(`HTTP ${response.status} for ${url}`);
-  return response.json();
+  const url = valveDatafeedUrl(path, params);
+  return fetchValveJson(url);
 }
 
 /** Latest patch id from Valve (e.g. "7.41d"). */
