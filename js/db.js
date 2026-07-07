@@ -1,9 +1,11 @@
 export const DB_NAME = "dota2-player-stats";
-export const DB_VERSION = 5;
+export const DB_VERSION = 6;
 export const MATCH_STORE = "matches";
 export const MATCH_LIST_STORE = "matchLists";
 export const ACCOUNT_STORE = "accounts";
 export const PARSE_FAILURES_STORE = "parseFailures";
+export const DOTA_DATA_STORE = "dotaData";
+export const HERO_BUILDS_STORE = "heroBuilds";
 
 let dbPromise = null;
 
@@ -38,6 +40,14 @@ export function openDb() {
       }
       if (!db.objectStoreNames.contains(PARSE_FAILURES_STORE)) {
         db.createObjectStore(PARSE_FAILURES_STORE, { keyPath: "key" });
+      }
+      if (!db.objectStoreNames.contains(DOTA_DATA_STORE)) {
+        db.createObjectStore(DOTA_DATA_STORE, { keyPath: "key" });
+      }
+      if (!db.objectStoreNames.contains(HERO_BUILDS_STORE)) {
+        const store = db.createObjectStore(HERO_BUILDS_STORE, { keyPath: "id" });
+        store.createIndex("heroId", "heroId", { unique: false });
+        store.createIndex("updatedAt", "updatedAt", { unique: false });
       }
     };
   });

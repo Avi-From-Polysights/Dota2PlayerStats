@@ -1,7 +1,7 @@
 import { animateTabPanel } from "./motion.js";
 
 const TAB_KEY = "dota2stats-tab";
-const VALID_TABS = new Set(["analyze", "tools", "all-heroes", "changelogs"]);
+const VALID_TABS = new Set(["analyze", "tools", "all-heroes", "builder", "changelogs"]);
 
 /** @type {((name: string) => void) | null} */
 let activateTabFn = null;
@@ -46,6 +46,8 @@ export function initMainTabs() {
       url.hash = "#changelogs";
     } else if (name === "all-heroes") {
       url.hash = "#all-heroes";
+    } else if (name === "builder") {
+      url.hash = "#builder";
     } else {
       url.hash = "";
     }
@@ -62,6 +64,7 @@ export function initMainTabs() {
   if (window.location.hash === "#tools") initial = "tools";
   else if (window.location.hash === "#changelogs") initial = "changelogs";
   else if (window.location.hash === "#all-heroes") initial = "all-heroes";
+  else if (window.location.hash === "#builder") initial = "builder";
   else {
     try {
       const saved = localStorage.getItem(TAB_KEY);

@@ -12,8 +12,10 @@ A static web app that pulls match data from [OpenDota](https://www.opendota.com/
 - **Lane win %** — win rate broken down by lane assignment (Safe, Mid, Off, Jungle)
 - **Win rate over time** — rolling win-rate chart with overall baseline and recent trend indicator
 - **CSV export** — download the matchup table
+- **All Heroes tab** — cross-hero win/lane rates aggregated from your locally cached matches
+- **Hero Builder tab** — skill build (abilities, talents, Attribute Bonus) and item build planner with live computed stats, using OpenDota/dotaconstants hero & item data plus item-popularity stats; builds save locally
 
-Everything runs in the browser. No backend, no API keys, and no data is stored.
+Everything runs in the browser. No backend, no API keys. Match history, accounts, and hero builds are cached locally in your browser (IndexedDB) for performance and offline reuse.
 
 ## Usage
 

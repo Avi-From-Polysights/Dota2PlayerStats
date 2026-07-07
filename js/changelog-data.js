@@ -19,6 +19,8 @@ export const DOTA_IMG = {
     tp: "https://cdn.cloudflare.steamstatic.com/apps/dota2/images/dota_react/items/tpscroll.png",
     bloodstone:
       "https://cdn.cloudflare.steamstatic.com/apps/dota2/images/dota_react/items/bloodstone.png",
+    manta:
+      "https://cdn.cloudflare.steamstatic.com/apps/dota2/images/dota_react/items/manta.png",
   },
 };
 
@@ -37,6 +39,38 @@ export const SECTION_ICONS = {
  * Newest first.
  */
 export const CHANGELOGS = [
+  {
+    version: "0.0.45",
+    date: "2026-07-07",
+    title: "Hero Builder Tab",
+    tagline: "Plan skill builds and item timings for any hero.",
+    heroImage: DOTA_IMG.items.manta,
+    accent: "#42d68c",
+    sections: [
+      {
+        id: "features",
+        title: "Feature Updates",
+        items: [
+          {
+            type: "added",
+            text: "Hero Builder tab — pick any hero, see live base stats/abilities from the OpenDota community dataset, and build a level-by-level skill order (regular abilities, ultimate unlocks at 6/12/18, Attribute Bonus, and talent tiers at 10/15/20/25).",
+          },
+          {
+            type: "added",
+            text: "6 inventory slots + neutral slot + backpack (backpack is planning-only, matching real Dota) with a searchable item picker organized by shop category and OpenDota purchase-popularity badges per hero.",
+          },
+          {
+            type: "added",
+            text: "Live computed stat sheet (str/agi/int, HP/mana, regen, armor, magic resist, damage, attack speed, move speed, effective HP) that updates as you build.",
+          },
+          {
+            type: "added",
+            text: "Builds save locally to this browser (nameable, listable, deletable) so you can keep multiple builds per hero.",
+          },
+        ],
+      },
+    ],
+  },
   {
     version: "0.0.44",
     date: "2026-06-26",

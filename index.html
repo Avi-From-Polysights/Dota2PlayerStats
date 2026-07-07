@@ -11,6 +11,7 @@
   <link rel="stylesheet" href="css/style.css?v=__VERSION__" />
   <link rel="stylesheet" href="css/changelog.css?v=__VERSION__" />
   <link rel="stylesheet" href="css/onboarding.css?v=__VERSION__" />
+  <link rel="stylesheet" href="css/builder.css?v=__VERSION__" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js" defer></script>
   <script type="module" src="js/app.js?v=__VERSION__"></script>
 </head>
@@ -30,6 +31,7 @@
       <button type="button" class="main-tabs__tab main-tabs__tab--active" role="tab" aria-selected="true" data-tab="analyze">Analyze</button>
       <button type="button" class="main-tabs__tab" role="tab" aria-selected="false" data-tab="tools">Tools</button>
       <button type="button" class="main-tabs__tab" role="tab" aria-selected="false" data-tab="all-heroes">All Heroes</button>
+      <button type="button" class="main-tabs__tab" role="tab" aria-selected="false" data-tab="builder">Hero Builder</button>
       <button type="button" class="main-tabs__tab" role="tab" aria-selected="false" data-tab="changelogs">Changelogs</button>
     </nav>
 
@@ -745,6 +747,104 @@
             </article>
           </div>
         </section>
+      </section>
+
+      <section data-tab-panel="builder" class="tab-panel hidden" hidden>
+        <section class="card builder-panel">
+          <div class="section-head">
+            <h2 class="section-title">Hero Builder</h2>
+            <p class="section-desc">Plan a skill build and item timing for any hero. Base stats/abilities/items come from the OpenDota community dataset; item popularity badges use OpenDota's per-hero purchase stats. Builds save locally in this browser.</p>
+          </div>
+
+          <div class="builder-toolbar">
+            <div class="hero-combobox builder-hero-combobox" id="builder-hero-combobox">
+              <input type="text" id="builder-hero-search" placeholder="Search hero…" autocomplete="off" />
+              <ul id="builder-hero-suggestions" class="hero-combobox__list hidden" role="listbox" aria-label="Hero suggestions"></ul>
+            </div>
+            <select id="builder-saved-select" class="builder-saved-select" aria-label="My saved builds">
+              <option value="">My builds…</option>
+            </select>
+            <button type="button" id="builder-new-btn" class="btn btn--outline btn--sm">New build</button>
+            <button type="button" id="builder-save-btn" class="btn btn--primary btn--sm" disabled>Save build</button>
+            <button type="button" id="builder-delete-btn" class="btn btn--outline btn--sm" disabled>Delete</button>
+          </div>
+
+          <p id="builder-status" class="builder-status" aria-live="polite">Loading hero data…</p>
+
+          <div id="builder-workspace" class="builder-workspace hidden">
+            <div class="builder-hero-header">
+              <img id="builder-hero-portrait" class="builder-hero-portrait" alt="" />
+              <div class="builder-hero-header__info">
+                <input type="text" id="builder-build-name" class="builder-build-name" placeholder="Build name" maxlength="60" />
+                <div class="builder-hero-meta" id="builder-hero-meta"></div>
+              </div>
+              <div class="builder-level-badge" id="builder-level-badge">Level 0</div>
+            </div>
+
+            <article class="card builder-skill-panel">
+              <div class="section-head section-head--compact">
+                <h3 class="section-title">Skill build</h3>
+                <p class="section-desc">Click the highlighted next level to spend a point. Talent tiers lock in at levels 10/15/20/25 below.</p>
+              </div>
+              <div class="builder-skill-scroll">
+                <div id="builder-skill-grid" class="builder-skill-grid"></div>
+              </div>
+              <div class="builder-talent-tiers" id="builder-talent-tiers"></div>
+              <div class="builder-skill-actions">
+                <button type="button" id="builder-undo-btn" class="btn btn--outline btn--sm">Undo last pick</button>
+                <button type="button" id="builder-reset-skills-btn" class="btn btn--outline btn--sm">Reset skills</button>
+              </div>
+            </article>
+
+            <div class="builder-grid-layout">
+              <article class="card builder-items-panel">
+                <div class="section-head section-head--compact">
+                  <h3 class="section-title">Item build</h3>
+                  <p class="section-desc">The 6 inventory slots and neutral slot apply to stats below. Backpack is for planning only — matches real Dota, where backpack items don't grant bonuses.</p>
+                </div>
+                <div class="builder-slot-group">
+                  <span class="builder-slot-label">Inventory</span>
+                  <div class="builder-item-slots" id="builder-item-slots"></div>
+                </div>
+                <div class="builder-slot-group">
+                  <span class="builder-slot-label">Neutral</span>
+                  <div class="builder-item-slots builder-item-slots--single" id="builder-neutral-slot"></div>
+                </div>
+                <div class="builder-slot-group">
+                  <span class="builder-slot-label">Backpack (no stat bonus)</span>
+                  <div class="builder-item-slots" id="builder-backpack-slots"></div>
+                </div>
+                <p class="builder-cost" id="builder-cost"></p>
+              </article>
+
+              <article class="card builder-stats-panel">
+                <div class="section-head section-head--compact">
+                  <h3 class="section-title">Computed stats</h3>
+                  <p class="section-desc">From base hero stats + skill build + equipped items, at your build's current level. Only simple “+N attribute” talents feed these numbers — other talent effects show in the skill build but aren't simulated.</p>
+                </div>
+                <div class="summary-grid" id="builder-stats-grid"></div>
+              </article>
+            </div>
+          </div>
+        </section>
+
+        <div id="builder-item-picker" class="modal hidden" aria-hidden="true" role="dialog" aria-labelledby="builder-item-picker-title" aria-modal="true">
+          <div class="modal__backdrop" data-modal-close tabindex="-1"></div>
+          <div class="modal__panel motion-scale builder-item-picker__panel">
+            <header class="modal__header">
+              <h2 id="builder-item-picker-title" class="modal__title">Choose an item</h2>
+              <button type="button" class="modal__close" data-modal-close aria-label="Close item picker">×</button>
+            </header>
+            <div class="modal__body">
+              <div class="builder-item-picker__toolbar">
+                <input type="text" id="builder-item-search" placeholder="Search items…" autocomplete="off" />
+                <button type="button" id="builder-item-remove" class="btn btn--outline btn--sm" disabled>Remove item</button>
+              </div>
+              <div class="builder-item-tabs" id="builder-item-tabs"></div>
+              <div class="builder-item-list" id="builder-item-list"></div>
+            </div>
+          </div>
+        </div>
       </section>
 
       <section data-tab-panel="changelogs" class="tab-panel hidden" hidden>

@@ -58,6 +58,7 @@ import { initAppMotion, initScrollReveals, animateResultsReveal } from "./motion
 import { initMainTabs } from "./tabs.js";
 import { initOnboarding } from "./onboarding.js";
 import { initAllHeroes } from "./all-heroes.js";
+import { initBuilder } from "./builder.js";
 import { initTools } from "./tools.js";
 import { initConfigUi, getParallelConcurrency } from "./config-ui.js";
 import { readStratzSettingsFromDom, initStratzTokenPersistence } from "./stratz-token.js";
@@ -947,6 +948,13 @@ async function init() {
     initAllHeroes({
       heroes: list,
       getDefaultAccountId: () => document.getElementById("account-id")?.value || null,
+    });
+
+    initBuilder({
+      getDefaultHeroId: () => {
+        const id = Number(document.getElementById("hero-id")?.value);
+        return Number.isFinite(id) && id > 0 ? id : null;
+      },
     });
 
     const accountFromUrl = document.getElementById("account-id").value;
