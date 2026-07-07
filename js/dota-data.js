@@ -1,5 +1,9 @@
 import { DOTA_DATA_STORE, openDb } from "./db.js";
 import { fetchJson } from "./api.js";
+import { applyItemPatches } from "./item-patches.js";
+import { fetchLatestPatchVersion } from "./valve-datafeed.js";
+
+const PATCH_VERSION_CACHE_KEY = "appliedItemPatchVersion";
 
 const DOTACONSTANTS_BASE =
   "https://raw.githubusercontent.com/odota/dotaconstants/master/build";
@@ -49,10 +53,10 @@ async function setCacheEntry(key, data) {
 /**
  * Fetch a JSON resource with layered caching: memory -> IndexedDB (fresh) -> network -> stale cache fallback.
  */
-async function loadCached(key, url, ttlMs, { signal } = {}) {
-  if (memoryCache.has(key)) return memoryCache.get(key);
+async function loadCached(key, url, ttlMs, { signal, force = false } = {}) {
+  if (!force && memoryCache.has(key)) return memoryCache.get(key);
 
-  const cached = await getCacheEntry(key);
+  const cached = !force ? await getCacheEntry(key) : null;
   const isFresh = cached && Date.now() - cached.savedAt < ttlMs;
   if (isFresh) {
     memoryCache.set(key, cached.data);
@@ -79,13 +83,17 @@ async function loadCached(key, url, ttlMs, { signal } = {}) {
  * Load and normalize the full hero/ability/item dataset needed by the Hero Builder.
  * Cached in IndexedDB for 24h; falls back to stale cache if the network is unavailable.
  */
-export async function loadDotaData({ signal } = {}) {
+export async function loadDotaData({ signal, force = false } = {}) {
+  if (force) {
+    memoryCache.clear();
+  }
+
   const [heroesRaw, heroAbilities, abilities, items, itemIds] = await Promise.all([
-    loadCached("heroes", RESOURCES.heroes, CONSTANTS_TTL_MS, { signal }),
-    loadCached("heroAbilities", RESOURCES.heroAbilities, CONSTANTS_TTL_MS, { signal }),
-    loadCached("abilities", RESOURCES.abilities, CONSTANTS_TTL_MS, { signal }),
-    loadCached("items", RESOURCES.items, CONSTANTS_TTL_MS, { signal }),
-    loadCached("itemIds", RESOURCES.itemIds, CONSTANTS_TTL_MS, { signal }),
+    loadCached("heroes", RESOURCES.heroes, CONSTANTS_TTL_MS, { signal, force }),
+    loadCached("heroAbilities", RESOURCES.heroAbilities, CONSTANTS_TTL_MS, { signal, force }),
+    loadCached("abilities", RESOURCES.abilities, CONSTANTS_TTL_MS, { signal, force }),
+    loadCached("items", RESOURCES.items, CONSTANTS_TTL_MS, { signal, force }),
+    loadCached("itemIds", RESOURCES.itemIds, CONSTANTS_TTL_MS, { signal, force }),
   ]);
 
   const heroesById = new Map();
@@ -97,13 +105,69 @@ export async function loadDotaData({ signal } = {}) {
     Object.entries(itemIds).map(([id, key]) => [Number(id), key])
   );
 
+  const patchMeta = await applyItemPatches(items, itemKeyById, { signal });
+
   return {
     heroesById,
     heroAbilities,
     abilities,
     items,
     itemKeyById,
+    patchMeta,
   };
+}
+
+/** Bust in-memory game-data cache (IndexedDB entries expire by TTL on next load). */
+export function clearDotaDataCache() {
+  memoryCache.clear();
+}
+
+function parsePatchVersion(version) {
+  const match = String(version ?? "").match(/^(\d+)\.(\d+)([a-z]?)$/i);
+  if (!match) return { major: 0, minor: 0, letter: 0, raw: String(version ?? "") };
+  return {
+    major: Number(match[1]),
+    minor: Number(match[2]),
+    letter: match[3] ? match[3].toLowerCase().charCodeAt(0) - 96 : 0,
+    raw: String(version),
+  };
+}
+
+export function comparePatchVersions(a, b) {
+  const pa = parsePatchVersion(a);
+  const pb = parsePatchVersion(b);
+  if (pa.major !== pb.major) return pa.major - pb.major;
+  if (pa.minor !== pb.minor) return pa.minor - pb.minor;
+  return pa.letter - pb.letter;
+}
+
+async function getStoredPatchVersion() {
+  const cached = await getCacheEntry(PATCH_VERSION_CACHE_KEY);
+  return cached?.data ?? null;
+}
+
+async function setStoredPatchVersion(version) {
+  await setCacheEntry(PATCH_VERSION_CACHE_KEY, version);
+}
+
+/**
+ * Load dotaconstants base data, apply Valve patch-note deltas, and refresh when
+ * Valve reports a newer patch than we last stored.
+ */
+export async function ensureGameDataUpToDate({ signal, force = false } = {}) {
+  const latestPatch = await fetchLatestPatchVersion({ signal, force });
+  const storedPatch = force ? null : await getStoredPatchVersion();
+  const stale =
+    force || !storedPatch || comparePatchVersions(storedPatch, latestPatch) < 0;
+
+  const data = await loadDotaData({ signal, force: stale });
+  const applied = data.patchMeta?.latestPatch ?? latestPatch;
+
+  if (stale || storedPatch !== applied) {
+    await setStoredPatchVersion(applied);
+  }
+
+  return { ...data, latestPatch: applied, wasRefreshed: stale };
 }
 
 /**

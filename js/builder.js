@@ -1,6 +1,40 @@
-import { abilityIconUrl, heroIconUrl, heroPortraitUrl, itemIconUrl } from "./dota-cdn.js";
-import { loadDotaData, loadItemPopularity, resolveItemPopularityKeys } from "./dota-data.js";
+import { abilityIconByName, heroIconByKey, heroIconUrl, heroPortraitByKey, itemIconUrl } from "./dota-cdn.js";
+import {
+  clearDotaDataCache,
+  ensureGameDataUpToDate,
+  loadItemPopularity,
+  resolveItemPopularityKeys,
+} from "./dota-data.js";
 import { normalizeHeroQuery } from "./hero-picker.js";
+import { formatAbilityText } from "./valve-text.js";
+import {
+  allHeroAbilities,
+  fetchHeroData,
+  fetchHeroList,
+  formatValveAbilityLabel,
+  getAbilityFromValve,
+  normalizeValveHeroForStats,
+  clearValveHeroCache,
+  clearValvePatchCache,
+} from "./valve-datafeed.js";
+import {
+  goldCheckpointTable,
+  totalTimelineNetCost,
+  timelineGoldDelta,
+} from "./build-gold.js";
+import {
+  importBuildFromMatchPlayer,
+  listCachedMatchImports,
+} from "./build-import.js";
+import {
+  CONSUMABLE_SLOT_KINDS,
+  CONSUMABLE_ITEM_KEYS,
+  heroUsesBearInventory,
+  isConsumableSlotItem,
+  isMainInventoryItem,
+  resolveHeroSkillLayout,
+  resolveTalentTiers,
+} from "./hero-special.js";
 import {
   computeDerivedStats,
   computeItemBonuses,
@@ -30,6 +64,13 @@ import {
   getSkillableAbilities,
   getTalentTiers,
   heroHasAttributeBonus,
+  addTimelineEvent,
+  removeTimelineEvent,
+  setConsumableSlot,
+  setBearItemSlot,
+  setUpgradeTiming,
+  equippedItemKeys,
+  normalizeBuild,
   nextOpenLevelIndex,
   resetSkillOrder,
   setBackpackSlot,
@@ -46,6 +87,7 @@ import {
 } from "./builder-cache.js";
 
 const QUAL_LABELS = {
+  all: "All items",
   consumable: "Consumables",
   "consumable;laning": "Consumables",
   component: "Basics",
@@ -56,6 +98,7 @@ const QUAL_LABELS = {
   secret_shop: "Secret Shop",
 };
 const QUAL_ORDER = [
+  "all",
   "consumable",
   "component",
   "common",
@@ -64,6 +107,12 @@ const QUAL_ORDER = [
   "artifact",
   "secret_shop",
 ];
+
+const CONSUMABLE_SLOT_LABELS = {
+  scepter: "Aghanim's Scepter",
+  shard: "Aghanim's Shard",
+  moonshard: "Moon Shard",
+};
 
 function escapeHtml(text) {
   return String(text ?? "")
@@ -111,6 +160,21 @@ export function initBuilder(options = {}) {
   const newBtn = document.getElementById("builder-new-btn");
   const saveBtn = document.getElementById("builder-save-btn");
   const deleteBtn = document.getElementById("builder-delete-btn");
+  const refreshBtn = document.getElementById("builder-refresh-btn");
+  const importBtn = document.getElementById("builder-import-btn");
+  const upgradeGrantsEl = document.getElementById("builder-upgrade-grants");
+  const heroNoteEl = document.getElementById("builder-hero-note");
+  const consumableSlotsEl = document.getElementById("builder-consumable-slots");
+  const bearGroupEl = document.getElementById("builder-bear-group");
+  const bearSlotsEl = document.getElementById("builder-bear-slots");
+  const gpmInput = document.getElementById("builder-gpm");
+  const startGoldInput = document.getElementById("builder-start-gold");
+  const goldCheckpointsEl = document.getElementById("builder-gold-checkpoints");
+  const timelineListEl = document.getElementById("builder-timeline-list");
+  const timelineAddBtn = document.getElementById("builder-timeline-add");
+  const importModal = document.getElementById("builder-import-modal");
+  const importListEl = document.getElementById("builder-import-list");
+  const importDescEl = document.getElementById("builder-import-desc");
   const nameInput = document.getElementById("builder-build-name");
   const portraitImg = document.getElementById("builder-hero-portrait");
   const heroMetaEl = document.getElementById("builder-hero-meta");
@@ -133,11 +197,13 @@ export function initBuilder(options = {}) {
 
   if (!root || !heroSearch) return;
 
-  let data = null; // { heroesById, heroAbilities, abilities, items, itemKeyById }
+  let data = null; // { heroesById, heroAbilities, abilities, items, itemKeyById, patchMeta }
   let heroList = []; // [{ id, name, key, hero }]
   let hero = null;
   let heroKey = null;
-  let skillCtx = { regular: [], ultimate: null, innate: [] };
+  let valveHero = null;
+  let patchVersion = null;
+  let skillCtx = { regular: [], ultimate: null, innate: [], layout: "standard", linkedUltimates: [], grants: { shard: [], scepter: [] } };
   let talentTiers = [];
   let build = null;
   let savedBuilds = [];
@@ -149,14 +215,63 @@ export function initBuilder(options = {}) {
     statusEl.classList.toggle("builder-status--error", isError);
   }
 
-  async function ensureData() {
-    if (data) return data;
+  function dataStatusSuffix() {
+    const patch = patchVersion ?? data?.patchMeta?.latestPatch ?? "?";
+    const heroSource = valveHero ? "live" : "cached";
+    return `Hero data: ${heroSource} · Items: patched to ${patch}`;
+  }
+
+  function skillAssignOptions() {
+    return { heroKey, linkedUltimates: skillCtx.linkedUltimates ?? [] };
+  }
+
+  async function ensureData({ force = false } = {}) {
+    if (data && !force) return data;
     setStatus("Loading hero, ability, and item data…");
-    data = await loadDotaData();
-    heroList = [...data.heroesById.values()]
-      .map((h) => ({ id: h.id, key: h.name, name: h.localized_name, hero: h }))
-      .sort((a, b) => a.name.localeCompare(b.name));
+    const loaded = await ensureGameDataUpToDate({ force });
+    data = loaded;
+    patchVersion = loaded.latestPatch ?? loaded.patchMeta?.latestPatch ?? null;
+
+    try {
+      const valveList = await fetchHeroList();
+      heroList = valveList.map((h) => ({
+        id: h.id,
+        key: h.key,
+        name: h.name,
+        hero: data.heroesById.get(h.id) ?? null,
+      }));
+    } catch {
+      heroList = [...data.heroesById.values()]
+        .map((h) => ({ id: h.id, key: h.name, name: h.localized_name, hero: h }))
+        .sort((a, b) => a.name.localeCompare(b.name));
+    }
+
+    if (!patchVersion) {
+      patchVersion = loaded.patchMeta?.latestPatch ?? null;
+    }
+
     return data;
+  }
+
+  function abilityDisplayLabel(key) {
+    const va = valveHero ? getAbilityFromValve(valveHero, key) : null;
+    if (va) return formatValveAbilityLabel(va, valveHero);
+    return data.abilities[key]?.dname ?? key;
+  }
+
+  function abilityTooltip(key) {
+    const va = valveHero ? getAbilityFromValve(valveHero, key) : null;
+    if (va?.desc_loc) {
+      return formatAbilityText(va.desc_loc, va.special_values ?? [], allHeroAbilities(valveHero), va);
+    }
+    return data.abilities[key]?.desc ?? "";
+  }
+
+  function talentDisplayLabel(name) {
+    if (!name) return "";
+    const va = valveHero ? getAbilityFromValve(valveHero, name) : null;
+    if (va) return formatValveAbilityLabel(va, valveHero);
+    return talentLabel(data.abilities[name]?.dname, name);
   }
 
   async function refreshSavedBuilds() {
@@ -189,7 +304,7 @@ export function initBuilder(options = {}) {
       .map(
         (h) => `
       <li class="hero-combobox__option builder-hero-option" role="option" data-hero-id="${h.id}">
-        <img src="${heroIconUrl(h.hero)}" alt="" class="builder-hero-option__icon" loading="lazy" />
+        <img src="${heroIconByKey(h.key) ?? heroIconUrl(h.hero) ?? ""}" alt="" class="builder-hero-option__icon" loading="lazy" />
         <span>${escapeHtml(h.name)}</span>
       </li>`
       )
@@ -197,24 +312,65 @@ export function initBuilder(options = {}) {
     heroSuggestions.classList.remove("hidden");
   }
 
-  function selectHero(heroId, { fresh = true, existingBuild = null } = {}) {
+  async function selectHero(heroId, { fresh = true, existingBuild = null, force = false } = {}) {
     const entry = heroList.find((h) => h.id === Number(heroId));
     if (!entry) return;
 
-    hero = entry.hero;
     heroKey = entry.key;
     heroSearch.value = entry.name;
     heroSuggestions.classList.add("hidden");
 
-    skillCtx = getSkillableAbilities(heroKey, data.heroAbilities, data.abilities);
-    talentTiers = getTalentTiers(heroKey, data.heroAbilities);
-
-    build = existingBuild ?? createEmptyBuild({ heroId: entry.id, name: `${entry.name} build` });
+    build = normalizeBuild(existingBuild ?? createEmptyBuild({ heroId: entry.id, name: `${entry.name} build` }));
     nameInput.value = build.name;
+    if (gpmInput) gpmInput.value = String(build.gpm ?? 450);
+    if (startGoldInput) startGoldInput.value = String(build.startingGold ?? 600);
     saveBtn.disabled = false;
     root.classList.remove("hidden");
 
-    portraitImg.src = heroPortraitUrl(hero);
+    setStatus(`Loading live data for ${entry.name}…`);
+    valveHero = null;
+
+    try {
+      valveHero = await fetchHeroData(entry.id, { force });
+      hero = normalizeValveHeroForStats(valveHero);
+      skillCtx = resolveHeroSkillLayout(heroKey, {
+        valveHero,
+        heroAbilities: data.heroAbilities,
+        abilities: data.abilities,
+      });
+      talentTiers = resolveTalentTiers(heroKey, { valveHero, heroAbilities: data.heroAbilities });
+    } catch (error) {
+      hero = entry.hero ?? data.heroesById.get(entry.id);
+      if (!hero) {
+        setStatus(`Could not load hero data for ${entry.name}.`, true);
+        return;
+      }
+      skillCtx = resolveHeroSkillLayout(heroKey, {
+        heroAbilities: data.heroAbilities,
+        abilities: data.abilities,
+      });
+      talentTiers = resolveTalentTiers(heroKey, { heroAbilities: data.heroAbilities });
+      portraitImg.src = heroPortraitByKey(heroKey) ?? "";
+      portraitImg.alt = entry.name;
+      heroMetaEl.innerHTML = `
+      <span class="builder-hero-meta__badge">${escapeHtml(hero.primary_attr?.toUpperCase() ?? "")}</span>
+      <span class="builder-hero-meta__badge">${escapeHtml(hero.attack_type ?? "")}</span>
+      ${(hero.roles ?? []).slice(0, 3).map((r) => `<span class="builder-hero-meta__role">${escapeHtml(r)}</span>`).join("")}
+    `;
+      popularity = null;
+      loadItemPopularity(entry.id)
+        .then((raw) => {
+          popularity = resolveItemPopularityKeys(raw, data.itemKeyById);
+        })
+        .catch(() => {
+          popularity = null;
+        });
+      renderAll();
+      setStatus(`Using cached hero data for ${entry.name} (${error.message}).`, true);
+      return;
+    }
+
+    portraitImg.src = heroPortraitByKey(heroKey) ?? "";
     portraitImg.alt = entry.name;
     heroMetaEl.innerHTML = `
       <span class="builder-hero-meta__badge">${escapeHtml(hero.primary_attr?.toUpperCase() ?? "")}</span>
@@ -232,16 +388,12 @@ export function initBuilder(options = {}) {
       });
 
     renderAll();
-    setStatus(fresh ? `Building ${entry.name}. Pick abilities, talents, and items below.` : `Loaded build for ${entry.name}.`);
-  }
-
-  function renderAll() {
-    renderLevelBadge();
-    renderSkillGrid();
-    renderTalents();
-    renderItemSlots();
-    renderStats();
-    refreshSavedBuilds();
+    const suffix = dataStatusSuffix();
+    setStatus(
+      fresh
+        ? `Building ${entry.name}. ${suffix}`
+        : `Loaded build for ${entry.name}. ${suffix}`
+    );
   }
 
   function renderLevelBadge() {
@@ -249,11 +401,60 @@ export function initBuilder(options = {}) {
     levelBadge.textContent = `Level ${level}`;
   }
 
+  function renderAll() {
+    renderLevelBadge();
+    renderHeroNote();
+    renderSkillGrid();
+    renderTalents();
+    renderUpgradeGrants();
+    renderItemSlots();
+    renderGoldCheckpoints();
+    renderTimeline();
+    renderStats();
+    refreshSavedBuilds();
+  }
+
+  function renderHeroNote() {
+    if (!heroNoteEl) return;
+    if (skillCtx.layout === "lone_druid") {
+      heroNoteEl.textContent =
+        "Lone Druid: Spirit Bear mirrors your skill order at the same levels. Use the bear inventory below for the bear's items.";
+      heroNoteEl.classList.remove("hidden");
+    } else if (skillCtx.layout === "kez") {
+      heroNoteEl.textContent =
+        "Kez: Katana and Sai each have their own abilities; ultimate points apply to both stances.";
+      heroNoteEl.classList.remove("hidden");
+    } else {
+      heroNoteEl.classList.add("hidden");
+      heroNoteEl.textContent = "";
+    }
+  }
+
   function skillRows() {
-    const rows = skillCtx.regular.map((key) => ({ kind: "ability", key, isUltimate: false }));
-    if (skillCtx.ultimate) rows.push({ kind: "ability", key: skillCtx.ultimate, isUltimate: true });
+    const rows = [];
+    if (skillCtx.layout === "kez" && skillCtx.stances) {
+      for (const stance of skillCtx.stances) {
+        rows.push({ kind: "stance-head", label: stance.label });
+        for (const key of stance.regular) {
+          rows.push({ kind: "ability", key, isUltimate: false, stance: stance.id });
+        }
+        rows.push({ kind: "ability", key: stance.ultimate, isUltimate: true, stance: stance.id });
+      }
+    } else {
+      for (const key of skillCtx.regular) rows.push({ kind: "ability", key, isUltimate: false });
+      if (skillCtx.ultimate) rows.push({ kind: "ability", key: skillCtx.ultimate, isUltimate: true });
+    }
     if (heroHasAttributeBonus(heroKey)) rows.push({ kind: "attribute" });
     return rows;
+  }
+
+  function abilityMatchesRow(entry, row) {
+    if (!entry || entry.kind !== "ability") return false;
+    if (entry.key === row.key) return true;
+    if (row.isUltimate && skillCtx.linkedUltimates?.includes(row.key)) {
+      return skillCtx.linkedUltimates.includes(entry.key);
+    }
+    return false;
   }
 
   function renderSkillGrid() {
@@ -268,14 +469,26 @@ export function initBuilder(options = {}) {
     }
 
     for (const row of rows) {
+      if (row.kind === "stance-head") {
+        html += `<div class="builder-skill-row__label builder-skill-row__label--stance">${escapeHtml(row.label)}</div>`;
+        for (let level = 1; level <= MAX_LEVEL; level += 1) {
+          html += `<div class="builder-skill-cell builder-skill-cell--stance-head"></div>`;
+        }
+        continue;
+      }
+
       const label =
         row.kind === "attribute"
           ? `<span class="builder-skill-row__name">Attribute Bonus</span>`
-          : `<img src="${abilityIconUrl(data.abilities[row.key])}" alt="" class="builder-skill-row__icon" loading="lazy" /><span class="builder-skill-row__name">${escapeHtml(data.abilities[row.key]?.dname ?? row.key)}</span>`;
+          : `<img src="${abilityIconByName(row.key)}" alt="" class="builder-skill-row__icon" loading="lazy" /><span class="builder-skill-row__name">${escapeHtml(abilityDisplayLabel(row.key))}</span>`;
 
-      html += `<div class="builder-skill-row__label${row.isUltimate ? " builder-skill-row__label--ultimate" : ""}" title="${escapeHtml(data.abilities[row.key]?.desc ?? "")}">${label}</div>`;
+      html += `<div class="builder-skill-row__label${row.isUltimate ? " builder-skill-row__label--ultimate" : ""}" title="${escapeHtml(abilityTooltip(row.key))}">${label}</div>`;
 
-      const pointsSoFar = row.kind === "attribute" ? countAttributeBonusPoints(build) : countAbilityPoints(build, row.key);
+      const assignOpts = skillAssignOptions();
+      const pointsSoFar =
+        row.kind === "attribute"
+          ? countAttributeBonusPoints(build)
+          : countAbilityPoints(build, row.key, assignOpts);
       const maxPoints = row.kind === "attribute" ? ATTRIBUTE_BONUS_MAX_POINTS : row.isUltimate ? ULTIMATE_MAX_POINTS : 4;
       let pointsRendered = 0;
 
@@ -285,7 +498,7 @@ export function initBuilder(options = {}) {
         const isTalentCol = TALENT_TIER_LEVELS.includes(level);
         const matches =
           entry &&
-          ((row.kind === "ability" && entry.kind === "ability" && entry.key === row.key) ||
+          ((row.kind === "ability" && abilityMatchesRow(entry, row)) ||
             (row.kind === "attribute" && entry.kind === "attribute"));
 
         let cls = "builder-skill-cell";
@@ -301,7 +514,7 @@ export function initBuilder(options = {}) {
           const check =
             row.kind === "attribute"
               ? canAssignAttribute(build, heroKey)
-              : canAssignAbility(build, skillCtx, row.key);
+              : canAssignAbility(build, skillCtx, row.key, assignOpts);
           if (check.ok) {
             cls += " builder-skill-cell--available";
             title = "Click to assign this level";
@@ -332,7 +545,7 @@ export function initBuilder(options = {}) {
         const chosenSide = chosen[tier.tier];
         const renderOption = (side, name) => {
           if (!name) return "";
-          const dname = talentLabel(data.abilities[name]?.dname, name);
+          const dname = talentDisplayLabel(name);
           const isChosen = chosenSide === side;
           const isLocked = !isNext && !isChosen;
           const cls = [
@@ -356,41 +569,158 @@ export function initBuilder(options = {}) {
       .join("");
   }
 
-  function itemSlotHtml(itemKey, { kind, index }) {
+  function renderUpgradeGrants() {
+    if (!upgradeGrantsEl) return;
+    const grants = skillCtx.grants ?? { shard: [], scepter: [] };
+    const hasGrants = grants.shard.length || grants.scepter.length;
+    if (!hasGrants) {
+      upgradeGrantsEl.classList.add("hidden");
+      upgradeGrantsEl.innerHTML = "";
+      return;
+    }
+
+    const currentLevel = currentHeroLevel(build);
+    const renderBlock = (kind, abilities, slotKind) => {
+      if (!abilities.length) return "";
+      const timing = build.upgradeTimings?.[slotKind];
+      const owned = build.consumables?.[slotKind];
+      const active = owned || (timing != null && timing <= currentLevel);
+      const abilityCards = abilities
+        .map(
+          (a) =>
+            `<div class="builder-grant-ability${active ? " builder-grant-ability--active" : ""}" title="${escapeHtml(formatValveAbilityLabel(a, valveHero))}">
+              <img src="${abilityIconByName(a.name)}" alt="" loading="lazy" />
+              <span>${escapeHtml(formatValveAbilityLabel(a, valveHero))}</span>
+            </div>`
+        )
+        .join("");
+      return `
+        <div class="builder-upgrade-block">
+          <div class="builder-upgrade-block__head">
+            <strong>${escapeHtml(CONSUMABLE_SLOT_LABELS[slotKind] ?? slotKind)}</strong>
+            <label class="builder-upgrade-timing">Target level
+              <select data-upgrade-kind="${slotKind}">
+                <option value="">—</option>
+                ${Array.from({ length: MAX_LEVEL }, (_, i) => i + 1)
+                  .map(
+                    (lv) =>
+                      `<option value="${lv}" ${Number(timing) === lv ? "selected" : ""}>${lv}</option>`
+                  )
+                  .join("")}
+              </select>
+            </label>
+          </div>
+          <div class="builder-grant-abilities">${abilityCards}</div>
+        </div>`;
+    };
+
+    upgradeGrantsEl.innerHTML =
+      renderBlock("shard", grants.shard, "shard") + renderBlock("scepter", grants.scepter, "scepter");
+    upgradeGrantsEl.classList.remove("hidden");
+  }
+
+  function itemSlotHtml(itemKey, { kind, index, label }) {
     const item = itemKey ? data.items[itemKey] : null;
     const img = item ? `<img src="${itemIconUrl(item)}" alt="${escapeHtml(item.dname)}" loading="lazy" />` : "";
-    return `<button type="button" class="builder-item-slot${item ? " builder-item-slot--filled" : ""}" data-slot-kind="${kind}" data-slot-index="${index}" title="${item ? escapeHtml(item.dname) : "Empty slot"}">${img}</button>`;
+    const slotLabel = label ?? (item ? item.dname : "Empty slot");
+    return `<button type="button" class="builder-item-slot${item ? " builder-item-slot--filled" : ""}" data-slot-kind="${kind}" data-slot-index="${index}" title="${escapeHtml(slotLabel)}">${img}${label && !item ? `<span class="builder-item-slot__hint">${escapeHtml(label)}</span>` : ""}</button>`;
   }
 
   function renderItemSlots() {
     itemSlotsEl.innerHTML = build.items
       .map((key, i) => itemSlotHtml(key, { kind: "main", index: i }))
       .join("");
+
+    if (consumableSlotsEl) {
+      consumableSlotsEl.innerHTML = CONSUMABLE_SLOT_KINDS.map((kind) =>
+        itemSlotHtml(build.consumables?.[kind], {
+          kind,
+          index: 0,
+          label: CONSUMABLE_SLOT_LABELS[kind],
+        })
+      ).join("");
+    }
+
     neutralSlotEl.innerHTML = itemSlotHtml(build.neutralItem, { kind: "neutral", index: 0 });
     backpackSlotsEl.innerHTML = build.backpack
       .map((key, i) => itemSlotHtml(key, { kind: "backpack", index: i }))
       .join("");
 
+    if (bearGroupEl && bearSlotsEl) {
+      const showBear = heroUsesBearInventory(heroKey);
+      bearGroupEl.classList.toggle("hidden", !showBear);
+      if (showBear) {
+        bearSlotsEl.innerHTML = (build.bearItems ?? [])
+          .map((key, i) => itemSlotHtml(key, { kind: "bear", index: i }))
+          .join("");
+      }
+    }
+
     const mainCost = totalItemCost(build.items, data.items);
     const neutralCost = totalItemCost([build.neutralItem], data.items);
+    const consumableCost = totalItemCost(Object.values(build.consumables ?? {}), data.items);
     const backpackCost = totalItemCost(build.backpack, data.items);
-    costEl.textContent = `Inventory: ${mainCost + neutralCost}g  ·  Backpack (not counted in stats): ${backpackCost}g  ·  Total: ${mainCost + neutralCost + backpackCost}g`;
+    const bearCost = totalItemCost(build.bearItems ?? [], data.items);
+    const timelineNet = totalTimelineNetCost(build.itemTimeline, data.items);
+    costEl.textContent =
+      `Inventory: ${mainCost + neutralCost + consumableCost}g · Timeline net: ${timelineNet}g · Backpack: ${backpackCost}g` +
+      (bearCost ? ` · Bear: ${bearCost}g` : "");
+  }
+
+  function renderGoldCheckpoints() {
+    if (!goldCheckpointsEl) return;
+    const rows = goldCheckpointTable({
+      gpm: build.gpm,
+      startingGold: build.startingGold,
+      timeline: build.itemTimeline,
+      itemsData: data.items,
+    });
+    goldCheckpointsEl.innerHTML = rows
+      .map(
+        (row) =>
+          `<div class="builder-gold-checkpoint"><span>${row.minute}m</span><strong>${Math.round(row.gold)}g</strong></div>`
+      )
+      .join("");
+  }
+
+  function renderTimeline() {
+    if (!timelineListEl) return;
+    const events = build.itemTimeline ?? [];
+    if (!events.length) {
+      timelineListEl.innerHTML = `<p class="builder-timeline__empty">No buy/sell events yet. Add purchases to track gold.</p>`;
+      return;
+    }
+    timelineListEl.innerHTML = events
+      .map((event) => {
+        const item = data.items[event.itemKey];
+        const delta = timelineGoldDelta(event, data.items);
+        const sign = delta >= 0 ? "+" : "";
+        return `
+        <div class="builder-timeline__row" data-event-id="${escapeHtml(event.id)}">
+          <span class="builder-timeline__minute">${event.minute}m</span>
+          <span class="builder-timeline__action">${event.action === "sell" ? "Sell" : "Buy"}</span>
+          <span class="builder-timeline__item">${escapeHtml(item?.dname ?? event.itemKey)}</span>
+          <span class="builder-timeline__gold">${sign}${delta}g</span>
+          <button type="button" class="builder-timeline__remove" data-remove-event="${escapeHtml(event.id)}" aria-label="Remove event">×</button>
+        </div>`;
+      })
+      .join("");
   }
 
   function renderStats() {
     const level = Math.max(1, currentHeroLevel(build));
-    const talentDnameByKey = new Map(
-      Object.entries(data.abilities).map(([key, a]) => [key, a.dname])
-    );
+    const talentDnameByKey = valveHero
+      ? new Map(
+          (valveHero.talents ?? []).map((t) => [t.name, formatValveAbilityLabel(t, valveHero)])
+        )
+      : new Map(Object.entries(data.abilities).map(([key, a]) => [key, a.dname]));
     const extraAttrs = computeSkillAttributeBonus(build, {
       parseTalentAttributeBonus,
       talentDnameByKey,
     });
-    const itemBonuses = computeItemBonuses(
-      [...build.items, build.neutralItem],
-      data.items,
-      { primaryAttr: hero.primary_attr }
-    );
+    const itemBonuses = computeItemBonuses(equippedItemKeys(build), data.items, {
+      primaryAttr: hero.primary_attr,
+    });
     const stats = computeDerivedStats(hero, level, extraAttrs, itemBonuses);
 
     const attributePoints = countAttributeBonusPoints(build);
@@ -447,7 +777,7 @@ export function initBuilder(options = {}) {
       if (cell.dataset.rowKind === "attribute") {
         assignAttribute(build, heroKey);
       } else {
-        assignAbility(build, skillCtx, cell.dataset.rowKey);
+        assignAbility(build, skillCtx, cell.dataset.rowKey, skillAssignOptions());
       }
       renderAll();
     } catch (error) {
@@ -482,9 +812,14 @@ export function initBuilder(options = {}) {
   // ---- Item picker ----
 
   function openPicker(kind, index) {
-    pickerState = { kind, index, qual: pickerState.qual };
-    const current =
-      kind === "main" ? build.items[index] : kind === "backpack" ? build.backpack[index] : build.neutralItem;
+    pickerState = { kind, index, qual: pickerState.qual ?? "all" };
+    let current = null;
+    if (kind === "main") current = build.items[index];
+    else if (kind === "backpack") current = build.backpack[index];
+    else if (kind === "neutral") current = build.neutralItem;
+    else if (kind === "bear") current = build.bearItems?.[index];
+    else if (CONSUMABLE_SLOT_KINDS.includes(kind)) current = build.consumables?.[kind];
+
     pickerRemoveBtn.disabled = !current;
     pickerSearch.value = "";
     renderPickerTabs();
@@ -518,9 +853,23 @@ export function initBuilder(options = {}) {
     );
   }
 
+  function pickerItemAllowed(key) {
+    if (CONSUMABLE_SLOT_KINDS.includes(pickerState.kind)) {
+      return isConsumableSlotItem(pickerState.kind, key);
+    }
+    if (pickerState.kind === "main" || pickerState.kind === "backpack" || pickerState.kind === "bear") {
+      return isMainInventoryItem(key, data.items);
+    }
+    return true;
+  }
+
   function renderPickerList(query) {
     const q = query.trim().toLowerCase();
-    let entries = Object.entries(data.items).filter(([, item]) => item.qual === pickerState.qual && item.dname);
+    let entries = Object.entries(data.items).filter(([, item]) => item.dname);
+    if (pickerState.qual !== "all") {
+      entries = entries.filter(([, item]) => item.qual === pickerState.qual);
+    }
+    entries = entries.filter(([key]) => pickerItemAllowed(key));
     if (q) {
       entries = entries.filter(([, item]) => item.dname.toLowerCase().includes(q));
     }
@@ -549,6 +898,17 @@ export function initBuilder(options = {}) {
       })
       .join("");
   }
+
+  consumableSlotsEl?.addEventListener("click", (event) => {
+    const btn = event.target.closest("[data-slot-kind]");
+    if (!btn) return;
+    openPicker(btn.dataset.slotKind, Number(btn.dataset.slotIndex));
+  });
+  bearSlotsEl?.addEventListener("click", (event) => {
+    const btn = event.target.closest("[data-slot-kind]");
+    if (!btn) return;
+    openPicker(btn.dataset.slotKind, Number(btn.dataset.slotIndex));
+  });
 
   itemSlotsEl.addEventListener("click", (event) => {
     const btn = event.target.closest("[data-slot-kind]");
@@ -589,13 +949,161 @@ export function initBuilder(options = {}) {
   pickerRemoveBtn.addEventListener("click", () => applyPicked(null));
 
   function applyPicked(itemKey) {
-    if (pickerState.kind === "main") setItemSlot(build, pickerState.index, itemKey);
-    else if (pickerState.kind === "backpack") setBackpackSlot(build, pickerState.index, itemKey);
-    else if (pickerState.kind === "neutral") setNeutralItem(build, itemKey);
+    const kind = pickerState.kind;
+    if (kind === "main") setItemSlot(build, pickerState.index, itemKey);
+    else if (kind === "backpack") setBackpackSlot(build, pickerState.index, itemKey);
+    else if (kind === "neutral") setNeutralItem(build, itemKey);
+    else if (kind === "bear") setBearItemSlot(build, pickerState.index, itemKey);
+    else if (CONSUMABLE_SLOT_KINDS.includes(kind)) setConsumableSlot(build, kind, itemKey);
     closePicker();
     renderItemSlots();
     renderStats();
+    renderUpgradeGrants();
   }
+
+  // ---- Gold, timeline, upgrades ----
+
+  gpmInput?.addEventListener("change", () => {
+    if (!build) return;
+    build.gpm = Number(gpmInput.value) || 450;
+    renderGoldCheckpoints();
+    renderItemSlots();
+  });
+
+  startGoldInput?.addEventListener("change", () => {
+    if (!build) return;
+    build.startingGold = Number(startGoldInput.value) || 600;
+    renderGoldCheckpoints();
+    renderItemSlots();
+  });
+
+  timelineAddBtn?.addEventListener("click", () => {
+    if (!build || !data) return;
+    const minute = Number(window.prompt("Minute of game (0–60):", "10"));
+    if (!Number.isFinite(minute)) return;
+    const action = window.confirm("OK = Buy, Cancel = Sell (50% refund)") ? "buy" : "sell";
+    const query = window.prompt("Item name search (partial match):", "");
+    if (!query) return;
+    const match = Object.entries(data.items).find(([, item]) =>
+      item.dname?.toLowerCase().includes(query.trim().toLowerCase())
+    );
+    if (!match) {
+      setStatus(`No item matching “${query}”.`, true);
+      return;
+    }
+    addTimelineEvent(build, {
+      minute,
+      action,
+      itemKey: match[0],
+      slotKind: classifyTimelineSlot(match[0]),
+    });
+    renderTimeline();
+    renderGoldCheckpoints();
+    renderItemSlots();
+  });
+
+  function classifyTimelineSlot(itemKey) {
+    for (const kind of CONSUMABLE_SLOT_KINDS) {
+      if (CONSUMABLE_ITEM_KEYS[kind]?.has(itemKey)) return kind;
+    }
+    return "main";
+  }
+
+  timelineListEl?.addEventListener("click", (event) => {
+    const btn = event.target.closest("[data-remove-event]");
+    if (!btn || !build) return;
+    removeTimelineEvent(build, btn.dataset.removeEvent);
+    renderTimeline();
+    renderGoldCheckpoints();
+    renderItemSlots();
+  });
+
+  upgradeGrantsEl?.addEventListener("change", (event) => {
+    const select = event.target.closest("[data-upgrade-kind]");
+    if (!select || !build) return;
+    const kind = select.dataset.upgradeKind;
+    const level = select.value ? Number(select.value) : null;
+    setUpgradeTiming(build, kind, level);
+    renderUpgradeGrants();
+  });
+
+  // ---- Import from cache ----
+
+  async function openImportModal() {
+    if (!hero || !build) {
+      setStatus("Pick a hero first.");
+      return;
+    }
+    const accountId = Number(options.getDefaultAccountId?.());
+    if (!accountId) {
+      setStatus("Set your Account ID on the Analyze tab to import cached matches.", true);
+      return;
+    }
+    importDescEl.textContent = `Cached matches for account ${accountId} on ${hero.localized_name ?? heroSearch.value}.`;
+    importListEl.innerHTML = `<li class="builder-import-list__loading">Loading cached matches…</li>`;
+    importModal.classList.remove("hidden");
+    importModal.setAttribute("aria-hidden", "false");
+    document.body.classList.add("modal-open");
+
+    try {
+      const rows = await listCachedMatchImports({
+        accountId,
+        heroId: hero.id,
+        heroNameById: data?.heroesById,
+      });
+      if (!rows.length) {
+        importListEl.innerHTML = `<li class="builder-import-list__empty">No cached matches for this hero. Run an analysis on the Analyze tab first.</li>`;
+        return;
+      }
+      importListEl.innerHTML = rows
+        .map(
+          (row) =>
+            `<li><button type="button" class="builder-import-option" data-match-id="${row.matchId}">${escapeHtml(row.label)}${row.gpm ? ` · ${row.gpm} GPM` : ""}</button></li>`
+        )
+        .join("");
+    } catch (error) {
+      importListEl.innerHTML = `<li class="builder-import-list__empty">${escapeHtml(error.message)}</li>`;
+    }
+  }
+
+  function closeImportModal() {
+    importModal?.classList.add("hidden");
+    importModal?.setAttribute("aria-hidden", "true");
+    document.body.classList.remove("modal-open");
+  }
+
+  importBtn?.addEventListener("click", () => void openImportModal());
+  importModal?.addEventListener("click", (event) => {
+    if (event.target.closest("[data-modal-close]")) closeImportModal();
+  });
+  importListEl?.addEventListener("click", async (event) => {
+    const btn = event.target.closest(".builder-import-option");
+    if (!btn || !hero) return;
+    const accountId = Number(options.getDefaultAccountId?.());
+    const rows = await listCachedMatchImports({
+      accountId,
+      heroId: hero.id,
+      heroNameById: data?.heroesById,
+    });
+    const row = rows.find((r) => String(r.matchId) === btn.dataset.matchId);
+    if (!row) return;
+    build = importBuildFromMatchPlayer({
+      player: row.player,
+      heroId: hero.id,
+      heroKey,
+      valveHero,
+      skillCtx,
+      itemsData: data.items,
+      itemKeyById: data.itemKeyById,
+      matchLabel: `${hero.localized_name ?? heroSearch.value} · ${row.label}`,
+    });
+    nameInput.value = build.name;
+    if (gpmInput) gpmInput.value = String(build.gpm);
+    if (startGoldInput) startGoldInput.value = String(build.startingGold);
+    closeImportModal();
+    renderAll();
+    setStatus(`Imported build from match ${row.matchId}. ${dataStatusSuffix()}`);
+  });
 
   // ---- Hero search ----
 
@@ -608,7 +1116,7 @@ export function initBuilder(options = {}) {
   heroSuggestions.addEventListener("click", (event) => {
     const option = event.target.closest("[data-hero-id]");
     if (!option) return;
-    selectHero(Number(option.dataset.heroId));
+    void selectHero(Number(option.dataset.heroId));
   });
 
   // ---- Save/load/delete ----
@@ -631,7 +1139,7 @@ export function initBuilder(options = {}) {
       setStatus("Pick a hero first.");
       return;
     }
-    build = createEmptyBuild({ heroId: hero.id, name: `${hero.localized_name} build` });
+    build = normalizeBuild(createEmptyBuild({ heroId: hero.id, name: `${hero.localized_name} build` }));
     nameInput.value = build.name;
     savedSelect.value = "";
     deleteBtn.disabled = true;
@@ -654,8 +1162,29 @@ export function initBuilder(options = {}) {
     const stored = await getBuild(id);
     if (!stored) return;
     await ensureData();
-    selectHero(stored.heroId, { fresh: false, existingBuild: stored });
+    await selectHero(stored.heroId, { fresh: false, existingBuild: stored });
     deleteBtn.disabled = false;
+  });
+
+  refreshBtn?.addEventListener("click", async () => {
+    const prevHeroId = hero?.id;
+    const prevBuild = build ? cloneBuild(build) : null;
+    setStatus("Refreshing game data from Valve…");
+    clearDotaDataCache();
+    clearValvePatchCache();
+    if (prevHeroId) clearValveHeroCache(prevHeroId);
+    data = null;
+    valveHero = null;
+    try {
+      await ensureData({ force: true });
+      if (prevHeroId) {
+        await selectHero(prevHeroId, { fresh: false, existingBuild: prevBuild, force: true });
+      } else {
+        setStatus(`Game data refreshed. ${dataStatusSuffix()}`);
+      }
+    } catch (error) {
+      setStatus(`Could not refresh game data: ${error.message}`, true);
+    }
   });
 
   nameInput.addEventListener("change", () => {
@@ -669,9 +1198,9 @@ export function initBuilder(options = {}) {
       await refreshSavedBuilds();
       const defaultHeroId = options.getDefaultHeroId?.();
       if (defaultHeroId && heroList.some((h) => h.id === Number(defaultHeroId))) {
-        selectHero(defaultHeroId);
+        await selectHero(defaultHeroId);
       } else {
-        setStatus("Pick a hero to start building.");
+        setStatus(`Pick a hero to start building. ${dataStatusSuffix()}`);
       }
     })
     .catch((error) => {

@@ -82,6 +82,13 @@ async function main() {
     await page.locator("#builder-hero-search").fill("Anti-Mage");
     await page.locator('#builder-hero-suggestions [data-hero-id]').first().click();
 
+    await page.waitForFunction(
+      () =>
+        document.getElementById("builder-status")?.textContent?.includes("Hero data: live") ||
+        document.getElementById("builder-status")?.textContent?.includes("Building"),
+      { timeout: 45000 }
+    );
+
     await page.locator("#builder-workspace").waitFor({ state: "visible", timeout: 15000 });
     await page.locator(".builder-skill-row__label").first().waitFor({ state: "visible" });
 

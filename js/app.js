@@ -955,6 +955,7 @@ async function init() {
         const id = Number(document.getElementById("hero-id")?.value);
         return Number.isFinite(id) && id > 0 ? id : null;
       },
+      getDefaultAccountId: () => document.getElementById("account-id")?.value || null,
     });
 
     const accountFromUrl = document.getElementById("account-id").value;

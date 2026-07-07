@@ -21,6 +21,8 @@ export const NO_ATTRIBUTE_BONUS_HEROES = new Set(["npc_dota_hero_invoker"]);
 
 export const ITEM_SLOT_COUNT = 6;
 export const BACKPACK_SLOT_COUNT = 3;
+export const STARTING_GOLD_DEFAULT = 600;
+export const GPM_DEFAULT = 450;
 
 function uid() {
   if (typeof crypto !== "undefined" && crypto.randomUUID) return crypto.randomUUID();
@@ -89,17 +91,46 @@ export function createEmptyBuild({ heroId, name = "" } = {}) {
     items: new Array(ITEM_SLOT_COUNT).fill(null),
     backpack: new Array(BACKPACK_SLOT_COUNT).fill(null),
     neutralItem: null,
+    consumables: { scepter: null, shard: null, moonshard: null },
+    bearItems: new Array(ITEM_SLOT_COUNT).fill(null),
+    itemTimeline: [],
+    upgradeTimings: { scepter: null, shard: null },
+    gpm: GPM_DEFAULT,
+    startingGold: STARTING_GOLD_DEFAULT,
     notes: "",
   };
 }
 
-export function cloneBuild(build) {
+/** Back-fill newer fields on builds saved before schema extensions. */
+export function normalizeBuild(build) {
+  if (!build) return createEmptyBuild();
+  const base = createEmptyBuild({ heroId: build.heroId, name: build.name });
   return {
+    ...base,
+    ...build,
+    skillOrder: (build.skillOrder ?? base.skillOrder).map((entry) => (entry ? { ...entry } : null)),
+    items: [...(build.items ?? base.items)],
+    backpack: [...(build.backpack ?? base.backpack)],
+    bearItems: [...(build.bearItems ?? base.bearItems)],
+    consumables: { ...base.consumables, ...(build.consumables ?? {}) },
+    itemTimeline: (build.itemTimeline ?? []).map((event) => ({ ...event })),
+    upgradeTimings: { ...base.upgradeTimings, ...(build.upgradeTimings ?? {}) },
+    gpm: build.gpm ?? GPM_DEFAULT,
+    startingGold: build.startingGold ?? STARTING_GOLD_DEFAULT,
+  };
+}
+
+export function cloneBuild(build) {
+  return normalizeBuild({
     ...build,
     skillOrder: build.skillOrder.map((entry) => (entry ? { ...entry } : null)),
     items: [...build.items],
     backpack: [...build.backpack],
-  };
+    bearItems: [...(build.bearItems ?? new Array(ITEM_SLOT_COUNT).fill(null))],
+    consumables: { ...(build.consumables ?? {}) },
+    itemTimeline: (build.itemTimeline ?? []).map((event) => ({ ...event })),
+    upgradeTimings: { ...(build.upgradeTimings ?? {}) },
+  });
 }
 
 /** Index (0-based) of the next unfilled level, or -1 if the timeline (level 25) is complete. */
@@ -117,8 +148,16 @@ function countPicks(build, predicate) {
   return build.skillOrder.filter((entry) => entry != null && predicate(entry)).length;
 }
 
-export function countAbilityPoints(build, abilityKey) {
-  return countPicks(build, (entry) => entry.kind === "ability" && entry.key === abilityKey);
+export function countAbilityPoints(build, abilityKey, { heroKey, linkedUltimates = [] } = {}) {
+  return countPicks(build, (entry) => {
+    if (entry.kind !== "ability") return false;
+    if (entry.key === abilityKey) return true;
+    if (heroKey && linkedUltimates.length >= 2) {
+      const linked = linkedUltimates.includes(abilityKey) && linkedUltimates.includes(entry.key);
+      if (linked) return true;
+    }
+    return false;
+  });
 }
 
 export function countAttributeBonusPoints(build) {
@@ -130,7 +169,7 @@ export function isTalentLevel(level) {
   return TALENT_TIER_LEVELS.includes(level);
 }
 
-export function canAssignAbility(build, ctx, abilityKey) {
+export function canAssignAbility(build, ctx, abilityKey, { heroKey, linkedUltimates = [] } = {}) {
   const idx = nextOpenLevelIndex(build);
   if (idx === -1) return { ok: false, reason: "Build is already at level 25." };
   const level = idx + 1;
@@ -138,8 +177,13 @@ export function canAssignAbility(build, ctx, abilityKey) {
     return { ok: false, reason: `Level ${level} is reserved for a talent choice.` };
   }
 
-  if (abilityKey === ctx.ultimate) {
-    const have = countAbilityPoints(build, abilityKey);
+  const isUlt =
+    abilityKey === ctx.ultimate ||
+    (linkedUltimates.includes(abilityKey) && linkedUltimates.includes(ctx.ultimate));
+
+  if (isUlt || linkedUltimates.includes(abilityKey)) {
+    const ultimateKey = linkedUltimates.includes(abilityKey) ? linkedUltimates[0] : abilityKey;
+    const have = countAbilityPoints(build, ultimateKey, { heroKey, linkedUltimates });
     if (have >= ULTIMATE_MAX_POINTS) return { ok: false, reason: "Ultimate is already maxed." };
     const requiredLevel = ULTIMATE_UNLOCK_LEVELS[have];
     if (level < requiredLevel) {
@@ -151,7 +195,7 @@ export function canAssignAbility(build, ctx, abilityKey) {
   if (!ctx.regular.includes(abilityKey)) {
     return { ok: false, reason: "Unknown ability for this hero." };
   }
-  const have = countAbilityPoints(build, abilityKey);
+  const have = countAbilityPoints(build, abilityKey, { heroKey, linkedUltimates });
   if (have >= REGULAR_MAX_POINTS) return { ok: false, reason: "Ability is already maxed." };
   return { ok: true, level };
 }
@@ -188,10 +232,12 @@ export function canAssignAttribute(build, heroKey) {
   return { ok: true, level };
 }
 
-export function assignAbility(build, ctx, abilityKey) {
-  const check = canAssignAbility(build, ctx, abilityKey);
+export function assignAbility(build, ctx, abilityKey, options = {}) {
+  const check = canAssignAbility(build, ctx, abilityKey, options);
   if (!check.ok) throw new Error(check.reason);
-  build.skillOrder[check.level - 1] = { kind: "ability", key: abilityKey };
+  const storedKey =
+    options.linkedUltimates?.includes(abilityKey) ? options.linkedUltimates[0] : abilityKey;
+  build.skillOrder[check.level - 1] = { kind: "ability", key: storedKey };
   build.updatedAt = Date.now();
   return build;
 }
@@ -277,6 +323,63 @@ export function setNeutralItem(build, itemKey) {
   build.neutralItem = itemKey || null;
   build.updatedAt = Date.now();
   return build;
+}
+
+export function setConsumableSlot(build, kind, itemKey) {
+  build.consumables = build.consumables ?? { scepter: null, shard: null, moonshard: null };
+  build.consumables[kind] = itemKey || null;
+  build.updatedAt = Date.now();
+  return build;
+}
+
+export function setBearItemSlot(build, index, itemKey) {
+  if (index < 0 || index >= ITEM_SLOT_COUNT) throw new Error("Invalid bear item slot index.");
+  build.bearItems = build.bearItems ?? new Array(ITEM_SLOT_COUNT).fill(null);
+  build.bearItems[index] = itemKey || null;
+  build.updatedAt = Date.now();
+  return build;
+}
+
+export function setUpgradeTiming(build, kind, level) {
+  build.upgradeTimings = build.upgradeTimings ?? { scepter: null, shard: null };
+  build.upgradeTimings[kind] = level == null ? null : Number(level);
+  build.updatedAt = Date.now();
+  return build;
+}
+
+function timelineUid() {
+  if (typeof crypto !== "undefined" && crypto.randomUUID) return crypto.randomUUID();
+  return `evt-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+export function addTimelineEvent(build, event) {
+  build.itemTimeline = build.itemTimeline ?? [];
+  build.itemTimeline.push({
+    id: event.id ?? timelineUid(),
+    minute: Number(event.minute) || 0,
+    action: event.action === "sell" ? "sell" : "buy",
+    itemKey: event.itemKey,
+    slotKind: event.slotKind ?? "main",
+    slotIndex: event.slotIndex ?? null,
+  });
+  build.itemTimeline.sort((a, b) => a.minute - b.minute);
+  build.updatedAt = Date.now();
+  return build;
+}
+
+export function removeTimelineEvent(build, eventId) {
+  build.itemTimeline = (build.itemTimeline ?? []).filter((event) => event.id !== eventId);
+  build.updatedAt = Date.now();
+  return build;
+}
+
+/** Items that contribute to computed stats (main + neutral + consumables, not backpack). */
+export function equippedItemKeys(build) {
+  const keys = [...build.items, build.neutralItem];
+  for (const key of Object.values(build.consumables ?? {})) {
+    if (key) keys.push(key);
+  }
+  return keys.filter(Boolean);
 }
 
 export function totalItemCost(itemKeys, itemsData) {

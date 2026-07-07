@@ -16,7 +16,26 @@ export function heroPortraitUrl(hero) {
 }
 
 export function abilityIconUrl(ability) {
-  return cdnUrl(ability?.img);
+  if (ability?.img) return cdnUrl(ability.img);
+  if (ability?.name) return abilityIconByName(ability.name);
+  return BLANK_ABILITY_ICON;
+}
+
+export function abilityIconByName(abilityName) {
+  if (!abilityName) return BLANK_ABILITY_ICON;
+  return `${CDN_BASE}/apps/dota2/images/dota_react/abilities/${abilityName}.png`;
+}
+
+export function heroPortraitByKey(heroKey) {
+  if (!heroKey) return null;
+  const short = heroKey.replace("npc_dota_hero_", "");
+  return `${CDN_BASE}/apps/dota2/images/dota_react/heroes/${short}.png`;
+}
+
+export function heroIconByKey(heroKey) {
+  if (!heroKey) return null;
+  const short = heroKey.replace("npc_dota_hero_", "");
+  return `${CDN_BASE}/apps/dota2/images/dota_react/heroes/icons/${short}.png`;
 }
 
 export function itemIconUrl(item) {

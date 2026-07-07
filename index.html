@@ -753,7 +753,7 @@
         <section class="card builder-panel">
           <div class="section-head">
             <h2 class="section-title">Hero Builder</h2>
-            <p class="section-desc">Plan a skill build and item timing for any hero. Base stats/abilities/items come from the OpenDota community dataset; item popularity badges use OpenDota's per-hero purchase stats. Builds save locally in this browser.</p>
+            <p class="section-desc">Plan skill builds and item timings with live Valve hero data (talents/abilities) and patch-current items. Import from cached matches or save builds locally.</p>
           </div>
 
           <div class="builder-toolbar">
@@ -767,6 +767,8 @@
             <button type="button" id="builder-new-btn" class="btn btn--outline btn--sm">New build</button>
             <button type="button" id="builder-save-btn" class="btn btn--primary btn--sm" disabled>Save build</button>
             <button type="button" id="builder-delete-btn" class="btn btn--outline btn--sm" disabled>Delete</button>
+            <button type="button" id="builder-refresh-btn" class="btn btn--outline btn--sm" title="Fetch latest patch data from Valve">Refresh data</button>
+            <button type="button" id="builder-import-btn" class="btn btn--outline btn--sm" title="Import skill and item timings from cached matches">Import from cache</button>
           </div>
 
           <p id="builder-status" class="builder-status" aria-live="polite">Loading hero data…</p>
@@ -790,6 +792,8 @@
                 <div id="builder-skill-grid" class="builder-skill-grid"></div>
               </div>
               <div class="builder-talent-tiers" id="builder-talent-tiers"></div>
+              <div class="builder-upgrade-grants hidden" id="builder-upgrade-grants"></div>
+              <p class="builder-hero-note hidden" id="builder-hero-note"></p>
               <div class="builder-skill-actions">
                 <button type="button" id="builder-undo-btn" class="btn btn--outline btn--sm">Undo last pick</button>
                 <button type="button" id="builder-reset-skills-btn" class="btn btn--outline btn--sm">Reset skills</button>
@@ -800,19 +804,45 @@
               <article class="card builder-items-panel">
                 <div class="section-head section-head--compact">
                   <h3 class="section-title">Item build</h3>
-                  <p class="section-desc">The 6 inventory slots and neutral slot apply to stats below. Backpack is for planning only — matches real Dota, where backpack items don't grant bonuses.</p>
+                  <p class="section-desc">Plan inventory, consumable upgrades, and buy/sell timings. Backpack items don't grant stat bonuses.</p>
                 </div>
+                <div class="builder-gold-controls">
+                  <label class="builder-gold-field">
+                    <span>GPM</span>
+                    <input type="number" id="builder-gpm" min="0" max="2000" step="10" value="450" />
+                  </label>
+                  <label class="builder-gold-field">
+                    <span>Start gold</span>
+                    <input type="number" id="builder-start-gold" min="0" max="5000" step="50" value="600" />
+                  </label>
+                </div>
+                <div class="builder-gold-checkpoints" id="builder-gold-checkpoints"></div>
                 <div class="builder-slot-group">
                   <span class="builder-slot-label">Inventory</span>
                   <div class="builder-item-slots" id="builder-item-slots"></div>
                 </div>
                 <div class="builder-slot-group">
+                  <span class="builder-slot-label">Upgrades (not inventory slots)</span>
+                  <div class="builder-consumable-slots" id="builder-consumable-slots"></div>
+                </div>
+                <div class="builder-slot-group">
                   <span class="builder-slot-label">Neutral</span>
                   <div class="builder-item-slots builder-item-slots--single" id="builder-neutral-slot"></div>
+                </div>
+                <div class="builder-slot-group hidden" id="builder-bear-group">
+                  <span class="builder-slot-label">Spirit Bear inventory</span>
+                  <div class="builder-item-slots" id="builder-bear-slots"></div>
                 </div>
                 <div class="builder-slot-group">
                   <span class="builder-slot-label">Backpack (no stat bonus)</span>
                   <div class="builder-item-slots" id="builder-backpack-slots"></div>
+                </div>
+                <div class="builder-timeline">
+                  <div class="builder-timeline__head">
+                    <span class="builder-slot-label">Item timeline</span>
+                    <button type="button" id="builder-timeline-add" class="btn btn--outline btn--sm">Add event</button>
+                  </div>
+                  <div class="builder-timeline__list" id="builder-timeline-list"></div>
                 </div>
                 <p class="builder-cost" id="builder-cost"></p>
               </article>
@@ -842,6 +872,20 @@
               </div>
               <div class="builder-item-tabs" id="builder-item-tabs"></div>
               <div class="builder-item-list" id="builder-item-list"></div>
+            </div>
+          </div>
+        </div>
+
+        <div id="builder-import-modal" class="modal hidden" aria-hidden="true" role="dialog" aria-labelledby="builder-import-title" aria-modal="true">
+          <div class="modal__backdrop" data-modal-close tabindex="-1"></div>
+          <div class="modal__panel motion-scale builder-import-modal__panel">
+            <header class="modal__header">
+              <h2 id="builder-import-title" class="modal__title">Import from cached matches</h2>
+              <button type="button" class="modal__close" data-modal-close aria-label="Close import dialog">×</button>
+            </header>
+            <div class="modal__body">
+              <p class="builder-import-desc" id="builder-import-desc">Uses matches already stored for your account ID on the Analyze tab.</p>
+              <ul class="builder-import-list" id="builder-import-list"></ul>
             </div>
           </div>
         </div>

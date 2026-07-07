@@ -40,6 +40,74 @@ export const SECTION_ICONS = {
  */
 export const CHANGELOGS = [
   {
+    version: "0.0.47",
+    date: "2026-07-07",
+    title: "Builder Upgrades & Gold",
+    tagline: "Live patch data, item timeline, and special hero support.",
+    heroImage: DOTA_IMG.items.manta,
+    accent: "#42d68c",
+    sections: [
+      {
+        id: "features",
+        title: "Feature Updates",
+        items: [
+          {
+            type: "changed",
+            text: "Game data loads dotaconstants 7.41 base + Valve patch-note overlays, with an automatic freshness check against the latest patch on load.",
+          },
+          {
+            type: "added",
+            text: "Aghanim's Shard/Scepter and Moon Shard use dedicated upgrade slots (not inventory). Granted abilities show when you plan to buy them — not as levelable skills.",
+          },
+          {
+            type: "added",
+            text: "Item timeline with buy/sell (50% refund), GPM + starting gold inputs, and estimated gold at 10/20/30/40/50/60 minutes.",
+          },
+          {
+            type: "added",
+            text: "Import from cached matches — pull skill order, purchases, and GPM from games already stored for your account.",
+          },
+          {
+            type: "added",
+            text: "Kez dual-stance skill grid and Lone Druid Spirit Bear inventory with mirrored skill notes.",
+          },
+          {
+            type: "added",
+            text: "All items tab in the item picker.",
+          },
+        ],
+      },
+    ],
+  },
+  {
+    version: "0.0.46",
+    date: "2026-07-07",
+    title: "Live Patch Data",
+    tagline: "Hero Builder talents and items stay current with 7.41d.",
+    heroImage: DOTA_IMG.items.aghanim,
+    accent: "#42d68c",
+    sections: [
+      {
+        id: "features",
+        title: "Feature Updates",
+        items: [
+          {
+            type: "changed",
+            text: "Hero Builder now loads live hero abilities and talents from Valve's datafeed (current patch, e.g. 7.41d) with resolved talent text instead of stale dotaconstants placeholders.",
+          },
+          {
+            type: "changed",
+            text: "Item stats and costs are patched from Valve patch notes (7.41 through the latest letter patch) so values like Mage Slayer damage reflect in-game numbers.",
+          },
+          {
+            type: "added",
+            text: "Refresh data button on the Hero Builder toolbar to bust caches and re-fetch from Valve.",
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: "0.0.45",
     date: "2026-07-07",
     title: "Hero Builder Tab",
