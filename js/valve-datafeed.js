@@ -1,6 +1,6 @@
 import { DOTA_DATA_STORE, openDb } from "./db.js";
 import { formatAbilityText } from "./valve-text.js";
-import { fetchValveJson, valveDatafeedUrl } from "./valve-fetch.js";
+import { fetchValveJson, fetchBundledJson, valveDatafeedUrl } from "./valve-fetch.js";
 
 const VALVE_BASE = "https://www.dota2.com/datafeed";
 const HERO_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
@@ -67,20 +67,42 @@ export async function fetchLatestPatchVersion({ signal, force = false } = {}) {
     return cached.data;
   }
 
-  const data = await fetchValve("patchnoteslist", { language: "english" });
-  if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
-  const patches = data.patches ?? data.result?.data?.patches ?? [];
-  const latest = patches[patches.length - 1]?.patch_name ?? patches[patches.length - 1]?.patch_number ?? "7.41";
-  memoryCache.set(key, latest);
-  setCacheEntry(key, latest);
-  return latest;
+  const bundled = await fetchBundledJson("patch-meta.json", { signal });
+  if (bundled?.latestPatch) {
+    memoryCache.set(key, bundled.latestPatch);
+    setCacheEntry(key, bundled.latestPatch);
+    return bundled.latestPatch;
+  }
+
+  try {
+    const data = await fetchValve("patchnoteslist", { language: "english" });
+    if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
+    const patches = data.patches ?? data.result?.data?.patches ?? [];
+    const latest =
+      patches[patches.length - 1]?.patch_name ??
+      patches[patches.length - 1]?.patch_number ??
+      "7.41";
+    memoryCache.set(key, latest);
+    setCacheEntry(key, latest);
+    return latest;
+  } catch {
+    return "7.41";
+  }
 }
 
 /** Hero picker list from Valve (id + localized name). */
 export async function fetchHeroList({ signal } = {}) {
-  const data = await fetchValve("herolist", { language: "english" });
+  const bundled = await fetchBundledJson("herolist.json", { signal });
+  let raw = bundled;
+  if (!raw) {
+    try {
+      raw = await fetchValve("herolist", { language: "english" });
+    } catch {
+      return [];
+    }
+  }
   if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
-  const heroes = data.result?.data?.heroes ?? [];
+  const heroes = raw.result?.data?.heroes ?? [];
   return heroes
     .map((h) => ({
       id: h.id,
@@ -104,14 +126,24 @@ export async function fetchHeroData(heroId, { signal, force = false } = {}) {
     return cached.data;
   }
 
-  const data = await fetchValve("herodata", { language: "english", hero_id: String(heroId) });
-  if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
-  const hero = data.result?.data?.heroes?.[0] ?? null;
-  if (!hero) throw new Error(`No Valve hero data for id ${heroId}`);
+  const bundled = await fetchBundledJson(`heroes/${heroId}.json`, { signal });
+  if (bundled) {
+    memoryCache.set(key, bundled);
+    setCacheEntry(key, bundled);
+    return bundled;
+  }
 
-  memoryCache.set(key, hero);
-  setCacheEntry(key, hero);
-  return hero;
+  try {
+    const data = await fetchValve("herodata", { language: "english", hero_id: String(heroId) });
+    if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
+    const hero = data.result?.data?.heroes?.[0] ?? null;
+    if (!hero) throw new Error(`No Valve hero data for id ${heroId}`);
+    memoryCache.set(key, hero);
+    setCacheEntry(key, hero);
+    return hero;
+  } catch (error) {
+    throw new Error(`No hero data for id ${heroId} (${error.message})`);
+  }
 }
 
 /** Convert Valve herodata into the shape used by build-stats.js (dotaconstants-like bases). */

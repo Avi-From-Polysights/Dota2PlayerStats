@@ -2,6 +2,7 @@ import { DOTA_DATA_STORE, openDb } from "./db.js";
 import { fetchJson } from "./api.js";
 import { applyItemPatches } from "./item-patches.js";
 import { fetchLatestPatchVersion } from "./valve-datafeed.js";
+import { fetchBundledJson } from "./valve-fetch.js";
 
 const PATCH_VERSION_CACHE_KEY = "appliedItemPatchVersion";
 
@@ -155,7 +156,14 @@ async function setStoredPatchVersion(version) {
  * Valve reports a newer patch than we last stored.
  */
 export async function ensureGameDataUpToDate({ signal, force = false } = {}) {
-  const latestPatch = await fetchLatestPatchVersion({ signal, force });
+  let latestPatch = "7.41";
+  try {
+    latestPatch = await fetchLatestPatchVersion({ signal, force });
+  } catch {
+    const bundled = await fetchBundledJson("patch-meta.json", { signal });
+    latestPatch = bundled?.latestPatch ?? "7.41";
+  }
+
   const storedPatch = force ? null : await getStoredPatchVersion();
   const stale =
     force || !storedPatch || comparePatchVersions(storedPatch, latestPatch) < 0;

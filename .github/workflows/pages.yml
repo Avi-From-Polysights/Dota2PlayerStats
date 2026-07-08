@@ -34,6 +34,8 @@ jobs:
           sed -e "s/__VERSION__/${VERSION}/g" -e "s|js/app.js?v=${VERSION}|js/${VERSION}/app.js|g" index.html > _site/index.html
           test -f _site/js/${VERSION}/app.js
           test -f _site/css/changelog.css
+      - name: Bundle Valve game data
+        run: node scripts/bundle-valve-data.mjs --out _site/data
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3

@@ -3,7 +3,7 @@
  * Valve publishes letter patches faster than the dotaconstants repo updates.
  */
 
-import { fetchValveJson, valveDatafeedUrl } from "./valve-fetch.js";
+import { fetchValveJson, fetchBundledJson, valveDatafeedUrl } from "./valve-fetch.js";
 
 const PATCH_FLOOR = "7.41";
 
@@ -81,6 +81,9 @@ function parseCostNote(note) {
 }
 
 async function fetchPatchNotes(version) {
+  const bundledAll = await fetchBundledJson("patch-notes.json");
+  if (bundledAll?.[version]) return bundledAll[version];
+
   const url = valveDatafeedUrl("patchnotes", { language: "english", version });
   try {
     return await fetchValveJson(url);
@@ -90,6 +93,9 @@ async function fetchPatchNotes(version) {
 }
 
 async function listPatchesSinceFloor() {
+  const bundledMeta = await fetchBundledJson("patch-meta.json");
+  if (bundledMeta?.patchVersions?.length) return bundledMeta.patchVersions;
+
   try {
     const data = await fetchValveJson(valveDatafeedUrl("patchnoteslist", { language: "english" }));
     const patches = data.patches ?? data.result?.data?.patches ?? [];

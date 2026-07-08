@@ -40,6 +40,30 @@ export const SECTION_ICONS = {
  */
 export const CHANGELOGS = [
   {
+    version: "0.0.49",
+    date: "2026-07-08",
+    title: "Bundled Game Data",
+    tagline: "Fix CORS failures on GitHub Pages.",
+    heroImage: DOTA_IMG.logo,
+    accent: "#42d68c",
+    sections: [
+      {
+        id: "fixes",
+        title: "Bug Fixes",
+        items: [
+          {
+            type: "fixed",
+            text: "Valve hero/talent and patch data is bundled at deploy time and served same-origin — no browser CORS or third-party proxy required.",
+          },
+          {
+            type: "fixed",
+            text: "Hero Builder no longer fails to load when live Valve fetches are blocked; falls back to dotaconstants gracefully.",
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: "0.0.48",
     date: "2026-07-07",
     title: "Builder Fixes",

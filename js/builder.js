@@ -2,6 +2,7 @@ import { abilityIconByName, heroIconByKey, heroIconUrl, heroPortraitByKey, itemI
 import {
   clearDotaDataCache,
   ensureGameDataUpToDate,
+  loadDotaData,
   loadItemPopularity,
   resolveItemPopularityKeys,
 } from "./dota-data.js";
@@ -230,7 +231,7 @@ export function initBuilder(options = {}) {
 
   function dataStatusSuffix() {
     const patch = patchVersion ?? data?.patchMeta?.latestPatch ?? "?";
-    const heroSource = valveHero ? "live" : "cached";
+    const heroSource = valveHero ? "bundled/live" : "cached";
     return `Hero data: ${heroSource} · Items: patched to ${patch}`;
   }
 
@@ -246,9 +247,15 @@ export function initBuilder(options = {}) {
   async function ensureData({ force = false } = {}) {
     if (data && !force) return data;
     setStatus("Loading hero, ability, and item data…");
-    const loaded = await ensureGameDataUpToDate({ force });
-    data = loaded;
-    patchVersion = loaded.latestPatch ?? loaded.patchMeta?.latestPatch ?? null;
+    try {
+      const loaded = await ensureGameDataUpToDate({ force });
+      data = loaded;
+      patchVersion = loaded.latestPatch ?? loaded.patchMeta?.latestPatch ?? "7.41";
+    } catch (error) {
+      console.warn("ensureGameDataUpToDate failed:", error);
+      data = await loadDotaData({ force });
+      patchVersion = data.patchMeta?.latestPatch ?? "7.41";
+    }
 
     try {
       const valveList = await fetchHeroList();
@@ -262,10 +269,6 @@ export function initBuilder(options = {}) {
       heroList = [...data.heroesById.values()]
         .map((h) => ({ id: h.id, key: h.name, name: h.localized_name, hero: h }))
         .sort((a, b) => a.name.localeCompare(b.name));
-    }
-
-    if (!patchVersion) {
-      patchVersion = loaded.patchMeta?.latestPatch ?? null;
     }
 
     return data;
