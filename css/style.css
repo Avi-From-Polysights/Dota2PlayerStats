@@ -101,6 +101,26 @@ a:hover {
   color: var(--foreground);
 }
 
+.section-title--inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.feature-badge {
+  font-size: 0.625rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #8ab4ff;
+  padding: 0.2rem 0.5rem;
+  border-radius: var(--radius-sm);
+  background: var(--accent-dim);
+  border: 1px solid rgba(21, 93, 252, 0.25);
+  line-height: 1.2;
+}
+
 .section-desc {
   margin: 0.35rem 0 0;
   font-size: 0.8125rem;
@@ -705,6 +725,11 @@ input[type="checkbox"] {
   padding: 0.75rem 1rem;
   border-radius: var(--radius-md);
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  flex-wrap: wrap;
   transition:
     background var(--motion-base) var(--motion-ease),
     color var(--motion-base) var(--motion-ease),
@@ -751,6 +776,12 @@ input[type="checkbox"] {
 .main-tabs__tab:not(.main-tabs__tab--active)[data-tab="changelogs"]:hover {
   border-color: rgba(197, 154, 47, 0.45);
   color: #e8b84a;
+}
+
+.main-tabs__tab .feature-badge {
+  font-size: 0.55rem;
+  padding: 0.15rem 0.35rem;
+  letter-spacing: 0.04em;
 }
 
 .tab-panel.hidden {
