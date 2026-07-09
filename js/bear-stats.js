@@ -1,12 +1,10 @@
+import { countAbilityPoints, currentHeroLevel } from "./build-model.js";
 import { computeItemBonuses } from "./build-stats.js";
 
 const UNIVERSAL_DAMAGE_FACTOR = 0.7;
 const ARMOR_PER_AGI = 1 / 6;
 
-function primaryDamageFromAttrs(primaryAttr, str, agi, int) {
-  if (primaryAttr === "str") return str;
-  if (primaryAttr === "agi") return agi;
-  if (primaryAttr === "int") return int;
+function primaryDamageFromAttrs(str, agi, int) {
   return (str + agi + int) * UNIVERSAL_DAMAGE_FACTOR;
 }
 
@@ -27,12 +25,15 @@ export function computeSpiritBearStats(buildingData, level, itemKeys, itemsData)
   const totalAgi = agi + itemBonuses.agi + itemBonuses.allStats;
   const totalInt = int + itemBonuses.int + itemBonuses.allStats;
 
-  const primaryDamage = primaryDamageFromAttrs("all", totalStr, totalAgi, totalInt);
+  const primaryDamage = primaryDamageFromAttrs(totalStr, totalAgi, totalInt);
   const damageMin = bear.baseDamageMin + primaryDamage + itemBonuses.damage;
   const damageMax = bear.baseDamageMax + primaryDamage + itemBonuses.damage;
   const armor = bear.baseArmor + totalAgi * ARMOR_PER_AGI + itemBonuses.armor;
   const iasFraction = (bear.baseAttackSpeed + totalAgi + itemBonuses.attackSpeed) / 100;
   const attacksPerSecond = (1 + iasFraction) / bear.attackRate;
+
+  const demolishPct =
+    level >= 1 ? (buildingData.demolish?.bonusBuildingDamagePct ?? 0) : 0;
 
   return {
     level,
@@ -43,39 +44,39 @@ export function computeSpiritBearStats(buildingData, level, itemKeys, itemsData)
     damageMax,
     armor,
     attacksPerSecond,
-    demolishPct: buildingData.demolish?.bonusBuildingDamagePct ?? 0,
+    demolishPct,
   };
 }
 
 /** Count skill points spent on a mirrored Lone Druid ability in the build. */
-export function bearAbilityPoints(build, heroAbilityKey) {
-  return (build?.levels ?? []).filter(
-    (entry) => entry?.kind === "ability" && entry.key === heroAbilityKey
-  ).length;
+export function bearAbilityPoints(build, heroAbilityKey, assignOpts = {}) {
+  return countAbilityPoints(build, heroAbilityKey, assignOpts);
 }
 
-export function bearSkillRows(buildingData, build, abilitiesData) {
+export function bearSkillRows(buildingData, build, abilitiesData, assignOpts = {}) {
   const mirror = buildingData?.spiritBear?.skillMirror ?? {};
   const rows = [];
+  const heroLevel = Math.max(1, currentHeroLevel(build));
 
   for (const [heroKey, bearKey] of Object.entries(mirror)) {
-    const points = bearAbilityPoints(build, heroKey);
+    const points = bearAbilityPoints(build, heroKey, assignOpts);
     rows.push({
       kind: "ability",
       heroKey,
       bearKey,
       points,
+      maxPoints: 4,
       label: abilitiesData?.[bearKey]?.dname ?? bearKey,
     });
   }
 
   for (const innate of buildingData?.spiritBear?.innateAbilities ?? []) {
     if (innate === buildingData?.demolish?.ability) {
-      const level = (build?.levels ?? []).filter((entry) => entry != null).length;
       rows.push({
         kind: "innate",
         bearKey: innate,
-        points: level > 0 ? 1 : 0,
+        points: heroLevel >= 1 ? 1 : 0,
+        maxPoints: 1,
         label: abilitiesData?.[innate]?.dname ?? "Demolish",
         demolishPct: buildingData.demolish?.bonusBuildingDamagePct ?? 0,
       });
@@ -84,10 +85,16 @@ export function bearSkillRows(buildingData, build, abilitiesData) {
     rows.push({
       kind: "innate",
       bearKey: innate,
-      points: 1,
+      points: heroLevel >= 1 ? 1 : 0,
+      maxPoints: 1,
       label: abilitiesData?.[innate]?.dname ?? innate,
     });
   }
 
   return rows;
+}
+
+export function formatBearCombatSummary(stats) {
+  if (!stats) return "";
+  return `${Math.round(stats.damageMin)}–${Math.round(stats.damageMax)} dmg · ${stats.attacksPerSecond.toFixed(2)}/s`;
 }

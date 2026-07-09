@@ -77,6 +77,10 @@ export function formatTowerTime(seconds) {
 export function computeTowerBreakdown(buildingData, attackers) {
   const heroArmorItems = hasBuildingArmorItem(attackers.heroItems);
   const bearArmorItems = hasBuildingArmorItem(attackers.bearItems ?? []);
+  const combinedArmorItems = hasBuildingArmorItem([
+    ...(attackers.heroItems ?? []),
+    ...(attackers.bearItems ?? []),
+  ]);
 
   const rows = [];
   for (const target of Object.values(buildingData.targets ?? {})) {
@@ -88,10 +92,11 @@ export function computeTowerBreakdown(buildingData, attackers) {
     });
     const heroTime = timeToKillBuilding(target, heroDps);
 
+    let bearDps = null;
     let bearTime = null;
     let combinedTime = heroTime;
     if (attackers.bear) {
-      const bearDps = physicalDpsVsBuilding(
+      bearDps = physicalDpsVsBuilding(
         {
           ...attackers.bear,
           demolishPct: attackers.bear.demolishPct ?? 0,
@@ -105,7 +110,27 @@ export function computeTowerBreakdown(buildingData, attackers) {
         }
       );
       bearTime = timeToKillBuilding(target, bearDps);
-      const combinedNet = heroDps + bearDps - (target.healthRegen ?? 0);
+
+      const heroDpsCombined = physicalDpsVsBuilding(attackers.hero, buildingData, {
+        baseArmor: target.armor,
+        hasDesolator: combinedArmorItems.hasDesolator,
+        hasAssault: combinedArmorItems.hasAssault,
+        buildingData,
+      });
+      const bearDpsCombined = physicalDpsVsBuilding(
+        {
+          ...attackers.bear,
+          demolishPct: attackers.bear.demolishPct ?? 0,
+        },
+        buildingData,
+        {
+          baseArmor: target.armor,
+          hasDesolator: combinedArmorItems.hasDesolator,
+          hasAssault: combinedArmorItems.hasAssault,
+          buildingData,
+        }
+      );
+      const combinedNet = heroDpsCombined + bearDpsCombined - (target.healthRegen ?? 0);
       combinedTime = combinedNet > 0 ? target.health / combinedNet : Infinity;
     }
 
@@ -114,14 +139,21 @@ export function computeTowerBreakdown(buildingData, attackers) {
       label: target.label,
       health: target.health,
       armor: target.armor,
+      effectiveArmorHero: effectiveBuildingArmor(target.armor, {
+        hasDesolator: heroArmorItems.hasDesolator,
+        hasAssault: heroArmorItems.hasAssault,
+        buildingData,
+      }),
+      effectiveArmorBear: attackers.bear
+        ? effectiveBuildingArmor(target.armor, {
+            hasDesolator: bearArmorItems.hasDesolator,
+            hasAssault: bearArmorItems.hasAssault,
+            buildingData,
+          })
+        : null,
       heroDps,
       heroTime,
-      bearDps: attackers.bear ? physicalDpsVsBuilding(attackers.bear, buildingData, {
-        baseArmor: target.armor,
-        hasDesolator: bearArmorItems.hasDesolator,
-        hasAssault: bearArmorItems.hasAssault,
-        buildingData,
-      }) : null,
+      bearDps,
       bearTime,
       combinedTime,
     });

@@ -47,7 +47,7 @@ import {
   parseTalentAttributeBonus,
 } from "./build-stats.js";
 import { loadBuildingData, clearBuildingDataCache, getBuildingDataSourceLabel } from "./building-data.js";
-import { computeSpiritBearStats, bearSkillRows } from "./bear-stats.js";
+import { computeSpiritBearStats, bearSkillRows, formatBearCombatSummary } from "./bear-stats.js";
 import { computeTowerBreakdown, formatTowerTime } from "./tower-damage.js";
 import {
   ATTRIBUTE_BONUS_MAX_POINTS,
@@ -180,6 +180,7 @@ export function initBuilder(options = {}) {
   const bearSlotsEl = document.getElementById("builder-bear-slots");
   const bearIconEl = document.getElementById("builder-bear-icon");
   const bearSkillsEl = document.getElementById("builder-bear-skills");
+  const bearCombatEl = document.getElementById("builder-bear-combat");
   const towerPanelEl = document.getElementById("builder-tower-panel");
   const towerDescEl = document.getElementById("builder-tower-desc");
   const towerBodyEl = document.getElementById("builder-tower-body");
@@ -848,23 +849,29 @@ export function initBuilder(options = {}) {
     if (!bearSkillsEl || !buildingData || !showSpiritBearPanel()) {
       bearSkillsEl?.classList.add("hidden");
       if (bearSkillsEl) bearSkillsEl.innerHTML = "";
+      bearCombatEl?.classList.add("hidden");
+      if (bearCombatEl) bearCombatEl.textContent = "";
       return;
     }
 
-    const rows = bearSkillRows(buildingData, build, data.abilities);
+    const rows = bearSkillRows(buildingData, build, data.abilities, skillAssignOptions());
     bearSkillsEl.classList.remove("hidden");
     bearSkillsEl.innerHTML = rows
       .map((row) => {
         const icon = abilityIconByName(row.bearKey);
-        const maxPoints = row.kind === "ability" ? 4 : 1;
-        const filled = row.kind === "ability" ? row.points : row.points > 0 ? 1 : 0;
+        const maxPoints = row.maxPoints ?? (row.kind === "ability" ? 4 : 1);
+        const filled = row.points ?? 0;
         const pips = Array.from({ length: maxPoints }, (_, i) =>
           i < filled ? "builder-bear-skill__pip--filled" : ""
         )
           .map((cls) => `<span class="builder-bear-skill__pip ${cls}"></span>`)
           .join("");
         const extra =
-          row.demolishPct != null ? `<span class="builder-bear-skill__meta">+${row.demolishPct}% tower damage</span>` : "";
+          row.demolishPct != null && filled > 0
+            ? `<span class="builder-bear-skill__meta">+${row.demolishPct}% tower damage</span>`
+            : row.demolishPct != null && filled === 0
+              ? `<span class="builder-bear-skill__meta builder-bear-skill__meta--muted">Active at level 1+</span>`
+              : "";
         return `
         <div class="builder-bear-skill" title="${escapeHtml(row.bearKey)}">
           <img src="${icon}" alt="" class="builder-bear-skill__icon" loading="lazy" />
@@ -876,6 +883,21 @@ export function initBuilder(options = {}) {
         </div>`;
       })
       .join("");
+
+    if (bearCombatEl) {
+      const level = Math.max(1, currentHeroLevel(build));
+      const bearStats = computeSpiritBearStats(
+        buildingData,
+        level,
+        (build.bearItems ?? []).filter(Boolean),
+        data.items
+      );
+      const summary = formatBearCombatSummary(bearStats);
+      const demo =
+        bearStats?.demolishPct > 0 ? ` · Demolish +${bearStats.demolishPct}% vs buildings` : "";
+      bearCombatEl.textContent = summary ? `Bear: ${summary}${demo}` : "";
+      bearCombatEl.classList.toggle("hidden", !summary);
+    }
   }
 
   function renderTowerDamage() {
@@ -920,15 +942,24 @@ export function initBuilder(options = {}) {
     const ac = buildingData.itemModifiers?.assault?.buildingArmorReduction ?? 0;
     if (towerDescEl) {
       towerDescEl.textContent =
-        `Siege rules: hero/bear auto-attacks deal ${mult}% base damage vs fortified buildings, then armor (Deso −${deso}, AC −${ac} on structures). ` +
-        `Data: ${getBuildingDataSourceLabel(buildingData)}.`;
+        `Siege: ${mult}% base auto-attack damage vs buildings, then armor. ` +
+        `Deso/AC on hero or bear reduce structure armor (combined column uses either inventory). ` +
+        `Item +damage applies to hero inventory and bear slots. ${getBuildingDataSourceLabel(buildingData)}.`;
     }
 
     towerBodyEl.innerHTML = rows
       .map((row) => {
-        const heroCell = `<span class="builder-tower-time">${formatTowerTime(row.heroTime)}</span><span class="builder-tower-dps">${fmt(row.heroDps, 0)} DPS</span>`;
+        const heroArmorNote =
+          row.effectiveArmorHero != null && row.effectiveArmorHero !== row.armor
+            ? ` → ${row.effectiveArmorHero} vs hero`
+            : "";
+        const bearArmorNote =
+          row.effectiveArmorBear != null && row.effectiveArmorBear !== row.armor
+            ? ` → ${row.effectiveArmorBear} vs bear`
+            : "";
+        const heroCell = `<span class="builder-tower-time">${formatTowerTime(row.heroTime)}</span><span class="builder-tower-dps">${fmt(row.heroDps, 0)} DPS${heroArmorNote}</span>`;
         const bearCell = showBear
-          ? `<span class="builder-tower-time">${formatTowerTime(row.bearTime)}</span><span class="builder-tower-dps">${fmt(row.bearDps, 0)} DPS</span>`
+          ? `<span class="builder-tower-time">${formatTowerTime(row.bearTime)}</span><span class="builder-tower-dps">${fmt(row.bearDps, 0)} DPS${bearArmorNote}</span>`
           : "";
         const combinedCell = showBear
           ? `<span class="builder-tower-time builder-tower-time--combined">${formatTowerTime(row.combinedTime)}</span>`
@@ -1142,9 +1173,7 @@ export function initBuilder(options = {}) {
     else if (kind === "bear") setBearItemSlot(build, pickerState.index, itemKey);
     else if (CONSUMABLE_SLOT_KINDS.includes(kind)) setConsumableSlot(build, kind, itemKey);
     closePicker();
-    renderItemSlots();
-    renderStats();
-    renderUpgradeGrants();
+    renderAll();
   }
 
   // ---- Gold, timeline, upgrades ----
@@ -1235,10 +1264,7 @@ export function initBuilder(options = {}) {
     if (!box || !build) return;
     try {
       setConsumableConsumed(build, box.dataset.consumedKind, box.checked);
-      renderConsumableSlots();
-      renderUpgradeGrants();
-      renderStats();
-      renderItemSlots();
+      renderAll();
     } catch (error) {
       box.checked = false;
       setStatus(error.message, true);

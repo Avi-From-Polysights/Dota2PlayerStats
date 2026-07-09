@@ -67,6 +67,12 @@ assert("wraith band + BKB strength sums", bonus.str === 2 + 10);
 assert("power treads switchable stat added to primary (agi)", bonus.agi === 2 + 10);
 assert("attack speed bonus captured", bonus.attackSpeed === 25);
 
+const universalTreads = computeItemBonuses(["power_treads"], items, { primaryAttr: "all" });
+assert(
+  "power treads on universal hero adds stat to all attrs",
+  universalTreads.str === 10 && universalTreads.agi === 10 && universalTreads.int === 10
+);
+
 const derivedNoItems = computeDerivedStats(antiMage, 1, { str: 0, agi: 0, int: 0 }, null);
 assert("level 1 health = 120 + str*22", Math.abs(derivedNoItems.health - (120 + 21 * 22)) < 1e-6);
 assert(

@@ -40,6 +40,35 @@ export const SECTION_ICONS = {
  */
 export const CHANGELOGS = [
   {
+    version: "0.0.53",
+    date: "2026-07-09",
+    title: "Bear Skills & Item Damage",
+    tagline: "Spirit Bear skills track your build; tower DPS reacts to items.",
+    heroImage: DOTA_IMG.heroes.kez,
+    accent: "#c59a2f",
+    sections: [
+      {
+        id: "fixes",
+        title: "Fixes",
+        icon: SECTION_ICONS.fixes,
+        items: [
+          {
+            text: "Spirit Bear skill pips now follow Lone Druid's skill order (Entangle, Spirit Link, Savage Roar) instead of staying empty.",
+          },
+          {
+            text: "Demolish shows as active on the bear from level 1; tower DPS includes the +40% building bonus.",
+          },
+          {
+            text: "Equipping or removing items refreshes the tower damage table; item +damage and Deso/AC apply on hero and bear inventories (combined column merges armor debuffs from either).",
+          },
+          {
+            text: "Power Treads switchable stat now adds to all attributes on the universal Spirit Bear.",
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: "0.0.52",
     date: "2026-07-09",
     title: "Tower Damage & Spirit Bear",

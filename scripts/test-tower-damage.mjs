@@ -59,4 +59,25 @@ assert(rows[0].combinedTime < rows[0].heroTime, "combined should be faster than 
 assert(formatTowerTime(45.2) === "45.2s", "short time format");
 assert(formatTowerTime(125) === "2m 5s", "long time format");
 
+// Deso on bear only: hero column keeps full armor, combined column still gets reduction
+const bearDesoRows = computeTowerBreakdown(sampleBuildingData, {
+  hero: { damageMin: 100, damageMax: 100, attacksPerSecond: 1 },
+  heroItems: [],
+  bear: { damageMin: 100, damageMax: 100, attacksPerSecond: 1, demolishPct: 40 },
+  bearItems: ["desolator"],
+});
+const t1BearDeso = bearDesoRows[0];
+assert(
+  t1BearDeso.effectiveArmorHero === 12,
+  `hero column armor unchanged without deso, got ${t1BearDeso.effectiveArmorHero}`
+);
+assert(
+  t1BearDeso.effectiveArmorBear === 6,
+  `bear column should apply deso, got ${t1BearDeso.effectiveArmorBear}`
+);
+assert(
+  t1BearDeso.combinedTime < t1BearDeso.heroTime,
+  "combined TTK should improve when bear carries deso"
+);
+
 console.log("tower-damage tests passed.");

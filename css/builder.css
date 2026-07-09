@@ -893,6 +893,17 @@
   color: #e8b84a;
 }
 
+.builder-bear-skill__meta--muted {
+  color: var(--muted-foreground);
+}
+
+.builder-bear-combat {
+  margin: 0 0 0.55rem;
+  font-size: 0.75rem;
+  color: var(--foreground);
+  font-variant-numeric: tabular-nums;
+}
+
 .builder-tower-panel {
   margin-top: 1rem;
   padding-top: 1rem;

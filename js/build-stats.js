@@ -98,8 +98,20 @@ export function computeItemBonuses(itemKeys, itemsData, { primaryAttr = "str" } 
 
     const stat = (item.attrib ?? []).find((a) => a.key === "bonus_stat");
     if (stat) {
-      const target = primaryAttr === "agi" || primaryAttr === "str" ? primaryAttr : primaryAttr === "int" ? "int" : "str";
-      bucket[target] += firstNumber(stat.value);
+      const amount = firstNumber(stat.value);
+      if (primaryAttr === "all") {
+        bucket.str += amount;
+        bucket.agi += amount;
+        bucket.int += amount;
+      } else {
+        const target =
+          primaryAttr === "agi" || primaryAttr === "str"
+            ? primaryAttr
+            : primaryAttr === "int"
+              ? "int"
+              : "str";
+        bucket[target] += amount;
+      }
     }
   }
   return bucket;
