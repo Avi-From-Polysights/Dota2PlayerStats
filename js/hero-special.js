@@ -7,6 +7,7 @@ import {
 
 export const KEZ_HERO_KEY = "npc_dota_hero_kez";
 export const LONE_DRUID_HERO_KEY = "npc_dota_hero_lone_druid";
+export const LONE_DRUID_HERO_ID = 80;
 
 export const KEZ_KATANA_REGULAR = ["kez_echo_slash", "kez_grappling_claw", "kez_kazurai_katana"];
 export const KEZ_SAI_REGULAR = ["kez_falcon_rush", "kez_talon_toss", "kez_shodo_sai"];
@@ -112,8 +113,11 @@ export function isMainInventoryItem(itemKey, itemsData) {
   return true;
 }
 
-export function heroUsesBearInventory(heroKey) {
-  return heroKey === LONE_DRUID_HERO_KEY;
+export function heroUsesBearInventory(heroKey, { heroId, heroName } = {}) {
+  if (heroKey === LONE_DRUID_HERO_KEY) return true;
+  if (heroId === LONE_DRUID_HERO_ID) return true;
+  if (heroName === LONE_DRUID_HERO_KEY) return true;
+  return false;
 }
 
 export function heroUsesKezStances(heroKey) {

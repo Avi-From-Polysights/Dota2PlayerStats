@@ -40,7 +40,53 @@ export const SECTION_ICONS = {
  */
 export const CHANGELOGS = [
   {
-    version: "0.0.49",
+    version: "0.0.52",
+    date: "2026-07-09",
+    title: "Tower Damage & Spirit Bear",
+    tagline: "Live tower TTK math and a proper Spirit Bear panel.",
+    heroImage: DOTA_IMG.heroes.kez,
+    accent: "#c59a2f",
+    sections: [
+      {
+        id: "features",
+        title: "Features",
+        icon: SECTION_ICONS.features,
+        items: [
+          {
+            text: "Hero Builder shows Spirit Bear skills (mirrored from Lone Druid) plus bear item slots in the skill panel.",
+          },
+          {
+            text: "Tower damage table estimates time to destroy T1–T4 towers and the Ancient from your build's auto-attack DPS, including Desolator, Assault Cuirass armor reduction, and Spirit Bear Demolish.",
+          },
+          {
+            text: "Building HP/armor and siege rules are bundled from live Dota VPK extracts on each deploy (not hardcoded).",
+          },
+        ],
+      },
+    ],
+  },
+  {
+    version: "0.0.51",
+    date: "2026-07-08",
+    title: "Spirit Bear Panel",
+    tagline: "Bear inventory lives in the skill build card.",
+    heroImage: DOTA_IMG.logo,
+    accent: "#42d68c",
+    sections: [
+      {
+        id: "fixes",
+        title: "Fixes",
+        icon: SECTION_ICONS.fixes,
+        items: [
+          {
+            text: "Moved Spirit Bear inventory into the Skill build panel so Lone Druid players can find bear items and the mirror note in one place.",
+          },
+        ],
+      },
+    ],
+  },
+  {
+    version: "0.0.50",
     date: "2026-07-08",
     title: "Bundled Game Data",
     tagline: "Fix CORS failures on GitHub Pages.",

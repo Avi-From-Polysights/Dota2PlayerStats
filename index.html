@@ -794,6 +794,17 @@
               <div class="builder-talent-tiers" id="builder-talent-tiers"></div>
               <div class="builder-upgrade-grants hidden" id="builder-upgrade-grants"></div>
               <p class="builder-hero-note hidden" id="builder-hero-note"></p>
+              <div class="builder-bear-panel hidden" id="builder-bear-group">
+                <div class="builder-bear-panel__head">
+                  <img id="builder-bear-icon" class="builder-bear-panel__icon" alt="Spirit Bear" width="40" height="40" loading="lazy" />
+                  <div>
+                    <span class="builder-slot-label">Spirit Bear</span>
+                    <p class="builder-bear-panel__desc">Mirrors your skill order at the same levels. Equip the bear's items below.</p>
+                  </div>
+                </div>
+                <div class="builder-bear-skills" id="builder-bear-skills" aria-label="Spirit Bear skills"></div>
+                <div class="builder-item-slots" id="builder-bear-slots"></div>
+              </div>
               <div class="builder-skill-actions">
                 <button type="button" id="builder-undo-btn" class="btn btn--outline btn--sm">Undo last pick</button>
                 <button type="button" id="builder-reset-skills-btn" class="btn btn--outline btn--sm">Reset skills</button>
@@ -834,10 +845,6 @@
                   <span class="builder-slot-label">Neutral</span>
                   <div class="builder-item-slots builder-item-slots--single" id="builder-neutral-slot"></div>
                 </div>
-                <div class="builder-slot-group hidden" id="builder-bear-group">
-                  <span class="builder-slot-label">Spirit Bear inventory</span>
-                  <div class="builder-item-slots" id="builder-bear-slots"></div>
-                </div>
                 <div class="builder-slot-group">
                   <span class="builder-slot-label">Backpack (no stat bonus)</span>
                   <div class="builder-item-slots" id="builder-backpack-slots"></div>
@@ -858,6 +865,25 @@
                   <p class="section-desc">From base hero stats + skill build + equipped items, at your build's current level. Only simple “+N attribute” talents feed these numbers — other talent effects show in the skill build but aren't simulated.</p>
                 </div>
                 <div class="summary-grid" id="builder-stats-grid"></div>
+                <div class="builder-tower-panel hidden" id="builder-tower-panel">
+                  <div class="builder-tower-panel__head">
+                    <h4 class="builder-tower-panel__title">Tower damage (auto-attacks)</h4>
+                    <p class="builder-tower-panel__desc" id="builder-tower-desc"></p>
+                  </div>
+                  <div class="builder-tower-table-wrap">
+                    <table class="builder-tower-table" id="builder-tower-table">
+                      <thead>
+                        <tr>
+                          <th>Structure</th>
+                          <th>Hero</th>
+                          <th id="builder-tower-bear-col" class="hidden">Bear</th>
+                          <th id="builder-tower-combined-col" class="hidden">Combined</th>
+                        </tr>
+                      </thead>
+                      <tbody id="builder-tower-body"></tbody>
+                    </table>
+                  </div>
+                </div>
               </article>
             </div>
           </div>

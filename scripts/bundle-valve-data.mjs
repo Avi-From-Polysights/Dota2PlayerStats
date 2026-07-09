@@ -6,6 +6,7 @@
  */
 import fs from "node:fs";
 import path from "node:path";
+import { bundleBuildingData } from "./bundle-building-data.mjs";
 
 const VALVE_BASE = "https://www.dota2.com/datafeed";
 const PATCH_FLOOR = "7.41";
@@ -91,6 +92,9 @@ async function main() {
   fs.writeFileSync(path.join(outDir, "patch-meta.json"), JSON.stringify(meta, null, 2));
   fs.writeFileSync(path.join(outDir, "patch-notes.json"), JSON.stringify(patchNotes));
   fs.writeFileSync(path.join(outDir, "herolist.json"), JSON.stringify(heroListRaw));
+
+  console.log("Bundling building / tower stats from VPK…");
+  await bundleBuildingData({ outDir });
 
   console.log(`Bundled game data → ${outDir} (patch ${latestPatch})`);
 }

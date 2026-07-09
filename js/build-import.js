@@ -119,7 +119,7 @@ function assignFinalItems(build, player, itemKeyById, itemsData, heroKey) {
     if (match) build.consumables[kind] = { itemKey: match, consumed: kind !== "scepter" };
   }
 
-  if (heroUsesBearInventory(heroKey)) {
+  if (heroUsesBearInventory(heroKey, { heroId: build.heroId })) {
     for (let i = 0; i < ITEM_SLOT_COUNT; i += 1) {
       build.bearItems[i] =
         resolveItemKeyFromId(player[`item_${i}_lone_druid_bear`], itemKeyById) ?? null;

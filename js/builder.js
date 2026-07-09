@@ -46,6 +46,9 @@ import {
   computeItemBonuses,
   parseTalentAttributeBonus,
 } from "./build-stats.js";
+import { loadBuildingData, clearBuildingDataCache, getBuildingDataSourceLabel } from "./building-data.js";
+import { computeSpiritBearStats, bearSkillRows } from "./bear-stats.js";
+import { computeTowerBreakdown, formatTowerTime } from "./tower-damage.js";
 import {
   ATTRIBUTE_BONUS_MAX_POINTS,
   ATTRIBUTE_BONUS_PER_POINT,
@@ -175,6 +178,13 @@ export function initBuilder(options = {}) {
   const consumableSlotsEl = document.getElementById("builder-consumable-slots");
   const bearGroupEl = document.getElementById("builder-bear-group");
   const bearSlotsEl = document.getElementById("builder-bear-slots");
+  const bearIconEl = document.getElementById("builder-bear-icon");
+  const bearSkillsEl = document.getElementById("builder-bear-skills");
+  const towerPanelEl = document.getElementById("builder-tower-panel");
+  const towerDescEl = document.getElementById("builder-tower-desc");
+  const towerBodyEl = document.getElementById("builder-tower-body");
+  const towerBearColEl = document.getElementById("builder-tower-bear-col");
+  const towerCombinedColEl = document.getElementById("builder-tower-combined-col");
   const gpmInput = document.getElementById("builder-gpm");
   const startGoldInput = document.getElementById("builder-start-gold");
   const goldCheckpointsEl = document.getElementById("builder-gold-checkpoints");
@@ -212,6 +222,7 @@ export function initBuilder(options = {}) {
   if (!root || !heroSearch) return;
 
   let data = null; // { heroesById, heroAbilities, abilities, items, itemKeyById, patchMeta }
+  let buildingData = null;
   let heroList = []; // [{ id, name, key, hero }]
   let hero = null;
   let heroKey = null;
@@ -258,13 +269,24 @@ export function initBuilder(options = {}) {
     }
 
     try {
+      buildingData = await loadBuildingData({ force });
+    } catch (error) {
+      console.warn("loadBuildingData failed:", error);
+      buildingData = null;
+    }
+
+    try {
       const valveList = await fetchHeroList();
-      heroList = valveList.map((h) => ({
-        id: h.id,
-        key: h.key,
-        name: h.name,
-        hero: data.heroesById.get(h.id) ?? null,
-      }));
+      if (valveList.length > 0) {
+        heroList = valveList.map((h) => ({
+          id: h.id,
+          key: h.key,
+          name: h.name,
+          hero: data.heroesById.get(h.id) ?? null,
+        }));
+      } else {
+        throw new Error("Empty hero list");
+      }
     } catch {
       heroList = [...data.heroesById.values()]
         .map((h) => ({ id: h.id, key: h.name, name: h.localized_name, hero: h }))
@@ -337,7 +359,7 @@ export function initBuilder(options = {}) {
     const entry = heroList.find((h) => h.id === Number(heroId));
     if (!entry) return;
 
-    heroKey = entry.key;
+    heroKey = entry.key || entry.hero?.name || heroKey;
     heroSearch.value = entry.name;
     heroSuggestions.classList.add("hidden");
 
@@ -354,6 +376,7 @@ export function initBuilder(options = {}) {
     try {
       valveHero = await fetchHeroData(entry.id, { force });
       hero = normalizeValveHeroForStats(valveHero);
+      heroKey = heroKey || hero?.name || heroKey;
       skillCtx = resolveHeroSkillLayout(heroKey, {
         valveHero,
         heroAbilities: data.heroAbilities,
@@ -366,6 +389,7 @@ export function initBuilder(options = {}) {
         setStatus(`Could not load hero data for ${entry.name}.`, true);
         return;
       }
+      heroKey = heroKey || hero?.name || heroKey;
       skillCtx = resolveHeroSkillLayout(heroKey, {
         heroAbilities: data.heroAbilities,
         abilities: data.abilities,
@@ -430,15 +454,22 @@ export function initBuilder(options = {}) {
     renderGoldCheckpoints();
     renderTimeline();
     renderStats();
+    renderTowerDamage();
     refreshSavedBuilds();
+  }
+
+  function showSpiritBearPanel() {
+    return heroUsesBearInventory(heroKey, {
+      heroId: build?.heroId ?? hero?.id,
+      heroName: hero?.name,
+    });
   }
 
   function renderHeroNote() {
     if (!heroNoteEl) return;
     if (skillCtx.layout === "lone_druid") {
-      heroNoteEl.textContent =
-        "Lone Druid: Spirit Bear mirrors your skill order at the same levels. Use the bear inventory below for the bear's items.";
-      heroNoteEl.classList.remove("hidden");
+      heroNoteEl.classList.add("hidden");
+      heroNoteEl.textContent = "";
     } else if (skillCtx.layout === "kez") {
       heroNoteEl.textContent =
         "Kez: Katana and Sai each have their own abilities; ultimate points apply to both stances.";
@@ -681,12 +712,16 @@ export function initBuilder(options = {}) {
       .join("");
 
     if (bearGroupEl && bearSlotsEl) {
-      const showBear = heroUsesBearInventory(heroKey);
+      const showBear = showSpiritBearPanel();
       bearGroupEl.classList.toggle("hidden", !showBear);
       if (showBear) {
+        if (bearIconEl) bearIconEl.src = abilityIconByName("lone_druid_spirit_bear");
+        renderBearSkills();
         bearSlotsEl.innerHTML = (build.bearItems ?? [])
           .map((key, i) => itemSlotHtml(key, { kind: "bear", index: i }))
           .join("");
+      } else if (bearSkillsEl) {
+        bearSkillsEl.innerHTML = "";
       }
     }
 
@@ -806,6 +841,105 @@ export function initBuilder(options = {}) {
         <div class="summary-card__value" style="font-size:1.1rem">${escapeHtml(c.value)}</div>
       </div>`
       )
+      .join("");
+  }
+
+  function renderBearSkills() {
+    if (!bearSkillsEl || !buildingData || !showSpiritBearPanel()) {
+      bearSkillsEl?.classList.add("hidden");
+      if (bearSkillsEl) bearSkillsEl.innerHTML = "";
+      return;
+    }
+
+    const rows = bearSkillRows(buildingData, build, data.abilities);
+    bearSkillsEl.classList.remove("hidden");
+    bearSkillsEl.innerHTML = rows
+      .map((row) => {
+        const icon = abilityIconByName(row.bearKey);
+        const maxPoints = row.kind === "ability" ? 4 : 1;
+        const filled = row.kind === "ability" ? row.points : row.points > 0 ? 1 : 0;
+        const pips = Array.from({ length: maxPoints }, (_, i) =>
+          i < filled ? "builder-bear-skill__pip--filled" : ""
+        )
+          .map((cls) => `<span class="builder-bear-skill__pip ${cls}"></span>`)
+          .join("");
+        const extra =
+          row.demolishPct != null ? `<span class="builder-bear-skill__meta">+${row.demolishPct}% tower damage</span>` : "";
+        return `
+        <div class="builder-bear-skill" title="${escapeHtml(row.bearKey)}">
+          <img src="${icon}" alt="" class="builder-bear-skill__icon" loading="lazy" />
+          <div class="builder-bear-skill__body">
+            <span class="builder-bear-skill__name">${escapeHtml(row.label)}</span>
+            <span class="builder-bear-skill__pips">${pips}</span>
+            ${extra}
+          </div>
+        </div>`;
+      })
+      .join("");
+  }
+
+  function renderTowerDamage() {
+    if (!towerPanelEl || !towerBodyEl || !buildingData || !hero || !build || !data) {
+      towerPanelEl?.classList.add("hidden");
+      return;
+    }
+
+    const level = Math.max(1, currentHeroLevel(build));
+    const talentDnameByKey = valveHero
+      ? new Map(
+          (valveHero.talents ?? []).map((t) => [t.name, formatValveAbilityLabel(t, valveHero)])
+        )
+      : new Map(Object.entries(data.abilities).map(([key, a]) => [key, a.dname]));
+    const extraAttrs = computeSkillAttributeBonus(build, {
+      parseTalentAttributeBonus,
+      talentDnameByKey,
+    });
+    const itemBonuses = computeItemBonuses(equippedItemKeys(build), data.items, {
+      primaryAttr: hero.primary_attr,
+    });
+    const heroStats = computeDerivedStats(hero, level, extraAttrs, itemBonuses);
+
+    const showBear = showSpiritBearPanel();
+    const bearStats = showBear
+      ? computeSpiritBearStats(buildingData, level, (build.bearItems ?? []).filter(Boolean), data.items)
+      : null;
+
+    const rows = computeTowerBreakdown(buildingData, {
+      hero: heroStats,
+      heroItems: equippedItemKeys(build),
+      bear: bearStats ?? undefined,
+      bearItems: (build.bearItems ?? []).filter(Boolean),
+    });
+
+    towerPanelEl.classList.remove("hidden");
+    towerBearColEl?.classList.toggle("hidden", !showBear);
+    towerCombinedColEl?.classList.toggle("hidden", !showBear);
+
+    const mult = Math.round((buildingData.heroBuildingDamageMultiplier ?? 0.5) * 100);
+    const deso = buildingData.itemModifiers?.desolator?.buildingArmorReduction ?? 0;
+    const ac = buildingData.itemModifiers?.assault?.buildingArmorReduction ?? 0;
+    if (towerDescEl) {
+      towerDescEl.textContent =
+        `Siege rules: hero/bear auto-attacks deal ${mult}% base damage vs fortified buildings, then armor (Deso −${deso}, AC −${ac} on structures). ` +
+        `Data: ${getBuildingDataSourceLabel(buildingData)}.`;
+    }
+
+    towerBodyEl.innerHTML = rows
+      .map((row) => {
+        const heroCell = `<span class="builder-tower-time">${formatTowerTime(row.heroTime)}</span><span class="builder-tower-dps">${fmt(row.heroDps, 0)} DPS</span>`;
+        const bearCell = showBear
+          ? `<span class="builder-tower-time">${formatTowerTime(row.bearTime)}</span><span class="builder-tower-dps">${fmt(row.bearDps, 0)} DPS</span>`
+          : "";
+        const combinedCell = showBear
+          ? `<span class="builder-tower-time builder-tower-time--combined">${formatTowerTime(row.combinedTime)}</span>`
+          : "";
+        return `
+        <tr>
+          <td><span class="builder-tower-label">${escapeHtml(row.label)}</span><span class="builder-tower-meta">${row.health} HP · ${row.armor} armor</span></td>
+          <td>${heroCell}</td>
+          ${showBear ? `<td>${bearCell}</td><td>${combinedCell}</td>` : ""}
+        </tr>`;
+      })
       .join("");
   }
 
@@ -1281,8 +1415,10 @@ export function initBuilder(options = {}) {
     setStatus("Refreshing game data from Valve…");
     clearDotaDataCache();
     clearValvePatchCache();
+    clearBuildingDataCache();
     if (prevHeroId) clearValveHeroCache(prevHeroId);
     data = null;
+    buildingData = null;
     valveHero = null;
     try {
       await ensureData({ force: true });
