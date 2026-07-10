@@ -40,6 +40,35 @@ export const SECTION_ICONS = {
  */
 export const CHANGELOGS = [
   {
+    version: "0.0.54",
+    date: "2026-07-10",
+    title: "Instant Load Without OpenDota 429s",
+    tagline: "Static hero and builder data ships with the site; match APIs only when you analyze.",
+    heroImage: DOTA_IMG.logo,
+    accent: "#4a90c4",
+    sections: [
+      {
+        id: "fixes",
+        title: "Fixes",
+        icon: SECTION_ICONS.fixes,
+        items: [
+          {
+            text: "Hero list and Hero Builder game data load from same-origin bundled files at deploy — no more blocking on OpenDota /heroes 429 retries on first visit.",
+          },
+          {
+            text: "dotaconstants heroes, abilities, items, and patch list are bundled alongside Valve data in CI.",
+          },
+          {
+            text: "OpenDota is only used for match analysis and optional item popularity (cached); hero picker prefers bundled Valve herolist, then dotaconstants.",
+          },
+          {
+            text: "Added favicon to stop /favicon.ico 404 noise in the console.",
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: "0.0.53",
     date: "2026-07-09",
     title: "Bear Skills & Item Damage",

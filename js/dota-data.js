@@ -8,17 +8,20 @@ const PATCH_VERSION_CACHE_KEY = "appliedItemPatchVersion";
 
 const DOTACONSTANTS_BASE =
   "https://raw.githubusercontent.com/odota/dotaconstants/master/build";
-const OPENDOTA_BASE = "https://api.opendota.com/api";
 
 const CONSTANTS_TTL_MS = 24 * 60 * 60 * 1000;
 const POPULARITY_TTL_MS = 12 * 60 * 60 * 1000;
+const OPENDOTA_BASE = "https://api.opendota.com/api";
 
 const RESOURCES = {
-  heroes: `${DOTACONSTANTS_BASE}/heroes.json`,
-  heroAbilities: `${DOTACONSTANTS_BASE}/hero_abilities.json`,
-  abilities: `${DOTACONSTANTS_BASE}/abilities.json`,
-  items: `${DOTACONSTANTS_BASE}/items.json`,
-  itemIds: `${DOTACONSTANTS_BASE}/item_ids.json`,
+  heroes: { bundled: "constants/heroes.json", url: `${DOTACONSTANTS_BASE}/heroes.json` },
+  heroAbilities: {
+    bundled: "constants/hero_abilities.json",
+    url: `${DOTACONSTANTS_BASE}/hero_abilities.json`,
+  },
+  abilities: { bundled: "constants/abilities.json", url: `${DOTACONSTANTS_BASE}/abilities.json` },
+  items: { bundled: "constants/items.json", url: `${DOTACONSTANTS_BASE}/items.json` },
+  itemIds: { bundled: "constants/item_ids.json", url: `${DOTACONSTANTS_BASE}/item_ids.json` },
 };
 
 const memoryCache = new Map();
@@ -52,10 +55,24 @@ async function setCacheEntry(key, data) {
 }
 
 /**
- * Fetch a JSON resource with layered caching: memory -> IndexedDB (fresh) -> network -> stale cache fallback.
+ * Fetch a JSON resource with layered caching: memory -> bundled (deploy) -> IndexedDB (fresh) -> network -> stale cache fallback.
  */
-async function loadCached(key, url, ttlMs, { signal, force = false } = {}) {
+async function loadResource(key, { bundled, url }, ttlMs, { signal, force = false } = {}) {
   if (!force && memoryCache.has(key)) return memoryCache.get(key);
+
+  if (!force) {
+    const bundledData = await fetchBundledJson(bundled, { signal });
+    if (bundledData) {
+      memoryCache.set(key, bundledData);
+      setCacheEntry(key, bundledData);
+      return bundledData;
+    }
+  }
+
+  return loadCached(key, url, ttlMs, { signal, force });
+}
+
+async function loadCached(key, url, ttlMs, { signal, force = false } = {}) {
 
   const cached = !force ? await getCacheEntry(key) : null;
   const isFresh = cached && Date.now() - cached.savedAt < ttlMs;
@@ -90,11 +107,11 @@ export async function loadDotaData({ signal, force = false } = {}) {
   }
 
   const [heroesRaw, heroAbilities, abilities, items, itemIds] = await Promise.all([
-    loadCached("heroes", RESOURCES.heroes, CONSTANTS_TTL_MS, { signal, force }),
-    loadCached("heroAbilities", RESOURCES.heroAbilities, CONSTANTS_TTL_MS, { signal, force }),
-    loadCached("abilities", RESOURCES.abilities, CONSTANTS_TTL_MS, { signal, force }),
-    loadCached("items", RESOURCES.items, CONSTANTS_TTL_MS, { signal, force }),
-    loadCached("itemIds", RESOURCES.itemIds, CONSTANTS_TTL_MS, { signal, force }),
+    loadResource("heroes", RESOURCES.heroes, CONSTANTS_TTL_MS, { signal, force }),
+    loadResource("heroAbilities", RESOURCES.heroAbilities, CONSTANTS_TTL_MS, { signal, force }),
+    loadResource("abilities", RESOURCES.abilities, CONSTANTS_TTL_MS, { signal, force }),
+    loadResource("items", RESOURCES.items, CONSTANTS_TTL_MS, { signal, force }),
+    loadResource("itemIds", RESOURCES.itemIds, CONSTANTS_TTL_MS, { signal, force }),
   ]);
 
   const heroesById = new Map();

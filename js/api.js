@@ -5,6 +5,7 @@ import {
   OPENDOTA_REQUEST_COST,
   acquireOpenDotaQuota,
 } from "./rate-limit.js";
+import { fetchBundledJson } from "./valve-fetch.js";
 
 const BASE_URL = "https://api.opendota.com/api";
 const HEROES_FALLBACK_URL =
@@ -109,7 +110,26 @@ function mapHeroList(heroes) {
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 
+function mapHeroListFromValve(raw) {
+  const heroes = raw?.result?.data?.heroes ?? [];
+  return heroes
+    .map((h) => ({ id: h.id, name: h.name_loc ?? h.name }))
+    .filter((h) => h.id && h.name)
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
 async function loadHeroesFromDotaconstants(signal) {
+  try {
+    const bundled = await fetchBundledJson("constants/heroes.json", { signal });
+    if (bundled) {
+      const heroes = Array.isArray(bundled) ? bundled : Object.values(bundled);
+      const list = mapHeroList(heroes);
+      if (list.length) return list;
+    }
+  } catch {
+    // fall through
+  }
+
   const response = await fetch(HEROES_FALLBACK_URL, { signal });
   if (!response.ok) {
     throw new Error(`HTTP ${response.status} for hero fallback`);
@@ -120,24 +140,32 @@ async function loadHeroesFromDotaconstants(signal) {
 }
 
 export async function loadHeroes(options = {}) {
+  const { signal } = options;
+
+  try {
+    const bundled = await fetchBundledJson("herolist.json", { signal });
+    const fromBundled = mapHeroListFromValve(bundled);
+    if (fromBundled.length) return fromBundled;
+  } catch {
+    // fall through
+  }
+
+  try {
+    const fallback = await loadHeroesFromDotaconstants(signal);
+    if (fallback.length) return fallback;
+  } catch (primaryError) {
+    console.warn("Hero list fallback unavailable — trying OpenDota.", primaryError);
+  }
+
   try {
     const heroes = await fetchJson(`${BASE_URL}/heroes`, {
-      ...options,
+      signal,
       label: "heroes",
-      maxRetries: 2,
+      maxRetries: 1,
     });
     return mapHeroList(heroes);
-  } catch (primaryError) {
-    try {
-      const fallback = await loadHeroesFromDotaconstants(options.signal);
-      if (fallback.length) {
-        console.warn("OpenDota heroes unavailable — using dotaconstants fallback.", primaryError);
-        return fallback;
-      }
-    } catch {
-      // fall through to primary error
-    }
-    throw primaryError;
+  } catch (error) {
+    throw error;
   }
 }
 

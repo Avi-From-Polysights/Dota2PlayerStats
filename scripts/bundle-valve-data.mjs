@@ -9,6 +9,16 @@ import path from "node:path";
 import { bundleBuildingData } from "./bundle-building-data.mjs";
 
 const VALVE_BASE = "https://www.dota2.com/datafeed";
+const DOTACONSTANTS_BASE =
+  "https://raw.githubusercontent.com/odota/dotaconstants/master/build";
+const DOTACONSTANTS_FILES = [
+  "heroes.json",
+  "hero_abilities.json",
+  "abilities.json",
+  "items.json",
+  "item_ids.json",
+  "patch.json",
+];
 const PATCH_FLOOR = "7.41";
 const HERO_DELAY_MS = 80;
 
@@ -95,6 +105,16 @@ async function main() {
 
   console.log("Bundling building / tower stats from VPK…");
   await bundleBuildingData({ outDir });
+
+  const constantsDir = path.join(outDir, "constants");
+  fs.mkdirSync(constantsDir, { recursive: true });
+  console.log("Fetching dotaconstants reference data…");
+  for (const file of DOTACONSTANTS_FILES) {
+    const response = await fetch(`${DOTACONSTANTS_BASE}/${file}`);
+    if (!response.ok) throw new Error(`HTTP ${response.status} for dotaconstants ${file}`);
+    fs.writeFileSync(path.join(constantsDir, file), await response.text());
+    console.log(`  ${file}`);
+  }
 
   console.log(`Bundled game data → ${outDir} (patch ${latestPatch})`);
 }
