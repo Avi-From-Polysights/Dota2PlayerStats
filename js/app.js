@@ -71,6 +71,8 @@ import {
   populateLaneFilterSelects,
   readLaneFiltersFromDom,
 } from "./lane-filters.js";
+import { readMatchFiltersFromDom } from "./match-filters.js";
+import { exportMatchupCsv, exportRawMatchesCsv } from "./export-csv.js";
 import { assessAnalysisQuality } from "./data-quality.js";
 
 const form = document.getElementById("stats-form");
@@ -92,6 +94,7 @@ const matchupHeaders = document.querySelectorAll("#matchup-table th[data-sort]")
 const laneTable = document.getElementById("lane-table");
 const laneVsGameStats = document.getElementById("lane-vs-game-stats");
 const exportBtn = document.getElementById("export-btn");
+const exportMatchesBtn = document.getElementById("export-matches-btn");
 const fetchBtn = document.getElementById("fetch-btn");
 const patchFilter = document.getElementById("patch-filter");
 const patchBreakdown = document.getElementById("patch-breakdown");
@@ -111,6 +114,7 @@ const ACCOUNT_ID_HINT =
 let patches = [];
 let heroes = [];
 let lastMatchupRows = [];
+let lastTimeline = [];
 let sortState = { key: "games", dir: "desc" };
 let abortController = null;
 let progressContext = { pct: 0, task: "" };
@@ -168,12 +172,15 @@ function renderAnalysisResults(analysis, meta) {
   });
   animateResultsReveal(resultsEl);
   exportBtn.disabled = false;
+  if (exportMatchesBtn) exportMatchesBtn.disabled = false;
+  lastTimeline = analysis.timeline ?? [];
 }
 
 function refilterCachedAnalysis() {
   if (!cachedAnalysisSession) return;
 
   const laneFilters = readLaneFiltersFromDom();
+  const matchFilters = readMatchFiltersFromDom();
   syncUrlFromForm();
 
   const analysis = analyzeMatches(
@@ -184,12 +191,15 @@ function refilterCachedAnalysis() {
     {
       turboSkippedList: cachedAnalysisSession.turboSkippedList,
       rankedSkippedList: cachedAnalysisSession.rankedSkippedList,
-      rankedOnly: cachedAnalysisSession.rankedOnly,
+      botsSkippedList: cachedAnalysisSession.botsSkippedList,
+      practiceSkippedList: cachedAnalysisSession.practiceSkippedList,
+      modeSkippedList: cachedAnalysisSession.modeSkippedList,
+      ...matchFilters,
       laneFilters,
     }
   );
 
-  renderAnalysisResults(analysis, { ...cachedAnalysisSession, laneFilters });
+  renderAnalysisResults(analysis, { ...cachedAnalysisSession, laneFilters, ...matchFilters });
 
   const summary = formatLaneFilterSummary(laneFilters);
   analyzeMultiLog?.info(summary ? `Filters updated — ${summary}` : "Filters cleared — showing all games");
@@ -201,6 +211,11 @@ function initLaneFilterListeners() {
     "my-role-filter",
     "enemy-lane-filter",
     "enemy-role-filter",
+    "exclude-turbo",
+    "ranked-only",
+    "exclude-bots",
+    "exclude-practice",
+    "standard-modes-only",
   ]) {
     document.getElementById(id)?.addEventListener("change", refilterCachedAnalysis);
   }
@@ -295,7 +310,7 @@ function renderSummary(analysis, heroName, trend, rollingWindow, selectedPatchLa
     <div class="summary-card">
       <div class="summary-card__label">Hero</div>
       <div class="summary-card__value" style="font-size:1.35rem">${heroName}</div>
-      <div class="summary-card__sub">${analysis.processed} processed · ${analysis.skipped} skipped${analysis.turboSkipped ? ` · ${analysis.turboSkipped} turbo excluded` : ""}${analysis.rankedSkipped ? ` · ${analysis.rankedSkipped} non-ranked excluded` : ""}${laneSkipNote ? ` · ${laneSkipNote}` : ""}${laneFilterNote ? ` · ${laneFilterNote}` : ""}${loadNote ? ` · ${loadNote}` : ""}</div>
+      <div class="summary-card__sub">${analysis.processed} processed · ${analysis.skipped} skipped${analysis.turboSkipped ? ` · ${analysis.turboSkipped} turbo excluded` : ""}${analysis.rankedSkipped ? ` · ${analysis.rankedSkipped} non-ranked excluded` : ""}${analysis.botsSkipped ? ` · ${analysis.botsSkipped} bots excluded` : ""}${analysis.practiceSkipped ? ` · ${analysis.practiceSkipped} practice excluded` : ""}${analysis.modeSkipped ? ` · ${analysis.modeSkipped} non-standard modes excluded` : ""}${laneSkipNote ? ` · ${laneSkipNote}` : ""}${laneFilterNote ? ` · ${laneFilterNote}` : ""}${loadNote ? ` · ${loadNote}` : ""}</div>
     </div>
     <div class="summary-card">
       <div class="summary-card__label">Recent trend</div>
@@ -578,54 +593,15 @@ function renderLaneTable(laneRows) {
 }
 
 function exportCsv(rows) {
-  const headers = [
-    "hero",
-    "games",
-    "wins",
-    "losses",
-    "winrate",
-    "lane_games",
-    "lane_wld",
-    "lane_winrate",
-    "wilson_lower",
-    "wilson_upper",
-    "avg_duration_min",
-    "avg_kills",
-    "avg_deaths",
-  ];
-
-  const lines = [
-    headers.join(","),
-    ...rows.map((r) =>
-      [
-        `"${r.hero.replace(/"/g, '""')}"`,
-        r.games,
-        r.wins,
-        r.losses,
-        r.winrate.toFixed(2),
-        r.laneGames ?? 0,
-        r.laneGames ? `${r.laneWon}-${r.laneLost}-${r.laneDraw}` : "",
-        r.laneWinrate != null ? r.laneWinrate.toFixed(2) : "",
-        r.wilsonLower.toFixed(2),
-        r.wilsonUpper.toFixed(2),
-        r.avgDuration.toFixed(2),
-        r.avgKills.toFixed(2),
-        r.avgDeaths.toFixed(2),
-      ].join(",")
-    ),
-  ];
-
-  const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = "dota2_matchups.csv";
-  link.click();
-  URL.revokeObjectURL(url);
+  exportMatchupCsv(rows);
 }
 
 exportBtn.addEventListener("click", () => {
   if (lastMatchupRows.length) exportCsv(lastMatchupRows);
+});
+
+exportMatchesBtn?.addEventListener("click", () => {
+  if (lastTimeline.length) exportRawMatchesCsv(lastTimeline);
 });
 
 let shareToastTimer = null;
@@ -678,8 +654,8 @@ form.addEventListener("submit", async (event) => {
   const heroId = resolveHeroId();
   const limit = Number(document.getElementById("match-limit").value);
   const significant = document.getElementById("significant-only").checked;
-  const excludeTurbo = document.getElementById("exclude-turbo").checked;
-  const rankedOnly = document.getElementById("ranked-only").checked;
+  const matchFilters = readMatchFiltersFromDom();
+  const { excludeTurbo, rankedOnly, excludeBots, excludePractice, standardModesOnly } = matchFilters;
   const requestParse = requestParseCheckbox.checked;
   const parseMaxRaw = Number(parseMaxInput.value);
   const parseParallelism = clampParseConcurrency(parseParallelismInput?.value);
@@ -729,6 +705,8 @@ form.addEventListener("submit", async (event) => {
   cachedAnalysisSession = null;
   fetchBtn.disabled = true;
   exportBtn.disabled = true;
+  if (exportMatchesBtn) exportMatchesBtn.disabled = true;
+  lastTimeline = [];
   resultsEl.classList.add("hidden");
   analyzeMultiLog = analyzeMultiLog ?? initMultiActivityLog("activity-log-panel");
   analyzeMultiLog?.clear();
@@ -754,17 +732,26 @@ form.addEventListener("submit", async (event) => {
       patchId,
       excludeTurbo,
       rankedOnly,
+      excludeBots,
+      excludePractice,
+      standardModesOnly,
     });
 
     let matchList;
     let turboSkipped;
     let rankedSkipped;
+    let botsSkipped;
+    let practiceSkipped;
+    let modeSkipped;
     const cachedList = await getCachedMatchList(matchListKey);
 
     if (cachedList) {
       matchList = cachedList.matches;
       turboSkipped = cachedList.turboSkipped;
       rankedSkipped = cachedList.rankedSkipped ?? 0;
+      botsSkipped = cachedList.botsSkipped ?? 0;
+      practiceSkipped = cachedList.practiceSkipped ?? 0;
+      modeSkipped = cachedList.modeSkipped ?? 0;
       loadStats.matchListFromCache = true;
       analyzeMultiLog?.cache(`Match list from cache (${matchList.length} games)`);
       setProgress(true, 2, `Match list loaded from cache (${matchList.length} games)…`);
@@ -776,12 +763,30 @@ form.addEventListener("submit", async (event) => {
         limit,
         significant,
         patchId,
-        { excludeTurbo, rankedOnly, signal, onRateLimitWait }
+        {
+          excludeTurbo,
+          rankedOnly,
+          excludeBots,
+          excludePractice,
+          standardModesOnly,
+          signal,
+          onRateLimitWait,
+        }
       );
       matchList = result.matches;
       turboSkipped = result.turboSkipped;
       rankedSkipped = result.rankedSkipped;
-      await setCachedMatchList(matchListKey, { matches: matchList, turboSkipped, rankedSkipped });
+      botsSkipped = result.botsSkipped;
+      practiceSkipped = result.practiceSkipped;
+      modeSkipped = result.modeSkipped;
+      await setCachedMatchList(matchListKey, {
+        matches: matchList,
+        turboSkipped,
+        rankedSkipped,
+        botsSkipped,
+        practiceSkipped,
+        modeSkipped,
+      });
     }
 
     if (!matchList.length) {
@@ -859,7 +864,10 @@ form.addEventListener("submit", async (event) => {
       confidence,
       turboSkippedList: turboSkipped,
       rankedSkippedList: rankedSkipped,
-      rankedOnly,
+      botsSkippedList: botsSkipped,
+      practiceSkippedList: practiceSkipped,
+      modeSkippedList: modeSkipped,
+      ...matchFilters,
       heroName,
       rollingWindow,
       selectedPatchLabel,
@@ -871,7 +879,10 @@ form.addEventListener("submit", async (event) => {
     const analysis = analyzeMatches(detailsList, accountId, heroMap, confidence, {
       turboSkippedList: turboSkipped,
       rankedSkippedList: rankedSkipped,
-      rankedOnly,
+      botsSkippedList: botsSkipped,
+      practiceSkippedList: practiceSkipped,
+      modeSkippedList: modeSkipped,
+      ...matchFilters,
       laneFilters,
     });
 

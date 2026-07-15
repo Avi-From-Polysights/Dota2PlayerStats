@@ -14,6 +14,9 @@ export function buildMatchListCacheKey({
   patchId,
   excludeTurbo,
   rankedOnly,
+  excludeBots = true,
+  excludePractice = true,
+  standardModesOnly = false,
 }) {
   return [
     accountId,
@@ -23,6 +26,9 @@ export function buildMatchListCacheKey({
     patchId ?? "",
     excludeTurbo ? 1 : 0,
     rankedOnly ? 1 : 0,
+    excludeBots ? 1 : 0,
+    excludePractice ? 1 : 0,
+    standardModesOnly ? 1 : 0,
   ].join("|");
 }
 
@@ -96,12 +102,29 @@ export async function getCachedMatchList(cacheKey) {
         resolve(null);
         return;
       }
-      resolve({ matches: row.matches, turboSkipped: row.turboSkipped ?? 0, rankedSkipped: row.rankedSkipped ?? 0 });
+      resolve({
+        matches: row.matches,
+        turboSkipped: row.turboSkipped ?? 0,
+        rankedSkipped: row.rankedSkipped ?? 0,
+        botsSkipped: row.botsSkipped ?? 0,
+        practiceSkipped: row.practiceSkipped ?? 0,
+        modeSkipped: row.modeSkipped ?? 0,
+      });
     };
   });
 }
 
-export async function setCachedMatchList(cacheKey, { matches, turboSkipped, rankedSkipped = 0 }) {
+export async function setCachedMatchList(
+  cacheKey,
+  {
+    matches,
+    turboSkipped,
+    rankedSkipped = 0,
+    botsSkipped = 0,
+    practiceSkipped = 0,
+    modeSkipped = 0,
+  }
+) {
   const db = await openDb();
   return new Promise((resolve, reject) => {
     const tx = db.transaction(MATCH_LIST_STORE, "readwrite");
@@ -110,6 +133,9 @@ export async function setCachedMatchList(cacheKey, { matches, turboSkipped, rank
       matches,
       turboSkipped,
       rankedSkipped,
+      botsSkipped,
+      practiceSkipped,
+      modeSkipped,
       savedAt: Date.now(),
     });
     tx.oncomplete = () => resolve();

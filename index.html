@@ -146,6 +146,39 @@
                 </label>
 
                 <label class="field field--checkbox">
+                  <input type="checkbox" id="exclude-bots" name="excludeBots" checked />
+                  <div class="field__label-row">
+                    <span class="field__label">Exclude bots</span>
+                    <span class="info-tip">
+                      <button type="button" class="info-tip__btn" aria-label="About Exclude bots">i</button>
+                      <span class="info-tip__panel" role="tooltip">Skip co-op vs bots lobbies and matches where most enemy players have no account (likely bots). Strongly recommended so bot games do not skew win rates.</span>
+                    </span>
+                  </div>
+                </label>
+
+                <label class="field field--checkbox">
+                  <input type="checkbox" id="exclude-practice" name="excludePractice" checked />
+                  <div class="field__label-row">
+                    <span class="field__label">Exclude practice / tutorial</span>
+                    <span class="info-tip">
+                      <button type="button" class="info-tip__btn" aria-label="About Exclude practice">i</button>
+                      <span class="info-tip__panel" role="tooltip">Skip practice lobby and tutorial matches so they are not included in analysis.</span>
+                    </span>
+                  </div>
+                </label>
+
+                <label class="field field--checkbox">
+                  <input type="checkbox" id="standard-modes-only" name="standardModesOnly" />
+                  <div class="field__label-row">
+                    <span class="field__label">Standard modes only</span>
+                    <span class="info-tip">
+                      <button type="button" class="info-tip__btn" aria-label="About Standard modes only">i</button>
+                      <span class="info-tip__panel" role="tooltip">Keep All Pick, Captains Mode, Random/Single Draft, All Random, and All Draft. Drops Ability Draft, ARDM, 1v1 Mid, and other niche modes (Turbo still controlled separately).</span>
+                    </span>
+                  </div>
+                </label>
+
+                <label class="field field--checkbox">
                   <input type="checkbox" id="significant-only" name="significant" />
                   <div class="field__label-row">
                     <span class="field__label">Significant matches only</span>
@@ -289,7 +322,8 @@
 
           <div class="form-actions">
             <button type="submit" id="fetch-btn" class="btn btn--primary" disabled>Analyze matches</button>
-            <button type="button" id="export-btn" class="btn btn--outline" disabled>Export CSV</button>
+            <button type="button" id="export-btn" class="btn btn--outline" disabled>Export matchups CSV</button>
+            <button type="button" id="export-matches-btn" class="btn btn--outline" disabled>Export matches CSV</button>
           </div>
         </form>
 
@@ -501,6 +535,21 @@
                 <label class="field field--checkbox">
                   <input type="checkbox" id="tool-ranked-only" />
                   <span class="field__label">Ranked only</span>
+                </label>
+
+                <label class="field field--checkbox">
+                  <input type="checkbox" id="tool-exclude-bots" checked />
+                  <span class="field__label">Exclude bots</span>
+                </label>
+
+                <label class="field field--checkbox">
+                  <input type="checkbox" id="tool-exclude-practice" checked />
+                  <span class="field__label">Exclude practice / tutorial</span>
+                </label>
+
+                <label class="field field--checkbox">
+                  <input type="checkbox" id="tool-standard-modes-only" />
+                  <span class="field__label">Standard modes only</span>
                 </label>
 
                 <label class="field field--checkbox">

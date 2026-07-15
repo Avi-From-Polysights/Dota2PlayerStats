@@ -40,6 +40,32 @@ export const SECTION_ICONS = {
  */
 export const CHANGELOGS = [
   {
+    version: "0.0.55",
+    date: "2026-07-14",
+    title: "Match Filters & Raw CSV Export",
+    tagline: "Exclude bots and export every match behind the table.",
+    heroImage: DOTA_IMG.heroes.kez,
+    accent: "#4a90c4",
+    sections: [
+      {
+        id: "features",
+        title: "Features",
+        icon: SECTION_ICONS.features,
+        items: [
+          {
+            text: "Analyze (and Tools) can exclude bot matches, practice/tutorial lobbies, and optionally keep only standard game modes — alongside Turbo and ranked filters.",
+          },
+          {
+            text: "Export matches CSV downloads the raw per-match sample used for the matchup table (win, KDA, lobby, mode, lane, enemy heroes).",
+          },
+          {
+            text: "Export matchups CSV is unchanged for the aggregated hero table; both buttons enable after analysis.",
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: "0.0.54",
     date: "2026-07-10",
     title: "Instant Load Without OpenDota 429s",

@@ -9,6 +9,9 @@ export const FORM_DEFAULTS = {
   patch: "",
   turbo: "0",
   ranked: "0",
+  bots: "0",
+  practice: "0",
+  stdmodes: "0",
   parse: "1",
   parsemax: "0",
   parseparallel: "0",
@@ -32,6 +35,9 @@ export function captureFormConfig() {
     window: document.getElementById("rolling-window")?.value ?? FORM_DEFAULTS.window,
     turbo: document.getElementById("exclude-turbo")?.checked ? "0" : "1",
     ranked: document.getElementById("ranked-only")?.checked ? "1" : "0",
+    bots: document.getElementById("exclude-bots")?.checked ? "0" : "1",
+    practice: document.getElementById("exclude-practice")?.checked ? "0" : "1",
+    stdmodes: document.getElementById("standard-modes-only")?.checked ? "1" : "0",
     parse: document.getElementById("request-parse")?.checked ? "1" : "0",
     parsemax: document.getElementById("parse-max")?.value ?? FORM_DEFAULTS.parsemax,
     parseparallel: document.getElementById("parse-parallel-enabled")?.checked ? "1" : "0",
@@ -77,6 +83,9 @@ export function applyFormConfig(values, { heroes = [], heroPicker = null } = {})
 
   if (values.turbo != null) setCheckbox("exclude-turbo", values.turbo !== "1");
   if (values.ranked != null) setCheckbox("ranked-only", values.ranked === "1");
+  if (values.bots != null) setCheckbox("exclude-bots", values.bots !== "1");
+  if (values.practice != null) setCheckbox("exclude-practice", values.practice !== "1");
+  if (values.stdmodes != null) setCheckbox("standard-modes-only", values.stdmodes === "1");
   if (values.sig != null) setCheckbox("significant-only", values.sig === "1");
   if (values.parse != null) setCheckbox("request-parse", values.parse === "1");
   if (values.parseparallel != null) {

@@ -1,11 +1,10 @@
-import { GAMEMODE_TURBO } from "./game-modes.js";
-import { isRankedLobby } from "./lobby-types.js";
 import {
   OPENDOTA_PARSE_COST,
   OPENDOTA_REQUEST_COST,
   acquireOpenDotaQuota,
 } from "./rate-limit.js";
 import { fetchBundledJson } from "./valve-fetch.js";
+import { classifyMatchSummary } from "./match-filters.js";
 
 const BASE_URL = "https://api.opendota.com/api";
 const HEROES_FALLBACK_URL =
@@ -190,7 +189,7 @@ export async function loadPlayerMatches(
 }
 
 /**
- * Fetch up to `limit` matches, optionally skipping Turbo and scanning further back.
+ * Fetch up to `limit` matches, applying lobby/mode filters and scanning further back as needed.
  */
 export async function loadPlayerMatchesFiltered(
   accountId,
@@ -198,12 +197,30 @@ export async function loadPlayerMatchesFiltered(
   limit,
   significant,
   patchId = null,
-  { excludeTurbo = true, rankedOnly = false, signal, onRateLimitWait } = {}
+  {
+    excludeTurbo = true,
+    rankedOnly = false,
+    excludeBots = true,
+    excludePractice = true,
+    standardModesOnly = false,
+    signal,
+    onRateLimitWait,
+  } = {}
 ) {
   const matches = [];
   let offset = 0;
   let turboSkipped = 0;
   let rankedSkipped = 0;
+  let botsSkipped = 0;
+  let practiceSkipped = 0;
+  let modeSkipped = 0;
+  const filterOpts = {
+    excludeTurbo,
+    rankedOnly,
+    excludeBots,
+    excludePractice,
+    standardModesOnly,
+  };
   const maxScan = Math.min(Math.max(limit * 6, limit), 99_999);
 
   while (matches.length < limit && offset < maxScan) {
@@ -227,12 +244,13 @@ export async function loadPlayerMatchesFiltered(
     if (!batch.length) break;
 
     for (const match of batch) {
-      if (excludeTurbo && match.game_mode === GAMEMODE_TURBO) {
-        turboSkipped += 1;
-        continue;
-      }
-      if (rankedOnly && match.lobby_type != null && !isRankedLobby(match.lobby_type)) {
-        rankedSkipped += 1;
+      const { keep, reason } = classifyMatchSummary(match, filterOpts);
+      if (!keep) {
+        if (reason === "turbo") turboSkipped += 1;
+        else if (reason === "ranked") rankedSkipped += 1;
+        else if (reason === "bots") botsSkipped += 1;
+        else if (reason === "practice") practiceSkipped += 1;
+        else if (reason === "mode") modeSkipped += 1;
         continue;
       }
       matches.push(match);
@@ -243,7 +261,7 @@ export async function loadPlayerMatchesFiltered(
     if (batch.length < batchLimit) break;
   }
 
-  return { matches, turboSkipped, rankedSkipped };
+  return { matches, turboSkipped, rankedSkipped, botsSkipped, practiceSkipped, modeSkipped };
 }
 
 /**
@@ -252,13 +270,33 @@ export async function loadPlayerMatchesFiltered(
 export async function loadPlayerMatchesAll(
   accountId,
   limit,
-  { excludeTurbo = true, rankedOnly = false, significant = false, signal, onRateLimitWait, onBatch } = {}
+  {
+    excludeTurbo = true,
+    rankedOnly = false,
+    excludeBots = true,
+    excludePractice = true,
+    standardModesOnly = false,
+    significant = false,
+    signal,
+    onRateLimitWait,
+    onBatch,
+  } = {}
 ) {
   const matches = [];
   const seen = new Set();
   let offset = 0;
   let turboSkipped = 0;
   let rankedSkipped = 0;
+  let botsSkipped = 0;
+  let practiceSkipped = 0;
+  let modeSkipped = 0;
+  const filterOpts = {
+    excludeTurbo,
+    rankedOnly,
+    excludeBots,
+    excludePractice,
+    standardModesOnly,
+  };
   const maxScan = limit > 0 ? limit : 10_000;
 
   while (matches.length < maxScan) {
@@ -283,12 +321,13 @@ export async function loadPlayerMatchesAll(
       if (seen.has(id)) continue;
       seen.add(id);
 
-      if (excludeTurbo && match.game_mode === GAMEMODE_TURBO) {
-        turboSkipped += 1;
-        continue;
-      }
-      if (rankedOnly && match.lobby_type != null && !isRankedLobby(match.lobby_type)) {
-        rankedSkipped += 1;
+      const { keep, reason } = classifyMatchSummary(match, filterOpts);
+      if (!keep) {
+        if (reason === "turbo") turboSkipped += 1;
+        else if (reason === "ranked") rankedSkipped += 1;
+        else if (reason === "bots") botsSkipped += 1;
+        else if (reason === "practice") practiceSkipped += 1;
+        else if (reason === "mode") modeSkipped += 1;
         continue;
       }
 
@@ -300,7 +339,7 @@ export async function loadPlayerMatchesAll(
     if (batch.length < batchLimit) break;
   }
 
-  return { matches, turboSkipped, rankedSkipped };
+  return { matches, turboSkipped, rankedSkipped, botsSkipped, practiceSkipped, modeSkipped };
 }
 
 export async function loadMatchDetails(matchId, signal, options = {}) {

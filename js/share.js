@@ -30,6 +30,9 @@ export function buildShareUrl(params, { autoRun = false } = {}) {
   }
   if (params.turbo === "1") url.searchParams.set("turbo", "1");
   if (params.ranked === "1") url.searchParams.set("ranked", "1");
+  if (params.bots === "1") url.searchParams.set("bots", "1");
+  if (params.practice === "1") url.searchParams.set("practice", "1");
+  if (params.stdmodes === "1") url.searchParams.set("stdmodes", "1");
   if (params.parse === "0") url.searchParams.set("parse", "0");
   if (params.parsemax && params.parsemax !== FORM_DEFAULTS.parsemax) {
     url.searchParams.set("parsemax", params.parsemax);
@@ -104,6 +107,18 @@ export function applyUrlParams(heroes) {
   }
   if (params.has("ranked")) {
     document.getElementById("ranked-only").checked = params.get("ranked") === "1";
+    hasParams = true;
+  }
+  if (params.has("bots")) {
+    document.getElementById("exclude-bots").checked = params.get("bots") !== "1";
+    hasParams = true;
+  }
+  if (params.has("practice")) {
+    document.getElementById("exclude-practice").checked = params.get("practice") !== "1";
+    hasParams = true;
+  }
+  if (params.has("stdmodes")) {
+    document.getElementById("standard-modes-only").checked = params.get("stdmodes") === "1";
     hasParams = true;
   }
   if (params.has("parse")) {

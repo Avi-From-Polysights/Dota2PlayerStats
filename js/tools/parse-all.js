@@ -38,6 +38,9 @@ export async function runBatchParseTool({
   excludeTurbo,
   significant,
   rankedOnly = false,
+  excludeBots = true,
+  excludePractice = true,
+  standardModesOnly = false,
   parseIgnoreAgeLimit = false,
   toolLabel = "Parse-all",
   signal,
@@ -77,28 +80,32 @@ export async function runBatchParseTool({
   try {
     multiLog?.info(`Scanning OpenDota for matches (all heroes, limit ${scanLimit})…`);
 
-    const { matches, turboSkipped, rankedSkipped } = await loadPlayerMatchesAll(accountId, scanLimit, {
-      excludeTurbo,
-      significant,
-      rankedOnly,
-      signal,
-      onRateLimitWait: (info) => {
-        loadStats.throttlePauses += 1;
-        multiLog?.wait(
-          `OpenDota limit — waiting ${Math.ceil(info.waitMs / 1000)}s before next match-list page…`
-        );
-      },
-      onBatch: ({ offset, collected }) => {
-        setProgress(
-          progressEl,
-          progressFill,
-          progressText,
-          true,
-          Math.min(8, (collected / scanLimit) * 8),
-          `Fetching match list… ${collected} collected (offset ${offset})`
-        );
-      },
-    });
+    const { matches, turboSkipped, rankedSkipped, botsSkipped, practiceSkipped, modeSkipped } =
+      await loadPlayerMatchesAll(accountId, scanLimit, {
+        excludeTurbo,
+        significant,
+        rankedOnly,
+        excludeBots,
+        excludePractice,
+        standardModesOnly,
+        signal,
+        onRateLimitWait: (info) => {
+          loadStats.throttlePauses += 1;
+          multiLog?.wait(
+            `OpenDota limit — waiting ${Math.ceil(info.waitMs / 1000)}s before next match-list page…`
+          );
+        },
+        onBatch: ({ offset, collected }) => {
+          setProgress(
+            progressEl,
+            progressFill,
+            progressText,
+            true,
+            Math.min(8, (collected / scanLimit) * 8),
+            `Fetching match list… ${collected} collected (offset ${offset})`
+          );
+        },
+      });
 
     if (!matches.length) {
       showToolError(errorBanner, "No matches found for that account and filters.");
@@ -107,8 +114,15 @@ export async function runBatchParseTool({
       return;
     }
 
+    const skipNotes = [
+      turboSkipped ? `${turboSkipped} turbo` : null,
+      rankedSkipped ? `${rankedSkipped} non-ranked` : null,
+      botsSkipped ? `${botsSkipped} bots` : null,
+      practiceSkipped ? `${practiceSkipped} practice` : null,
+      modeSkipped ? `${modeSkipped} non-standard modes` : null,
+    ].filter(Boolean);
     multiLog?.info(
-      `Found ${matches.length} matches${turboSkipped ? ` (${turboSkipped} turbo skipped)` : ""}${rankedSkipped ? ` (${rankedSkipped} non-ranked skipped)` : ""}. Checking cache…`
+      `Found ${matches.length} matches${skipNotes.length ? ` (${skipNotes.join(", ")} skipped)` : ""}. Checking cache…`
     );
 
     const matchIds = matches.map((m) => m.match_id);
@@ -273,6 +287,9 @@ function bindBatchParseForm({
       maxMatches: Number(document.getElementById(maxMatchesInputId)?.value),
       excludeTurbo: document.getElementById("tool-exclude-turbo")?.checked ?? true,
       rankedOnly: document.getElementById("tool-ranked-only")?.checked ?? false,
+      excludeBots: document.getElementById("tool-exclude-bots")?.checked ?? true,
+      excludePractice: document.getElementById("tool-exclude-practice")?.checked ?? true,
+      standardModesOnly: document.getElementById("tool-standard-modes-only")?.checked ?? false,
       significant: document.getElementById("tool-significant-only")?.checked ?? false,
       parseIgnoreAgeLimit,
       toolLabel,

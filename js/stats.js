@@ -2,8 +2,9 @@ import { wilsonInterval } from "./wilson.js";
 import { didPlayerWin, isRadiant } from "./api.js";
 import { computeLaneOutcome, computeLaneOutcomeVsOpponent, laneLabel, resolvePlayerLane } from "./lane.js";
 import { matchEnemyLaneFilter, matchMyLaneFilter } from "./lane-filters.js";
-import { GAMEMODE_TURBO } from "./game-modes.js";
-import { isRankedLobby } from "./lobby-types.js";
+import { gameModeLabel } from "./game-modes.js";
+import { lobbyLabel } from "./lobby-types.js";
+import { classifyMatchDetails } from "./match-filters.js";
 
 function emptyBucket() {
   return {
@@ -46,10 +47,29 @@ export function analyzeMatches(
   accountId,
   heroNames,
   confidence,
-  { turboSkippedList = 0, rankedSkippedList = 0, rankedOnly = false, laneFilters = {} } = {}
+  {
+    turboSkippedList = 0,
+    rankedSkippedList = 0,
+    botsSkippedList = 0,
+    practiceSkippedList = 0,
+    modeSkippedList = 0,
+    excludeTurbo = true,
+    rankedOnly = false,
+    excludeBots = true,
+    excludePractice = true,
+    standardModesOnly = false,
+    laneFilters = {},
+  } = {}
 ) {
   const filterMyPosition = Boolean(laneFilters.myLane || laneFilters.myRole);
   const filterEnemyPosition = Boolean(laneFilters.enemyLane || laneFilters.enemyRole);
+  const matchFilterOpts = {
+    excludeTurbo,
+    rankedOnly,
+    excludeBots,
+    excludePractice,
+    standardModesOnly,
+  };
 
   const matchups = new Map();
   const laneStats = new Map();
@@ -69,6 +89,9 @@ export function analyzeMatches(
   let parsedReplayCount = 0;
   let turboSkipped = 0;
   let rankedSkipped = 0;
+  let botsSkipped = 0;
+  let practiceSkipped = 0;
+  let modeSkipped = 0;
   let gameWinsWhenLaneWon = 0;
   let gameWinsWhenLaneLost = 0;
   let gameWinsWhenLaneDraw = 0;
@@ -88,29 +111,29 @@ export function analyzeMatches(
       continue;
     }
 
+    const classified = classifyMatchDetails(details, accountId, matchFilterOpts);
+    if (!classified.keep) {
+      skipped += 1;
+      if (classified.reason === "turbo") turboSkipped += 1;
+      else if (classified.reason === "ranked") rankedSkipped += 1;
+      else if (classified.reason === "bots") botsSkipped += 1;
+      else if (classified.reason === "practice") practiceSkipped += 1;
+      else if (classified.reason === "mode") modeSkipped += 1;
+      continue;
+    }
+
     const mySlot = me.player_slot;
     const mySideRadiant = isRadiant(mySlot);
     const win = didPlayerWin(mySlot, details.radiant_win);
     const durationMin = (details.duration ?? 0) / 60;
     const kills = me.kills ?? 0;
     const deaths = me.deaths ?? 0;
+    const assists = me.assists ?? 0;
     const laneInfo = resolvePlayerLane(me);
     const lane = laneInfo.lane;
     const laneOutcome = computeLaneOutcome(me, players);
     const goldAt10 = me.gold_t?.[10] ?? null;
     const patch = details.patch ?? null;
-
-    if (details.game_mode === GAMEMODE_TURBO) {
-      skipped += 1;
-      turboSkipped += 1;
-      continue;
-    }
-
-    if (rankedOnly && !isRankedLobby(details.lobby_type)) {
-      skipped += 1;
-      rankedSkipped += 1;
-      continue;
-    }
 
     if (filterMyPosition && !matchMyLaneFilter(me, laneFilters, players)) {
       skipped += 1;
@@ -155,10 +178,18 @@ export function analyzeMatches(
     else patchBucket.losses += 1;
     patchStats.set(patchKey, patchBucket);
 
+    const enemyHeroes = [];
+    for (const p of players) {
+      if (isRadiant(p.player_slot) === mySideRadiant) continue;
+      enemyHeroes.push(heroNames.get(p.hero_id) ?? `hero_${p.hero_id}`);
+    }
+
     timeline.push({
       matchId: details.match_id,
       startTime: details.start_time,
       win,
+      heroId: me.hero_id,
+      heroName: heroNames.get(me.hero_id) ?? `hero_${me.hero_id}`,
       lane,
       laneLabel: laneInfo.label,
       laneSource: laneInfo.source,
@@ -168,6 +199,12 @@ export function analyzeMatches(
       durationMin,
       kills,
       deaths,
+      assists,
+      gameMode: details.game_mode ?? null,
+      gameModeLabel: gameModeLabel(details.game_mode),
+      lobbyType: details.lobby_type ?? null,
+      lobbyLabel: lobbyLabel(details.lobby_type),
+      enemyHeroes: enemyHeroes.join("; "),
     });
 
     for (const p of players) {
@@ -294,6 +331,9 @@ export function analyzeMatches(
     parsedReplayCount,
     turboSkipped: turboSkippedList + turboSkipped,
     rankedSkipped: rankedSkippedList + rankedSkipped,
+    botsSkipped: botsSkippedList + botsSkipped,
+    practiceSkipped: practiceSkippedList + practiceSkipped,
+    modeSkipped: modeSkippedList + modeSkipped,
     overallLaneWinrate,
     overallLaneCi,
     gameWinWhenLaneWon: laneWon ? (gameWinsWhenLaneWon / laneWon) * 100 : null,
