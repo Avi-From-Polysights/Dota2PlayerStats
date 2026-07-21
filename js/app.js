@@ -74,6 +74,7 @@ import {
 import { readMatchFiltersFromDom } from "./match-filters.js";
 import { exportMatchupCsv, exportRawMatchesCsv } from "./export-csv.js";
 import { assessAnalysisQuality } from "./data-quality.js";
+import { createAbortableTask } from "./abortable-task.js";
 
 const form = document.getElementById("stats-form");
 const heroSearch = document.getElementById("hero-search");
@@ -116,7 +117,7 @@ let heroes = [];
 let lastMatchupRows = [];
 let lastTimeline = [];
 let sortState = { key: "games", dir: "desc" };
-let abortController = null;
+const analyzeTask = createAbortableTask();
 let progressContext = { pct: 0, task: "" };
 let analyzeMultiLog = null;
 let cachedAnalysisSession = null;
@@ -646,9 +647,7 @@ form.addEventListener("submit", async (event) => {
   event.preventDefault();
   hideError();
 
-  if (abortController) abortController.abort();
-  abortController = new AbortController();
-  const { signal } = abortController;
+  const signal = analyzeTask.start();
 
   const accountId = Number(document.getElementById("account-id").value);
   const heroId = resolveHeroId();
@@ -901,6 +900,7 @@ form.addEventListener("submit", async (event) => {
     }
   } finally {
     fetchBtn.disabled = false;
+    analyzeTask.finish(signal);
   }
 });
 
@@ -924,8 +924,7 @@ async function init() {
   initLaneFilterListeners();
   analyzeMultiLog = initMultiActivityLog("activity-log-panel");
   initTools({
-    getAnalyzeAbortSignal: () =>
-      abortController && !abortController.signal.aborted ? abortController.signal : null,
+    getAnalyzeAbortSignal: () => analyzeTask.activeSignal(),
   });
   initSavedAccounts({ onSelect: () => syncUrlFromForm() });
 

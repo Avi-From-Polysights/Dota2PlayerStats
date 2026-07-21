@@ -40,6 +40,29 @@ export const SECTION_ICONS = {
  */
 export const CHANGELOGS = [
   {
+    version: "0.0.56",
+    date: "2026-07-21",
+    title: "OpenDota Parser Tool Unlocked",
+    tagline: "Completed analyses no longer leave parsing tools permanently blocked.",
+    heroImage: DOTA_IMG.items.tp,
+    accent: "#4a90c4",
+    sections: [
+      {
+        id: "fixes",
+        title: "Fixes",
+        icon: SECTION_ICONS.fixes,
+        items: [
+          {
+            text: "OpenDota parse-all and full-history tools can now start after an Analyze run finishes; completed analyses correctly release their active-operation lock.",
+          },
+          {
+            text: "Starting a new analysis still safely cancels an older one without allowing stale cleanup to unlock the current task.",
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: "0.0.55",
     date: "2026-07-14",
     title: "Match Filters & Raw CSV Export",
