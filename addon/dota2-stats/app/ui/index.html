@@ -1,0 +1,321 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Dota 2 Player Stats</title>
+<style>
+  :root {
+    --background: #0b0b0b;
+    --card: #121111;
+    --foreground: #ffffff;
+    --muted-foreground: #7d7d7d;
+    --primary: #42d68c;
+    --accent: #155dfc;
+    --destructive: #ff6467;
+    --border: rgba(255, 255, 255, 0.08);
+    --hover: rgba(255, 255, 255, 0.05);
+    --radius: 8px;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 1rem;
+    font: 14px/1.45 "Inter", system-ui, sans-serif;
+    background: var(--background);
+    color: var(--foreground);
+  }
+  h1 { font-size: 1.1rem; margin: 0; }
+  h2 { font-size: .95rem; margin: 1.25rem 0 .5rem; }
+  .muted { color: var(--muted-foreground); }
+  .bar {
+    display: flex; flex-wrap: wrap; gap: .75rem; align-items: center;
+    padding: .75rem 1rem; margin-bottom: 1rem;
+    background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
+  }
+  .bar .spacer { flex: 1 1 auto; }
+  button {
+    font: inherit; padding: .4rem .8rem; border-radius: 6px; cursor: pointer;
+    border: 1px solid var(--border); background: var(--hover); color: var(--foreground);
+  }
+  button.primary { background: var(--primary); color: #06210f; border-color: transparent; font-weight: 600; }
+  button.danger { background: transparent; color: var(--destructive); border-color: var(--destructive); }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  .tabs { display: flex; flex-wrap: wrap; gap: .35rem; margin-bottom: .75rem; }
+  .tabs button { border-radius: 999px; }
+  .tabs button[aria-selected="true"] { background: var(--accent); border-color: transparent; }
+  .panel {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 1rem;
+  }
+  .stats { display: flex; flex-wrap: wrap; gap: 1.5rem; margin-bottom: .5rem; }
+  .stat .value { font-size: 1.4rem; font-weight: 600; }
+  .stat .label { color: var(--muted-foreground); font-size: .78rem; text-transform: uppercase; letter-spacing: .04em; }
+  .scroll { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: .85rem; min-width: 420px; }
+  th, td { text-align: left; padding: .35rem .6rem; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  th { color: var(--muted-foreground); font-weight: 500; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .downloads { display: flex; flex-wrap: wrap; gap: .4rem; margin-top: .75rem; }
+  .downloads a {
+    text-decoration: none; color: var(--foreground); font-size: .82rem;
+    border: 1px solid var(--border); border-radius: 6px; padding: .3rem .6rem; background: var(--hover);
+  }
+  .downloads a.missing { opacity: .4; pointer-events: none; }
+  #log {
+    margin-top: 1rem; height: 220px; overflow-y: auto; padding: .6rem .8rem;
+    background: #080808; border: 1px solid var(--border); border-radius: var(--radius);
+    font-family: ui-monospace, Menlo, Consolas, monospace; font-size: .76rem; line-height: 1.5;
+  }
+  #log div { white-space: pre-wrap; }
+  #log .warn { color: var(--destructive); }
+  #log .wait { color: #e5b567; }
+  #log .parse { color: var(--primary); }
+  #log .cache, #log .fetch { color: var(--muted-foreground); }
+  .dot { width: .55rem; height: .55rem; border-radius: 50%; background: var(--muted-foreground); display: inline-block; }
+  .dot.on { background: var(--primary); animation: pulse 1.4s infinite; }
+  @keyframes pulse { 50% { opacity: .35; } }
+</style>
+</head>
+<body>
+  <div class="bar">
+    <h1>Dota 2 Player Stats</h1>
+    <span class="dot" id="run-dot"></span>
+    <span id="run-state" class="muted">loading…</span>
+    <span class="spacer"></span>
+    <span class="muted" id="meta"></span>
+    <button class="primary" id="run-btn">Run now</button>
+    <button class="danger" id="stop-btn" disabled>Stop</button>
+  </div>
+
+  <div class="tabs" id="tabs" role="tablist"></div>
+  <div class="panel" id="panel">No accounts configured. Add profile IDs in the app's Configuration tab.</div>
+
+  <h2>Activity</h2>
+  <div id="log"></div>
+
+<script>
+  const el = (id) => document.getElementById(id);
+  const pct = (v) => (v == null ? "—" : `${Number(v).toFixed(1)}%`);
+  const state = { accounts: [], active: null, summaries: {}, exports: {}, status: null };
+
+  async function api(pathname, init) {
+    // Relative on purpose: ingress serves this page under /api/hassio_ingress/<token>/
+    const res = await fetch(`./${pathname}`, init);
+    if (!res.ok && res.status !== 404) throw new Error(`HTTP ${res.status}`);
+    return res.json();
+  }
+
+  function renderTabs() {
+    const tabs = el("tabs");
+    tabs.innerHTML = "";
+    for (const account of state.accounts) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.role = "tab";
+      btn.textContent = account.name;
+      btn.setAttribute("aria-selected", String(account.slug === state.active));
+      btn.addEventListener("click", () => selectAccount(account.slug));
+      tabs.appendChild(btn);
+    }
+  }
+
+  function table(headers, rows) {
+    if (!rows.length) return "";
+    const head = headers.map((h) => `<th class="${h.num ? "num" : ""}">${h.label}</th>`).join("");
+    const body = rows
+      .map((row) => `<tr>${row.map((cell, i) => `<td class="${headers[i].num ? "num" : ""}">${cell}</td>`).join("")}</tr>`)
+      .join("");
+    return `<div class="scroll"><table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></div>`;
+  }
+
+  function downloads(slug) {
+    const files = state.exports[slug] ?? {};
+    const names = ["matches.csv", "matchups.csv", "heroes.csv", "lanes.csv", "summary.json"];
+    return `<div class="downloads">${names
+      .map((name) => {
+        const present = Boolean(files[name]);
+        return `<a class="${present ? "" : "missing"}" href="./api/download/${encodeURIComponent(slug)}/${name}" download>${name}${
+          present ? "" : " (not yet)"
+        }</a>`;
+      })
+      .join("")}</div>`;
+  }
+
+  function renderPanel() {
+    const panel = el("panel");
+    if (!state.accounts.length) return;
+
+    const account = state.accounts.find((a) => a.slug === state.active);
+    if (!account) return;
+
+    const summary = state.summaries[account.slug];
+    if (!summary) {
+      panel.innerHTML = `<p class="muted">No run yet for ${account.name} (${account.accountId}). Hit <strong>Run now</strong> to build the first export.</p>${downloads(account.slug)}`;
+      return;
+    }
+
+    const t = summary.totals;
+    const lanes = table(
+      [
+        { label: "Lane" },
+        { label: "Games", num: true },
+        { label: "Win %", num: true },
+        { label: "Lane win %", num: true },
+        { label: "W-L-D" },
+      ],
+      (summary.lanes ?? []).map((r) => [
+        r.label,
+        r.games,
+        pct(r.gameWinrate),
+        r.laneKnown ? pct(r.laneWinrate) : "—",
+        `${r.laneWon}-${r.laneLost}-${r.laneDraw}`,
+      ])
+    );
+
+    const matchups = table(
+      [
+        { label: "Enemy hero" },
+        { label: "Games", num: true },
+        { label: "Win %", num: true },
+        { label: "Wilson", num: true },
+        { label: "Lane W-L-D" },
+      ],
+      (summary.topMatchups ?? []).slice(0, 15).map((r) => [
+        r.hero,
+        r.games,
+        pct(r.winrate),
+        `${r.wilsonLower.toFixed(0)}–${r.wilsonUpper.toFixed(0)}`,
+        r.laneRecord,
+      ])
+    );
+
+    panel.innerHTML = `
+      <div class="stats">
+        <div class="stat"><div class="value">${t.games}</div><div class="label">Games</div></div>
+        <div class="stat"><div class="value">${pct(t.winrate)}</div><div class="label">Win rate</div></div>
+        <div class="stat"><div class="value">${pct(t.laneWinrate)}</div><div class="label">Lane win rate</div></div>
+        <div class="stat"><div class="value">${pct(t.winPctWhenLaneWon)}</div><div class="label">Win % after winning lane</div></div>
+        <div class="stat"><div class="value">${pct(t.winPctWhenLaneLost)}</div><div class="label">Win % after losing lane</div></div>
+        <div class="stat"><div class="value">${pct(t.laneCoveragePct)}</div><div class="label">Lane data coverage</div></div>
+      </div>
+      <p class="muted">${summary.window.days}-day window · generated ${new Date(summary.window.generatedAt).toLocaleString()}</p>
+      ${downloads(account.slug)}
+      <h2>Lanes</h2>${lanes}
+      <h2>Toughest matchups</h2>${matchups}
+    `;
+  }
+
+  async function selectAccount(slug) {
+    state.active = slug;
+    renderTabs();
+    if (!state.summaries[slug]) {
+      const data = await api(`api/summary/${encodeURIComponent(slug)}`).catch(() => null);
+      if (data && !data.error) state.summaries[slug] = data;
+    }
+    renderPanel();
+  }
+
+  function renderStatus(status) {
+    state.status = status;
+    const running = status.run.active;
+    el("run-dot").className = `dot ${running ? "on" : ""}`;
+    el("run-btn").disabled = running || !status.accounts.length;
+    el("stop-btn").disabled = !running;
+
+    let label = "Idle";
+    if (running) {
+      const p = status.run.progress;
+      if (p?.phase === "parse") label = `Parsing ${p.completed}/${p.total} (match ${p.matchId})`;
+      else if (p?.phase === "scan") label = `Scanning match history — ${p.collected} found`;
+      else label = "Running…";
+    } else if (status.lastRun?.lastRunAt) {
+      label = `Last run ${new Date(status.lastRun.lastRunAt).toLocaleString()}`;
+    }
+    el("run-state").textContent = label;
+
+    const bits = [
+      `${status.days}-day window`,
+      status.hasApiKey ? "API key set" : "no API key (60/min)",
+      `quota ${status.quota.used}/${status.quota.limit}`,
+      status.cronValid
+        ? `next run ${status.nextRunAt ? new Date(status.nextRunAt).toLocaleString() : "—"}`
+        : "schedule invalid",
+    ];
+    el("meta").textContent = bits.join(" · ");
+  }
+
+  async function refresh() {
+    const status = await api("api/status");
+    state.exports = status.exports ?? {};
+
+    const changed =
+      state.accounts.length !== status.accounts.length ||
+      state.accounts.some((a, i) => a.slug !== status.accounts[i]?.slug);
+    state.accounts = status.accounts;
+
+    if (changed || !state.active) {
+      state.active = status.accounts[0]?.slug ?? null;
+      renderTabs();
+      if (state.active) await selectAccount(state.active);
+    }
+
+    renderStatus(status);
+  }
+
+  function startLogStream() {
+    const source = new EventSource("./api/logs");
+    const box = el("log");
+    source.onmessage = (event) => {
+      const line = JSON.parse(event.data);
+      const div = document.createElement("div");
+      div.className = line.level;
+      const time = new Date(line.at).toLocaleTimeString();
+      div.textContent = `${time} ${line.scope ? `[${line.scope}] ` : ""}${line.message}`;
+      const atBottom = box.scrollTop + box.clientHeight >= box.scrollHeight - 20;
+      box.appendChild(div);
+      while (box.childElementCount > 500) box.removeChild(box.firstChild);
+      if (atBottom) box.scrollTop = box.scrollHeight;
+    };
+  }
+
+  el("run-btn").addEventListener("click", async () => {
+    el("run-btn").disabled = true;
+    await api("api/run", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    }).catch(() => {});
+    refresh();
+  });
+
+  el("stop-btn").addEventListener("click", async () => {
+    el("stop-btn").disabled = true;
+    await api("api/stop", { method: "POST" }).catch(() => {});
+    refresh();
+  });
+
+  let wasRunning = false;
+  setInterval(async () => {
+    try {
+      const status = await api("api/status");
+      state.exports = status.exports ?? {};
+      renderStatus(status);
+      // Reload the visible summary once a run finishes.
+      if (wasRunning && !status.run.active) {
+        state.summaries = {};
+        if (state.active) await selectAccount(state.active);
+      }
+      wasRunning = status.run.active;
+    } catch {
+      el("run-state").textContent = "Disconnected";
+    }
+  }, 3000);
+
+  refresh().catch((error) => {
+    el("panel").textContent = `Could not load status: ${error.message}`;
+  });
+  startLogStream();
+</script>
+</body>
+</html>

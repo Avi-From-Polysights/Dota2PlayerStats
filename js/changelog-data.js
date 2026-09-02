@@ -40,6 +40,42 @@ export const SECTION_ICONS = {
  */
 export const CHANGELOGS = [
   {
+    version: "0.0.57",
+    date: "2026-09-01",
+    title: "Home Assistant App",
+    tagline: "The parser now runs on a schedule outside the browser, for a whole squad at once.",
+    heroImage: DOTA_IMG.items.aghanim,
+    accent: "#42d68c",
+    sections: [
+      {
+        id: "features",
+        title: "Features",
+        icon: SECTION_ICONS.features,
+        items: [
+          {
+            text: "New Home Assistant app: point it at any number of profile IDs and it fetches, parses and exports every account's recent games on a cron schedule — one tab, folder and set of CSVs per player.",
+          },
+          {
+            text: "Optional OpenDota API key support raises the request budget from 60 to 1200 per minute, which is the difference between roughly 5 and 120 replay parses per minute.",
+          },
+        ],
+      },
+      {
+        id: "general",
+        title: "Under the hood",
+        icon: SECTION_ICONS.general,
+        items: [
+          {
+            text: "The match cache now sits behind a storage interface, so the same analytics core runs against IndexedDB in the browser and the filesystem on a Home Assistant box. Browser behaviour is unchanged.",
+          },
+          {
+            text: "CSV column definitions moved into a shared module, so the site's downloads and the app's exports stay identical.",
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: "0.0.56",
     date: "2026-07-21",
     title: "OpenDota Parser Tool Unlocked",

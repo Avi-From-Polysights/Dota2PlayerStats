@@ -2,6 +2,16 @@
  * Same-origin bundled Valve data (built at deploy) + optional direct fetch for local dev.
  */
 
+let bundledLoader = null;
+
+/**
+ * Override how bundled JSON is read (Node reads it off disk; the browser fetches
+ * it same-origin from /data). Pass null to restore the default.
+ */
+export function setBundledDataLoader(loader) {
+  bundledLoader = typeof loader === "function" ? loader : null;
+}
+
 export function bundledDataUrl(relativePath) {
   if (typeof window === "undefined") return null;
   const page = window.location.href.split("#")[0];
@@ -11,6 +21,14 @@ export function bundledDataUrl(relativePath) {
 
 /** Load JSON from /data/ on this site (no CORS). Returns null if missing. */
 export async function fetchBundledJson(relativePath, { signal } = {}) {
+  if (bundledLoader) {
+    try {
+      return (await bundledLoader(relativePath)) ?? null;
+    } catch {
+      return null;
+    }
+  }
+
   try {
     const url = bundledDataUrl(`data/${relativePath}`);
     if (!url) return null;

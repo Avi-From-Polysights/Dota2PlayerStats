@@ -1,4 +1,4 @@
-import { ACCOUNT_STORE, openDb } from "./db.js";
+import { getStorageBackend } from "./storage/backend.js";
 
 const MAX_ACCOUNTS = 12;
 
@@ -13,22 +13,12 @@ export function accountAvatarUrl(account) {
 }
 
 export async function listSavedAccounts() {
-  const db = await openDb();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(ACCOUNT_STORE, "readonly");
-    const request = tx.objectStore(ACCOUNT_STORE).getAll();
-    request.onerror = () => reject(request.error);
-    request.onsuccess = () => {
-      const rows = (request.result ?? []).sort(
-        (a, b) => (b.lastUsedAt ?? 0) - (a.lastUsedAt ?? 0)
-      );
-      resolve(rows);
-    };
-  });
+  const backend = await getStorageBackend();
+  return backend.listAccounts();
 }
 
 export async function saveAccount(record) {
-  const db = await openDb();
+  const backend = await getStorageBackend();
   const now = Date.now();
   const entry = {
     accountId: Number(record.accountId),
@@ -43,12 +33,7 @@ export async function saveAccount(record) {
     lastUsedAt: record.lastUsedAt ?? now,
   };
 
-  await new Promise((resolve, reject) => {
-    const tx = db.transaction(ACCOUNT_STORE, "readwrite");
-    tx.objectStore(ACCOUNT_STORE).put(entry);
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error);
-  });
+  await backend.putAccount(entry);
 
   const all = await listSavedAccounts();
   if (all.length <= MAX_ACCOUNTS) return entry;
@@ -59,16 +44,9 @@ export async function saveAccount(record) {
 }
 
 export async function touchSavedAccount(accountId, updates = {}) {
-  const db = await openDb();
+  const backend = await getStorageBackend();
   const id = Number(accountId);
-
-  const existing = await new Promise((resolve, reject) => {
-    const tx = db.transaction(ACCOUNT_STORE, "readonly");
-    const request = tx.objectStore(ACCOUNT_STORE).get(id);
-    request.onerror = () => reject(request.error);
-    request.onsuccess = () => resolve(request.result ?? null);
-  });
-
+  const existing = await backend.getAccount(id);
   if (!existing) return null;
 
   return saveAccount({
@@ -80,11 +58,6 @@ export async function touchSavedAccount(accountId, updates = {}) {
 }
 
 export async function removeSavedAccount(accountId) {
-  const db = await openDb();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(ACCOUNT_STORE, "readwrite");
-    tx.objectStore(ACCOUNT_STORE).delete(Number(accountId));
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error);
-  });
+  const backend = await getStorageBackend();
+  return backend.removeAccount(accountId);
 }

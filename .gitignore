@@ -2,3 +2,7 @@ code.txt
 _site-test/
 data/
 node_modules/
+.devrun/
+.devdata/
+.devshare/
+dev-options.json

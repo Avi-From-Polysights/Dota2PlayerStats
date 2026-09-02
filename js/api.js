@@ -5,6 +5,7 @@ import {
 } from "./rate-limit.js";
 import { fetchBundledJson } from "./valve-fetch.js";
 import { classifyMatchSummary } from "./match-filters.js";
+import { withOpenDotaKey } from "./opendota-key.js";
 
 const BASE_URL = "https://api.opendota.com/api";
 const HEROES_FALLBACK_URL =
@@ -26,6 +27,11 @@ function retryWaitMs(response, attempt) {
     return Math.min(RETRY_SLEEP_MS * attempt * 3, 60_000);
   }
   return RETRY_SLEEP_MS * attempt;
+}
+
+/** Attach the API key to OpenDota URLs only — never to CDN / dotaconstants fetches. */
+function authorized(url) {
+  return url.startsWith(BASE_URL) ? withOpenDotaKey(url) : url;
 }
 
 export class OpenDotaRateLimitError extends Error {
@@ -52,7 +58,7 @@ export async function fetchJson(
         label,
       });
 
-      const response = await fetch(url, { signal });
+      const response = await fetch(authorized(url), { signal });
 
       if ([429, 500, 502, 503, 504].includes(response.status)) {
         if (response.status === 429) saw429 = true;
@@ -277,6 +283,7 @@ export async function loadPlayerMatchesAll(
     excludePractice = true,
     standardModesOnly = false,
     significant = false,
+    sinceUnix = null,
     signal,
     onRateLimitWait,
     onBatch,
@@ -285,6 +292,7 @@ export async function loadPlayerMatchesAll(
   const matches = [];
   const seen = new Set();
   let offset = 0;
+  let reachedCutoff = false;
   let turboSkipped = 0;
   let rankedSkipped = 0;
   let botsSkipped = 0;
@@ -321,6 +329,14 @@ export async function loadPlayerMatchesAll(
       if (seen.has(id)) continue;
       seen.add(id);
 
+      // Match lists come back newest-first, so the first older match ends the scan.
+      if (sinceUnix != null && typeof match.start_time === "number") {
+        if (match.start_time < sinceUnix) {
+          reachedCutoff = true;
+          break;
+        }
+      }
+
       const { keep, reason } = classifyMatchSummary(match, filterOpts);
       if (!keep) {
         if (reason === "turbo") turboSkipped += 1;
@@ -334,6 +350,8 @@ export async function loadPlayerMatchesAll(
       matches.push(match);
       if (matches.length >= maxScan) break;
     }
+
+    if (reachedCutoff) break;
 
     offset += batch.length;
     if (batch.length < batchLimit) break;
@@ -379,7 +397,7 @@ async function postJson(url, { signal, onRateLimitWait, quotaCost, label } = {})
         label,
       });
 
-      const response = await fetch(url, { method: "POST", signal });
+      const response = await fetch(authorized(url), { method: "POST", signal });
 
       if ([429, 500, 502, 503, 504].includes(response.status)) {
         if (response.status === 429) saw429 = true;

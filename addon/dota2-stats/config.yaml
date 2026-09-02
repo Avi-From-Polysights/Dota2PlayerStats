@@ -1,0 +1,61 @@
+name: Dota 2 Player Stats
+version: "0.1.0"
+slug: dota2_player_stats
+description: Scheduled OpenDota fetch + replay parse for multiple accounts, with lane and win-rate exports
+url: https://github.com/Avi-From-Polysights/Dota2PlayerStats
+image: ghcr.io/avi-from-polysights/dota2stats-{arch}
+arch:
+  - amd64
+  - aarch64
+init: false
+startup: application
+boot: auto
+ingress: true
+ingress_port: 8099
+panel_icon: mdi:sword-cross
+panel_title: Dota Stats
+map:
+  - type: share
+    read_only: false
+options:
+  accounts:
+    - name: Major Pickle de Noodle Prime
+      account_id: 98479851
+    - name: The Ducktator
+      account_id: 95888467
+  opendota_api_key: ""
+  days: 31
+  cron: "0 5 * * 1"
+  run_on_start: false
+  request_parse: true
+  parse_concurrency: 6
+  parse_retries: 2
+  significant_only: false
+  exclude_turbo: true
+  exclude_bots: true
+  exclude_practice: true
+  ranked_only: false
+  standard_modes_only: false
+  confidence: 0.95
+  cache_retention_days: 120
+  export_dir: /share/dota2stats
+schema:
+  accounts:
+    - name: str
+      account_id: int
+  opendota_api_key: password?
+  days: int(1,365)
+  cron: str
+  run_on_start: bool
+  request_parse: bool
+  parse_concurrency: int(1,6)
+  parse_retries: int(0,5)
+  significant_only: bool
+  exclude_turbo: bool
+  exclude_bots: bool
+  exclude_practice: bool
+  ranked_only: bool
+  standard_modes_only: bool
+  confidence: float(0.5,0.999)
+  cache_retention_days: int(0,3650)
+  export_dir: str

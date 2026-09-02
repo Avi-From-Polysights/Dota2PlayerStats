@@ -45,6 +45,29 @@ Win rates use the [Wilson score interval](https://en.wikipedia.org/wiki/Binomial
 
 This project is a browser port of a Python script that fetched Kez matchup data and exported an Excel file. The core matchup aggregation logic is preserved; Excel generation was replaced with an interactive UI and CSV export.
 
+## Home Assistant app
+
+The same parser also ships as a Home Assistant app (add-on) that runs on a
+schedule for several accounts at once, with no browser tab open. Add this
+repository under **Settings → Add-ons → Add-on Store → ⋮ → Repositories**:
+
+```
+https://github.com/Avi-From-Polysights/Dota2PlayerStats
+```
+
+Configure one entry per player, optionally an OpenDota API key, and a cron
+schedule. Each run writes per-account CSV/JSON exports to
+`/share/dota2stats/<account_id>-<name>/` plus combined multi-account files, and
+the sidebar UI gives every player their own tab. See
+[addon/dota2-stats/DOCS.md](addon/dota2-stats/DOCS.md) for the full option list.
+
+Running it locally, without Home Assistant:
+
+```bash
+D2PS_OPTIONS=./dev-options.json D2PS_DATA=./.devdata D2PS_EXPORT_DIR=./.devshare node addon/dota2-stats/app/main.mjs
+# then open http://localhost:8099
+```
+
 ## Contributing
 
 Contributions are welcome. Please read [CONTRIBUTING.md](CONTRIBUTING.md) — fork, open a PR, and note that **only the maintainer can approve and merge** pull requests.
