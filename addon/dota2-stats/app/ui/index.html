@@ -266,8 +266,14 @@
   function startLogStream() {
     const source = new EventSource("./api/logs");
     const box = el("log");
+    let lastSeq = 0;
     source.onmessage = (event) => {
       const line = JSON.parse(event.data);
+      // Guard against a reconnect replaying lines we already rendered.
+      if (line.seq != null) {
+        if (line.seq <= lastSeq) return;
+        lastSeq = line.seq;
+      }
       const div = document.createElement("div");
       div.className = line.level;
       const time = new Date(line.at).toLocaleTimeString();

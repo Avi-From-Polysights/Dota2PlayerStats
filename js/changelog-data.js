@@ -40,6 +40,32 @@ export const SECTION_ICONS = {
  */
 export const CHANGELOGS = [
   {
+    version: "0.0.58",
+    date: "2026-09-03",
+    title: "Visible Waiting",
+    tagline: "When OpenDota stalls, you can now see it happening instead of guessing.",
+    heroImage: DOTA_IMG.items.ward,
+    accent: "#e5b567",
+    sections: [
+      {
+        id: "fixes",
+        title: "Fixes",
+        icon: SECTION_ICONS.fixes,
+        items: [
+          {
+            text: "Failed OpenDota requests are now reported as they retry, with the status code and the wait before the next attempt. Previously a run could sit silent for minutes while it quietly retried an outage.",
+          },
+          {
+            text: "Requests time out after 30 seconds instead of hanging indefinitely on a stalled connection.",
+          },
+          {
+            text: "Cloudflare 520-527 responses — OpenDota's origin being unreachable — are now recognised as a temporary outage and reported in plain language, rather than surfacing as a raw HTTP error.",
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: "0.0.57",
     date: "2026-09-01",
     title: "Home Assistant App",

@@ -128,12 +128,15 @@ export function createServer({ options, controller, log }) {
           Connection: "keep-alive",
         });
 
-        for (const line of log.history()) {
-          res.write(`data: ${JSON.stringify(line)}\n\n`);
+        // A reconnecting client resends its last id, so it only gets what it missed.
+        const resumeFrom = req.headers["last-event-id"];
+        const backlog = resumeFrom ? log.historySince(resumeFrom) : log.history();
+        for (const line of backlog) {
+          res.write(`id: ${line.seq}\ndata: ${JSON.stringify(line)}\n\n`);
         }
 
         const unsubscribe = log.subscribe((line) => {
-          res.write(`data: ${JSON.stringify(line)}\n\n`);
+          res.write(`id: ${line.seq}\ndata: ${JSON.stringify(line)}\n\n`);
         });
 
         const keepAlive = setInterval(() => res.write(": ping\n\n"), 20_000);

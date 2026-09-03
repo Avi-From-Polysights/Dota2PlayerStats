@@ -8,6 +8,7 @@ import { setStorageBackend } from "../../../js/storage/backend.js";
 import { createNodeFsBackend } from "../../../js/storage/node-fs-backend.js";
 import { setBundledDataLoader } from "../../../js/valve-fetch.js";
 import { setOpenDotaApiKey } from "../../../js/opendota-key.js";
+import { setNetworkLogger } from "../../../js/net-log.js";
 import { getOpenDotaLimit } from "../../../js/rate-limit.js";
 import { loadOptions } from "./options.mjs";
 import { createRunLog } from "./log.mjs";
@@ -36,6 +37,33 @@ async function main() {
   });
 
   setOpenDotaApiKey(options.openDotaApiKey);
+
+  // Per-match fetches already log themselves; only announce the big-picture
+  // requests, but always surface retries and failures — silence during a 429
+  // backoff is what makes a run look hung.
+  const ANNOUNCE = new Set(["match-list-all", "match-list", "profile", "heroes"]);
+  setNetworkLogger((event) => {
+    const what = event.label ?? "request";
+    if (event.phase === "request" && ANNOUNCE.has(what)) {
+      const retry = event.attempt > 1 ? ` (attempt ${event.attempt}/${event.attempts})` : "";
+      log.fetch(`OpenDota ${what}${retry}…`);
+      return;
+    }
+    if (event.phase === "retry") {
+      const secs = Math.ceil((event.waitMs ?? 0) / 1000);
+      const cause = event.status
+        ? `HTTP ${event.status}${event.status >= 520 && event.status <= 527 ? " — OpenDota origin unreachable" : ""}`
+        : event.error;
+      log.warn(
+        `OpenDota ${what} failed (${cause}) — attempt ${event.attempt}/${event.attempts}, ` +
+          `retrying in ${secs}s`
+      );
+      return;
+    }
+    if (event.phase === "giveup") {
+      log.warn(`OpenDota ${what} gave up after ${event.attempts} attempts: ${event.error}`);
+    }
+  });
 
   log.info(`Dota 2 Player Stats app starting — ${options.accounts.length} account(s) configured`);
   log.info(
@@ -81,13 +109,26 @@ async function main() {
     }
 
     try {
-      const result = await runAll(accounts, options, {
-        log,
-        signal: run.controller.signal,
-        onProgress: (progress) => {
-          run.progress = progress;
-        },
+      const stopHeartbeat = log.startHeartbeat(() => {
+        const p = run.progress;
+        if (p?.phase === "parse") return `parsing match ${p.matchId} (${p.completed}/${p.total})`;
+        if (p?.phase === "scan") return `scanning match history (${p.collected} found so far)`;
+        if (p?.phase === "account") return `starting ${p.account?.name ?? "next account"}`;
+        return "";
       });
+
+      let result;
+      try {
+        result = await runAll(accounts, options, {
+          log,
+          signal: run.controller.signal,
+          onProgress: (progress) => {
+            run.progress = progress;
+          },
+        });
+      } finally {
+        stopHeartbeat();
+      }
 
       await state.write({
         lastRunAt: new Date().toISOString(),

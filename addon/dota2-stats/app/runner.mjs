@@ -3,10 +3,16 @@
  * (js/tools/parse-all.js), minus the DOM. Reuses the same loaders, parser,
  * rate limiter and analytics as the website.
  */
-import { loadHeroes, loadPlayerMatchesAll, loadPlayerProfile, profileFromPlayerResponse } from "../../../js/api.js";
+import {
+  loadHeroes,
+  loadPlayerMatchesAll,
+  loadPlayerProfile,
+  profileFromPlayerResponse,
+} from "../../../js/api.js";
 import { getCachedMatches } from "../../../js/match-cache.js";
 import { isMatchParsedForPlayer } from "../../../js/parse.js";
 import { PARSE_MAX_AGE_DAYS } from "../../../js/parse-age.js";
+import { OPENDOTA_PARSE_COST, getOpenDotaLimit } from "../../../js/rate-limit.js";
 import {
   createLoadStats,
   formatLoadStats,
@@ -61,8 +67,17 @@ export async function runAccount(account, options, { log, signal, onProgress } =
         `OpenDota limit — waiting ${Math.ceil(info.waitMs / 1000)}s before the next match-list page…`
       );
     },
-    onBatch: ({ collected, offset }) => {
+    onBatch: ({ page, batchSize, collected, offset, oldestIso, exhausted }) => {
       onProgress?.({ phase: "scan", collected, offset });
+      if (exhausted) {
+        log?.info(`${account.name}: reached the end of match history (${collected} in window)`);
+        return;
+      }
+      log?.fetch(
+        `${account.name}: match-list page ${page} — ${batchSize} rows scanned, ` +
+          `${collected} in window` +
+          (oldestIso ? `, back to ${oldestIso.slice(0, 10)}` : "")
+      );
     },
   });
 
@@ -92,6 +107,7 @@ export async function runAccount(account, options, { log, signal, onProgress } =
   }
 
   const matchIds = scan.matches.map((m) => Number(m.match_id));
+  log?.cache(`${account.name}: checking the local cache for ${matchIds.length} match(es)…`);
   const cachedDetailsMap = await getCachedMatches(matchIds);
 
   const needsWork = scan.matches.filter((match) => {
@@ -108,6 +124,16 @@ export async function runAccount(account, options, { log, signal, onProgress } =
         ? `/parse (replays older than ${PARSE_MAX_AGE_DAYS} days are fetched but not parsed)`
         : " (parsing disabled)")
   );
+
+  if (needsWork.length && options.requestParse) {
+    const perMinute = Math.max(1, Math.floor((getOpenDotaLimit() - 2) / OPENDOTA_PARSE_COST));
+    const estimateMin = Math.ceil(needsWork.length / perMinute);
+    log?.info(
+      `${account.name}: parse budget allows about ${perMinute} parse(s)/min — ` +
+        `roughly ${estimateMin} min for ${needsWork.length} match(es)` +
+        (getOpenDotaLimit() <= 60 ? " (an OpenDota API key makes this ~20x faster)" : "")
+    );
+  }
 
   const results = needsWork.length
     ? await loadMatchDetailsBatch({
@@ -214,6 +240,18 @@ export async function runAll(accounts, options, { log, signal, onProgress } = {}
       if (error?.name === "AbortError") throw error;
       log?.warn(`${named.name} failed: ${error.message ?? error}`);
       results.push({ account: named, analysis: null, error: String(error.message ?? error) });
+
+      // No point retrying every remaining account against a dead API.
+      if (error?.upstreamDown) {
+        const remaining = accounts.length - index - 1;
+        if (remaining > 0) {
+          log?.warn(
+            `Skipping ${remaining} remaining account(s) — OpenDota is unavailable. ` +
+              `The next scheduled run will pick up where this left off.`
+          );
+        }
+        break;
+      }
     }
   }
 

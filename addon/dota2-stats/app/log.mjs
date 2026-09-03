@@ -10,9 +10,13 @@ export function createRunLog({ onLine } = {}) {
   const buffer = [];
   const listeners = new Set();
   let workers = 1;
+  let lastEmitAt = Date.now();
+  let seq = 0;
 
   function emit(level, scope, message) {
+    seq += 1;
     const line = {
+      seq,
       at: new Date().toISOString(),
       level,
       scope,
@@ -21,6 +25,7 @@ export function createRunLog({ onLine } = {}) {
 
     buffer.push(line);
     if (buffer.length > MAX_BUFFER) buffer.shift();
+    lastEmitAt = Date.now();
 
     const prefix = scope ? `[${scope}]` : "";
     console.log(`${line.at} ${level.padEnd(5)} ${prefix} ${line.message}`.trim());
@@ -65,8 +70,33 @@ export function createRunLog({ onLine } = {}) {
     clear() {
       buffer.length = 0;
     },
+    /**
+     * Emit a "still working" line whenever nothing else has been logged for a
+     * while, so a long wait is never indistinguishable from a hang.
+     */
+    startHeartbeat(describe, intervalMs = 15_000) {
+      const startedAt = Date.now();
+      const timer = setInterval(() => {
+        if (Date.now() - lastEmitAt < intervalMs) return;
+        const elapsed = Math.round((Date.now() - startedAt) / 1000);
+        const detail = describe?.() ?? "";
+        emit(
+          "wait",
+          null,
+          `Still working — ${detail || "waiting on OpenDota"} (${elapsed}s into this run)`
+        );
+      }, Math.max(2000, Math.floor(intervalMs / 2)));
+      timer.unref?.();
+      return () => clearInterval(timer);
+    },
     history() {
       return [...buffer];
+    },
+    /** Lines after `afterSeq`, for an SSE client resuming with Last-Event-ID. */
+    historySince(afterSeq) {
+      const after = Number(afterSeq);
+      if (!Number.isFinite(after)) return [...buffer];
+      return buffer.filter((line) => line.seq > after);
     },
     subscribe(listener) {
       listeners.add(listener);

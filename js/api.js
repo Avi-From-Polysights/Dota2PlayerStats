@@ -6,6 +6,7 @@ import {
 import { fetchBundledJson } from "./valve-fetch.js";
 import { classifyMatchSummary } from "./match-filters.js";
 import { withOpenDotaKey } from "./opendota-key.js";
+import { netLog } from "./net-log.js";
 
 const BASE_URL = "https://api.opendota.com/api";
 const HEROES_FALLBACK_URL =
@@ -13,9 +14,48 @@ const HEROES_FALLBACK_URL =
 
 const RETRIES = 8;
 const RETRY_SLEEP_MS = 2500;
+/** A stalled connection must fail fast rather than hang the whole run. */
+const REQUEST_TIMEOUT_MS = 30_000;
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/** Combine the caller's abort signal with a per-request timeout. */
+function requestSignal(signal) {
+  if (typeof AbortSignal?.timeout !== "function") return signal;
+  const timeout = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
+  if (!signal) return timeout;
+  if (typeof AbortSignal.any !== "function") return signal;
+  return AbortSignal.any([signal, timeout]);
+}
+
+function isTimeout(error) {
+  return error?.name === "TimeoutError";
+}
+
+/** Transient upstream failures: OpenDota 5xx plus Cloudflare 52x origin errors. */
+function isRetryableStatus(status) {
+  if (status === 429) return true;
+  return status >= 500 && status <= 599;
+}
+
+/** Cloudflare returns these when OpenDota's origin is unreachable. */
+export function isUpstreamDownStatus(status) {
+  return status >= 520 && status <= 527;
+}
+
+export class OpenDotaUnavailableError extends Error {
+  constructor(status) {
+    super(
+      isUpstreamDownStatus(status)
+        ? `OpenDota is not responding (HTTP ${status}) — the API itself looks down, not your connection. Try again later; cached matches are kept.`
+        : `OpenDota returned HTTP ${status} repeatedly — try again later.`
+    );
+    this.name = "OpenDotaUnavailableError";
+    this.status = status;
+    this.upstreamDown = true;
+  }
 }
 
 function retryWaitMs(response, attempt) {
@@ -48,6 +88,7 @@ export async function fetchJson(
 ) {
   let lastError = null;
   let saw429 = false;
+  let lastStatus = 0;
   const attempts = Math.max(1, Math.min(maxRetries, RETRIES));
 
   for (let attempt = 1; attempt <= attempts; attempt += 1) {
@@ -58,11 +99,23 @@ export async function fetchJson(
         label,
       });
 
-      const response = await fetch(authorized(url), { signal });
+      netLog({ phase: "request", label, url, attempt, attempts });
+      const response = await fetch(authorized(url), { signal: requestSignal(signal) });
 
-      if ([429, 500, 502, 503, 504].includes(response.status)) {
+      if (isRetryableStatus(response.status)) {
         if (response.status === 429) saw429 = true;
-        await sleep(retryWaitMs(response, attempt));
+        else lastStatus = response.status;
+        const waitMs = retryWaitMs(response, attempt);
+        netLog({
+          phase: "retry",
+          label,
+          url,
+          status: response.status,
+          attempt,
+          attempts,
+          waitMs,
+        });
+        await sleep(waitMs);
         continue;
       }
 
@@ -71,17 +124,46 @@ export async function fetchJson(
       }
 
       const text = await response.text();
+      netLog({ phase: "done", label, url, status: response.status, attempt });
       return text ? JSON.parse(text) : null;
     } catch (error) {
+      // The caller cancelled — not a failure to retry.
+      if (signal?.aborted) throw error;
       if (error.name === "AbortError") throw error;
+
       lastError = error;
-      const isNetwork = error instanceof TypeError;
+      const isNetwork = error instanceof TypeError || isTimeout(error);
+      const waitMs = RETRY_SLEEP_MS * attempt;
+      netLog({
+        phase: "retry",
+        label,
+        url,
+        attempt,
+        attempts,
+        waitMs,
+        error: isTimeout(error)
+          ? `no response within ${REQUEST_TIMEOUT_MS / 1000}s`
+          : error.message ?? String(error),
+      });
       if (isNetwork && attempt >= Math.min(2, attempts)) break;
-      await sleep(RETRY_SLEEP_MS * attempt);
+      await sleep(waitMs);
     }
   }
 
+  netLog({
+    phase: "giveup",
+    label,
+    url,
+    attempts,
+    error: saw429
+      ? "OpenDota rate limit (429)"
+      : lastStatus
+        ? `HTTP ${lastStatus}`
+        : lastError?.message ?? "request failed",
+  });
+
   if (saw429) throw new OpenDotaRateLimitError();
+  if (lastStatus) throw new OpenDotaUnavailableError(lastStatus);
   throw lastError ?? new Error(`Failed to fetch: ${url}`);
 }
 
@@ -306,8 +388,10 @@ export async function loadPlayerMatchesAll(
     standardModesOnly,
   };
   const maxScan = limit > 0 ? limit : 10_000;
+  let page = 0;
 
   while (matches.length < maxScan) {
+    page += 1;
     const batchLimit = Math.min(100, maxScan - matches.length);
     const params = new URLSearchParams({
       limit: String(batchLimit),
@@ -320,9 +404,26 @@ export async function loadPlayerMatchesAll(
       { signal, onRateLimitWait, label: "match-list-all" }
     );
 
-    if (!batch.length) break;
+    if (!batch.length) {
+      onBatch?.({
+        page,
+        offset,
+        batchSize: 0,
+        collected: matches.length,
+        exhausted: true,
+      });
+      break;
+    }
 
-    onBatch?.({ offset, batchSize: batch.length, collected: matches.length });
+    const oldestInBatch = batch[batch.length - 1]?.start_time ?? null;
+    onBatch?.({
+      page,
+      offset,
+      batchSize: batch.length,
+      collected: matches.length,
+      oldestStartTime: oldestInBatch,
+      oldestIso: oldestInBatch ? new Date(oldestInBatch * 1000).toISOString() : null,
+    });
 
     for (const match of batch) {
       const id = match.match_id;
@@ -388,6 +489,7 @@ export async function loadParseJobStatus(jobId, signal, options = {}) {
 async function postJson(url, { signal, onRateLimitWait, quotaCost, label } = {}) {
   let lastError = null;
   let saw429 = false;
+  let lastStatus = 0;
 
   for (let attempt = 1; attempt <= RETRIES; attempt += 1) {
     try {
@@ -397,11 +499,26 @@ async function postJson(url, { signal, onRateLimitWait, quotaCost, label } = {})
         label,
       });
 
-      const response = await fetch(authorized(url), { method: "POST", signal });
+      netLog({ phase: "request", label, url, attempt, attempts: RETRIES });
+      const response = await fetch(authorized(url), {
+        method: "POST",
+        signal: requestSignal(signal),
+      });
 
-      if ([429, 500, 502, 503, 504].includes(response.status)) {
+      if (isRetryableStatus(response.status)) {
         if (response.status === 429) saw429 = true;
-        await sleep(retryWaitMs(response, attempt));
+        else lastStatus = response.status;
+        const waitMs = retryWaitMs(response, attempt);
+        netLog({
+          phase: "retry",
+          label,
+          url,
+          status: response.status,
+          attempt,
+          attempts: RETRIES,
+          waitMs,
+        });
+        await sleep(waitMs);
         continue;
       }
 
@@ -410,15 +527,43 @@ async function postJson(url, { signal, onRateLimitWait, quotaCost, label } = {})
       }
 
       const text = await response.text();
+      netLog({ phase: "done", label, url, status: response.status, attempt });
       return text ? JSON.parse(text) : null;
     } catch (error) {
+      if (signal?.aborted) throw error;
       if (error.name === "AbortError") throw error;
+
       lastError = error;
-      await sleep(RETRY_SLEEP_MS * attempt);
+      const waitMs = RETRY_SLEEP_MS * attempt;
+      netLog({
+        phase: "retry",
+        label,
+        url,
+        attempt,
+        attempts: RETRIES,
+        waitMs,
+        error: isTimeout(error)
+          ? `no response within ${REQUEST_TIMEOUT_MS / 1000}s`
+          : error.message ?? String(error),
+      });
+      await sleep(waitMs);
     }
   }
 
+  netLog({
+    phase: "giveup",
+    label,
+    url,
+    attempts: RETRIES,
+    error: saw429
+      ? "OpenDota rate limit (429)"
+      : lastStatus
+        ? `HTTP ${lastStatus}`
+        : lastError?.message ?? "request failed",
+  });
+
   if (saw429) throw new OpenDotaRateLimitError();
+  if (lastStatus) throw new OpenDotaUnavailableError(lastStatus);
   throw lastError ?? new Error(`Failed to POST: ${url}`);
 }
 

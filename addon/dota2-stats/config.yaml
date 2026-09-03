@@ -1,5 +1,5 @@
 name: Dota 2 Player Stats
-version: "0.1.0"
+version: "0.1.1"
 slug: dota2_player_stats
 description: Scheduled OpenDota fetch + replay parse for multiple accounts, with lane and win-rate exports
 url: https://github.com/Avi-From-Polysights/Dota2PlayerStats
