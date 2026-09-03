@@ -242,6 +242,11 @@
         ? `next run ${status.nextRunAt ? new Date(status.nextRunAt).toLocaleString() : "—"}`
         : "schedule invalid",
     ];
+    if (status.retry?.at) {
+      bits.push(
+        `retrying ${status.retry.accounts.length} account(s) at ${new Date(status.retry.at).toLocaleString()}`
+      );
+    }
     el("meta").textContent = bits.join(" · ");
   }
 

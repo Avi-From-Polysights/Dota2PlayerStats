@@ -1,5 +1,5 @@
 name: Dota 2 Player Stats
-version: "0.1.1"
+version: "0.1.2"
 slug: dota2_player_stats
 description: Scheduled OpenDota fetch + replay parse for multiple accounts, with lane and win-rate exports
 url: https://github.com/Avi-From-Polysights/Dota2PlayerStats
@@ -27,6 +27,7 @@ options:
   days: 31
   cron: "0 5 * * 1"
   run_on_start: false
+  retry_after_hours: 4
   request_parse: true
   parse_concurrency: 6
   parse_retries: 2
@@ -47,6 +48,7 @@ schema:
   days: int(1,365)
   cron: str
   run_on_start: bool
+  retry_after_hours: int(0,168)
   request_parse: bool
   parse_concurrency: int(1,6)
   parse_retries: int(0,5)

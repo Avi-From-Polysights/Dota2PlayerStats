@@ -66,6 +66,7 @@ export function createServer({ options, controller, log }) {
           parseConcurrency: options.parseConcurrency,
           quota: getOpenDotaQuotaSnapshot(),
           nextRunAt: controller.nextRunAt()?.toISOString() ?? null,
+          retry: controller.retry(),
           run: controller.status(),
           lastRun: await controller.lastRun(),
           exports: await controller.exportStatus(),

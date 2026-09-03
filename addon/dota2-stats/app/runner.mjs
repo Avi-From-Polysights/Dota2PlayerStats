@@ -21,6 +21,7 @@ import {
 import { analyzeMatches } from "../../../js/stats.js";
 import { aggregateAllHeroStats } from "../../../js/all-heroes-stats.js";
 import { writeAccountExports, writeCombinedExports } from "./exports.mjs";
+import { isTransientFailure } from "./retry.mjs";
 
 let heroMapPromise = null;
 
@@ -238,16 +239,27 @@ export async function runAll(accounts, options, { log, signal, onProgress } = {}
       results.push(result);
     } catch (error) {
       if (error?.name === "AbortError") throw error;
-      log?.warn(`${named.name} failed: ${error.message ?? error}`);
-      results.push({ account: named, analysis: null, error: String(error.message ?? error) });
+      const retryable = isTransientFailure(error);
+      log?.warn(
+        `${named.name} failed: ${error.message ?? error}` +
+          (retryable ? "" : " (not a transient error — check the account ID)")
+      );
+      results.push({
+        account: named,
+        analysis: null,
+        error: String(error.message ?? error),
+        retryable,
+      });
 
       // No point retrying every remaining account against a dead API.
       if (error?.upstreamDown) {
-        const remaining = accounts.length - index - 1;
-        if (remaining > 0) {
+        const remaining = accounts.slice(index + 1);
+        for (const pending of remaining) {
+          results.push({ account: pending, analysis: null, skipped: true });
+        }
+        if (remaining.length) {
           log?.warn(
-            `Skipping ${remaining} remaining account(s) — OpenDota is unavailable. ` +
-              `The next scheduled run will pick up where this left off.`
+            `Skipping ${remaining.length} remaining account(s) — OpenDota is unavailable.`
           );
         }
         break;

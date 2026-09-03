@@ -16,6 +16,7 @@ import { createScheduler, createStateStore } from "./scheduler.mjs";
 import { createServer } from "./server.mjs";
 import { runAll } from "./runner.mjs";
 import { ACCOUNT_FILES, accountDir } from "./exports.mjs";
+import { accountsNeedingRetry, delayForPendingRetry, nextRetryAt } from "./retry.mjs";
 
 const BUNDLED_DATA_DIR = process.env.D2PS_BUNDLED_DATA ?? path.resolve("data");
 
@@ -87,6 +88,46 @@ async function main() {
     progress: null,
   };
 
+  // A failed run reschedules itself so an OpenDota outage does not cost a week.
+  const retry = { timer: null, at: null, accounts: [], attempt: 0 };
+
+  function cancelRetry() {
+    if (retry.timer) clearTimeout(retry.timer);
+    retry.timer = null;
+    retry.at = null;
+    retry.accounts = [];
+  }
+
+  function armRetry(slugs, { at = null, attempt = retry.attempt + 1 } = {}) {
+    cancelRetry();
+    if (!options.retryAfterHours || !slugs.length) return;
+
+    const when = at ?? nextRetryAt(options.retryAfterHours);
+    if (!when) return;
+
+    const delay = Math.max(1000, when.getTime() - Date.now());
+    retry.at = when;
+    retry.accounts = slugs;
+    retry.attempt = attempt;
+    retry.timer = setTimeout(() => {
+      retry.timer = null;
+      if (run.active) {
+        log.warn("Retry skipped — a run is already in progress.");
+        return;
+      }
+      log.info(`Retrying ${slugs.length} account(s) — attempt ${retry.attempt}.`);
+      execute(slugs).catch(() => {});
+    }, delay);
+    retry.timer.unref?.();
+
+    const names = slugs
+      .map((slug) => options.accounts.find((a) => a.slug === slug)?.name ?? slug)
+      .join(", ");
+    log.info(
+      `Retry scheduled for ${when.toLocaleString()} (in ${options.retryAfterHours}h) — ${names}`
+    );
+  }
+
   async function execute(selected) {
     const accounts = selected?.length
       ? options.accounts.filter((a) => selected.includes(a.slug) || selected.includes(a.accountId))
@@ -130,6 +171,15 @@ async function main() {
         stopHeartbeat();
       }
 
+      const unfinished = accountsNeedingRetry(result.results);
+      if (unfinished.length) {
+        armRetry(unfinished);
+      } else {
+        if (retry.attempt) log.info("All accounts completed — retry cycle cleared.");
+        cancelRetry();
+        retry.attempt = 0;
+      }
+
       await state.write({
         lastRunAt: new Date().toISOString(),
         lastResult: result.results.map((r) => ({
@@ -139,12 +189,27 @@ async function main() {
           winrate: r.analysis?.overallWinrate ?? null,
           laneWinrate: r.analysis?.overallLaneWinrate ?? null,
           error: r.error ?? null,
+          skipped: r.skipped ?? false,
         })),
+        pendingRetry: retry.at
+          ? { at: retry.at.toISOString(), accounts: retry.accounts, attempt: retry.attempt }
+          : null,
       });
     } catch (error) {
-      if (error?.name === "AbortError") log.warn("Run stopped.");
-      else log.warn(`Run failed: ${error.message ?? error}`);
-      await state.write({ lastRunAt: new Date().toISOString(), lastError: String(error.message ?? error) });
+      if (error?.name === "AbortError") {
+        log.warn("Run stopped.");
+        cancelRetry();
+      } else {
+        log.warn(`Run failed: ${error.message ?? error}`);
+        armRetry(accounts.map((a) => a.slug));
+      }
+      await state.write({
+        lastRunAt: new Date().toISOString(),
+        lastError: String(error.message ?? error),
+        pendingRetry: retry.at
+          ? { at: retry.at.toISOString(), accounts: retry.accounts, attempt: retry.attempt }
+          : null,
+      });
     } finally {
       run.active = false;
       run.controller = null;
@@ -175,6 +240,12 @@ async function main() {
     }),
     cronValid: () => scheduler.valid(),
     nextRunAt: () => scheduler.nextRunAt(),
+    retry: () => ({
+      at: retry.at?.toISOString() ?? null,
+      accounts: retry.accounts,
+      attempt: retry.attempt,
+      intervalHours: options.retryAfterHours,
+    }),
     lastRun: async () => state.read(),
     start(selected) {
       if (run.active) return { ok: false, error: "A run is already in progress." };
@@ -185,6 +256,7 @@ async function main() {
     stop() {
       if (!run.active) return { ok: false, error: "Nothing running." };
       run.controller?.abort();
+      cancelRetry();
       return { ok: true };
     },
     async exportStatus() {
@@ -213,6 +285,21 @@ async function main() {
 
   scheduler.start();
 
+  // Resume a retry that was pending when the app last stopped.
+  const saved = await state.read();
+  const pendingDelay = delayForPendingRetry(saved.pendingRetry);
+  if (options.retryAfterHours && pendingDelay != null && saved.pendingRetry?.accounts?.length) {
+    const slugs = saved.pendingRetry.accounts.filter((slug) =>
+      options.accounts.some((a) => a.slug === slug)
+    );
+    if (slugs.length) {
+      armRetry(slugs, {
+        at: new Date(Date.now() + pendingDelay),
+        attempt: (saved.pendingRetry.attempt ?? 0) + 1,
+      });
+    }
+  }
+
   if (options.runOnStart && options.accounts.length) {
     log.info("run_on_start enabled — starting an initial run.");
     execute(null).catch(() => {});
@@ -223,6 +310,7 @@ async function main() {
       log.info(`${signal} received — shutting down.`);
       run.controller?.abort();
       scheduler.stop();
+      if (retry.timer) clearTimeout(retry.timer);
       server.close(() => {
         backend.flush().finally(() => process.exit(0));
       });

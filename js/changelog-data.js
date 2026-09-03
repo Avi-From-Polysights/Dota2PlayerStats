@@ -40,6 +40,29 @@ export const SECTION_ICONS = {
  */
 export const CHANGELOGS = [
   {
+    version: "0.0.59",
+    date: "2026-09-03",
+    title: "Outage Recovery",
+    tagline: "A failed run now retries itself instead of waiting for next week.",
+    heroImage: DOTA_IMG.items.tp,
+    accent: "#42d68c",
+    sections: [
+      {
+        id: "features",
+        title: "Features",
+        icon: SECTION_ICONS.features,
+        items: [
+          {
+            text: "The Home Assistant app retries a failed run every few hours until it succeeds, so an OpenDota outage no longer costs a week of lane data against the 31-day parse limit. The pending retry survives a restart.",
+          },
+          {
+            text: "Only transient failures are retried — an unreachable API or a rate limit. A permanent problem such as a mistyped account ID is reported once instead of retrying forever.",
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: "0.0.58",
     date: "2026-09-03",
     title: "Visible Waiting",

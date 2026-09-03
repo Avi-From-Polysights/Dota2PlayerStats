@@ -36,6 +36,7 @@ once, not once per player.
 | `days` | `31` | How far back each run looks |
 | `cron` | `0 5 * * 1` | 5-field cron, container local time (Mondays 05:00) |
 | `run_on_start` | `false` | Run once immediately when the app starts |
+| `retry_after_hours` | `4` | Retry a failed run this often until it succeeds (`0` disables) |
 | `request_parse` | `true` | Turn off to collect stats without queueing replay parses |
 | `parse_concurrency` | `6` | Parallel parse lanes (they share one rate-limit budget) |
 | `parse_retries` | `2` | Retries before a match is recorded as a parse failure |
@@ -61,6 +62,18 @@ Per account, under `<export_dir>/<account_id>-<name>/`:
 
 Plus `combined-summary.csv` (one row per account) and `combined-matches.csv`
 (every match across all accounts, with an `account` column) at the top level.
+
+## When OpenDota is down
+
+OpenDota's API goes down from time to time, usually returning HTTP 522. The app
+reports that in the activity log rather than sitting silent, stops the run
+instead of retrying the outage once per account, and schedules a retry every
+`retry_after_hours` until it succeeds. The pending retry survives a restart, and
+only transient failures qualify — a wrong account ID is reported once and not
+retried forever.
+
+That matters because of the 31-day parse limit: without automatic retries, an
+outage on the morning of a scheduled run would silently cost a week of lane data.
 
 ## Notes
 
