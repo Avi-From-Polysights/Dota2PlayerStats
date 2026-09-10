@@ -40,6 +40,57 @@ export const SECTION_ICONS = {
  */
 export const CHANGELOGS = [
   {
+    version: "0.0.60",
+    date: "2026-09-10",
+    title: "Last Hit Trainer",
+    tagline: "Practise last hitting and denying in the browser, no client needed.",
+    heroImage: DOTA_IMG.items.manta,
+    accent: "#42d68c",
+    sections: [
+      {
+        id: "features",
+        title: "Features",
+        icon: SECTION_ICONS.features,
+        items: [
+          {
+            text: "New Last Hit Trainer tab: a playable lane where two creep waves fight and you take last hits and denies as a level 1 Anti-Mage with no items. Built for a work break, when launching Dota is not an option.",
+          },
+          {
+            text: "Dota controls, not simplified ones. Right-click to attack or move, A then left-click to attack-move, and S to stop — which cancels the swing windup and the backswing, exactly as it does in game. A windup cancelled before the attack point costs no cooldown, so switching targets mid-swing is free.",
+          },
+          {
+            text: "Two session modes. A 10 wave drill on the real 30 second creep cadence, which is only scored once the last enemy creep is dead so no last hits are left on the table, plus an endless mode that runs until you stop it.",
+          },
+          {
+            text: "Allied creeps can only be denied below half health, and ordering an attack on a healthier one is refused and becomes a move, the same way the game handles it.",
+          },
+          {
+            text: "Two invulnerable tier 1 towers bound the lane so a winning wave cannot march into the enemy spawn. Towers do steal kills, and those count against your last hit percentage — beating your own tower to a creep is part of the drill.",
+          },
+          {
+            text: "Every drill is saved locally and charted over time, with best and average accuracy, so progress across weeks is visible. Nothing leaves your browser.",
+          },
+        ],
+      },
+      {
+        id: "general",
+        title: "Accuracy",
+        icon: SECTION_ICONS.general,
+        items: [
+          {
+            text: "Creep, tower and hero stats are bundled from live Dota game files at deploy time, so the trainer tracks the current patch instead of drifting out of date. Melee creeps at 550 health and 2 armor, ranged at 300 with 2 health regen a second, and Anti-Mage's 29-33 damage on a 1.4 base attack time with a 0.3 second attack point.",
+          },
+          {
+            text: "The armor curve, attack cycle, projectile travel and turn rate are all modelled, so the timing you learn here is the timing the real game uses. Anti-Mage moves at 315 to a creep's 325, which is why a healthy creep walking away genuinely cannot be caught.",
+          },
+          {
+            text: "No assists of any kind. Health bars only, with the damage roll hidden — reading the bar yourself is the skill. Flagbearer and siege creeps are left out to keep the drill to pure last hitting and denying.",
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: "0.0.59",
     date: "2026-09-03",
     title: "Outage Recovery",

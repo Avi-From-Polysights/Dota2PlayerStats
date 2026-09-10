@@ -473,3 +473,79 @@ export function renderAllHeroesCompareChart(canvas, rows, { limit = 12 } = {}) {
 
   return allHeroesCompareChart;
 }
+
+let lastHitHistoryChart = null;
+
+/**
+ * Last Hit Trainer progress: last hit and deny accuracy per drill, oldest
+ * first, so improvement over weeks is visible at a glance.
+ */
+export function renderLastHitHistoryChart(canvas, runs) {
+  if (!canvas || typeof Chart === "undefined") return null;
+  destroyChart(lastHitHistoryChart);
+
+  const drills = runs.filter((r) => r.mode === "drill" && r.lastHitsPossible > 0);
+  if (!drills.length) {
+    lastHitHistoryChart = null;
+    return null;
+  }
+
+  // Several drills often land on the same day, so the time is what actually
+  // distinguishes one point from the next.
+  const labels = drills.map((r) => {
+    const when = new Date(r.finishedAt);
+    const day = when.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+    const time = when.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+    return `${day} ${time}`;
+  });
+
+  lastHitHistoryChart = new Chart(canvas, {
+    type: "line",
+    data: {
+      labels,
+      datasets: [
+        {
+          label: "Last hit %",
+          data: drills.map((r) => r.lastHitPct),
+          borderColor: CHART.primary,
+          backgroundColor: "rgba(66, 214, 140, 0.12)",
+          borderWidth: 2,
+          pointRadius: 2,
+          tension: 0.25,
+          fill: true,
+        },
+        {
+          label: "Deny %",
+          data: drills.map((r) => r.denyPct),
+          borderColor: CHART.destructive,
+          backgroundColor: "rgba(255, 100, 103, 0.10)",
+          borderWidth: 2,
+          pointRadius: 2,
+          tension: 0.25,
+          fill: true,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: baseLegend(),
+        tooltip: {
+          ...baseTooltip(),
+          callbacks: {
+            afterBody(ctx) {
+              const run = drills[ctx[0].dataIndex];
+              return [
+                `${run.lastHits}/${run.lastHitsPossible} last hits · ${run.denies}/${run.deniesPossible} denies`,
+              ];
+            },
+          },
+        },
+      },
+      scales: baseScaleOptions(),
+    },
+  });
+
+  return lastHitHistoryChart;
+}

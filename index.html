@@ -13,6 +13,7 @@
   <link rel="stylesheet" href="css/changelog.css?v=__VERSION__" />
   <link rel="stylesheet" href="css/onboarding.css?v=__VERSION__" />
   <link rel="stylesheet" href="css/builder.css?v=__VERSION__" />
+  <link rel="stylesheet" href="css/lasthit.css?v=__VERSION__" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js" defer></script>
   <script type="module" src="js/app.js?v=__VERSION__"></script>
 </head>
@@ -33,6 +34,7 @@
       <button type="button" class="main-tabs__tab" role="tab" aria-selected="false" data-tab="tools">Tools</button>
       <button type="button" class="main-tabs__tab" role="tab" aria-selected="false" data-tab="all-heroes">All Heroes</button>
       <button type="button" class="main-tabs__tab" role="tab" aria-selected="false" data-tab="builder">Hero Builder <span class="feature-badge">Experimental</span></button>
+      <button type="button" class="main-tabs__tab" role="tab" aria-selected="false" data-tab="lasthit">Last Hit Trainer</button>
       <button type="button" class="main-tabs__tab" role="tab" aria-selected="false" data-tab="changelogs">Changelogs</button>
     </nav>
 
@@ -1004,6 +1006,77 @@
             </div>
           </div>
         </div>
+      </section>
+
+      <section data-tab-panel="lasthit" class="tab-panel hidden" hidden>
+        <section class="card lasthit-panel">
+          <div class="section-head">
+            <h2 class="section-title">Last Hit Trainer</h2>
+            <p class="section-desc">Last hitting and denying practice in the browser. Anti-Mage at level 1 with no items, three melee and one ranged creep per wave, on a real 30-second cadence. Creep, tower and hero numbers come from live Dota game files.</p>
+          </div>
+
+          <div class="lasthit-toolbar">
+            <div class="lasthit-modes" role="radiogroup" aria-label="Session mode">
+              <label class="lasthit-mode">
+                <input type="radio" name="lasthit-mode" value="drill" checked />
+                <span>Drill · 10 waves</span>
+              </label>
+              <label class="lasthit-mode">
+                <input type="radio" name="lasthit-mode" value="endless" />
+                <span>Endless</span>
+              </label>
+            </div>
+            <button type="button" id="lasthit-start" class="btn btn--primary">Start</button>
+            <button type="button" id="lasthit-stop" class="btn btn--outline" disabled>End run</button>
+            <span class="lasthit-toolbar__spacer"></span>
+            <span class="lasthit-source" id="lasthit-source"></span>
+          </div>
+
+          <div class="lasthit-stage">
+            <canvas id="lasthit-canvas" class="lasthit-canvas"></canvas>
+
+            <div class="lasthit-hud">
+              <div class="lasthit-hud__item">
+                <span class="lasthit-hud__value" id="lasthit-time">0:00</span>
+                <span class="lasthit-hud__label">Time</span>
+              </div>
+              <div class="lasthit-hud__item">
+                <span class="lasthit-hud__value" id="lasthit-wave">0 / 10</span>
+                <span class="lasthit-hud__label">Wave</span>
+              </div>
+              <div class="lasthit-hud__item lasthit-hud__item--lh">
+                <span class="lasthit-hud__value" id="lasthit-lh">0 / 0</span>
+                <span class="lasthit-hud__label">Last hits</span>
+              </div>
+              <div class="lasthit-hud__item lasthit-hud__item--deny">
+                <span class="lasthit-hud__value" id="lasthit-deny">0 / 0</span>
+                <span class="lasthit-hud__label">Denies</span>
+              </div>
+            </div>
+
+            <div class="lasthit-attack-move" id="lasthit-attack-move" hidden>Attack-move armed — left-click a target</div>
+
+            <div class="lasthit-overlay" id="lasthit-overlay" hidden>
+              <div class="lasthit-overlay__body" id="lasthit-overlay-body"></div>
+            </div>
+          </div>
+
+          <div class="section-head">
+            <h3 class="section-title section-title--inline">Your progress</h3>
+            <p class="section-desc">Drill runs are saved in this browser only. Endless runs are logged but left off the chart, since their length varies.</p>
+          </div>
+
+          <div class="lasthit-best" id="lasthit-best"></div>
+
+          <div class="lasthit-history-chart-wrap">
+            <canvas id="lasthit-history-chart" hidden></canvas>
+            <p class="section-desc" id="lasthit-history-empty">Finish a drill to start charting your accuracy over time.</p>
+          </div>
+
+          <div>
+            <button type="button" id="lasthit-clear-history" class="btn btn--outline">Clear run history</button>
+          </div>
+        </section>
       </section>
 
       <section data-tab-panel="changelogs" class="tab-panel hidden" hidden>

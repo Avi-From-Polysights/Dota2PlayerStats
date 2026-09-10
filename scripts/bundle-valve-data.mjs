@@ -7,6 +7,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { bundleBuildingData } from "./bundle-building-data.mjs";
+import { bundleCreepData } from "./bundle-creep-data.mjs";
 
 const VALVE_BASE = "https://www.dota2.com/datafeed";
 const DOTACONSTANTS_BASE =
@@ -105,6 +106,9 @@ async function main() {
 
   console.log("Bundling building / tower stats from VPK…");
   await bundleBuildingData({ outDir });
+
+  console.log("Bundling lane creep stats from VPK…");
+  await bundleCreepData({ outDir });
 
   const constantsDir = path.join(outDir, "constants");
   fs.mkdirSync(constantsDir, { recursive: true });

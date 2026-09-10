@@ -59,6 +59,7 @@ import { initMainTabs } from "./tabs.js";
 import { initOnboarding } from "./onboarding.js";
 import { initAllHeroes } from "./all-heroes.js";
 import { initBuilder } from "./builder.js";
+import { initLastHitTrainer } from "./lasthit/index.js";
 import { initTools } from "./tools.js";
 import { initConfigUi, getParallelConcurrency } from "./config-ui.js";
 import { readStratzSettingsFromDom, initStratzTokenPersistence } from "./stratz-token.js";
@@ -918,6 +919,7 @@ async function init() {
   initFieldTooltips();
   initChangelogs();
   initMainTabs();
+  initLastHitTrainer();
   initStratzTokenPersistence();
   initConfigUi();
   populateLaneFilterSelects();

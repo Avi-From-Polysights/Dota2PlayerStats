@@ -14,6 +14,7 @@ A static web app that pulls match data from [OpenDota](https://www.opendota.com/
 - **CSV export** — download the matchup table
 - **All Heroes tab** — cross-hero win/lane rates aggregated from your locally cached matches
 - **Hero Builder tab** — skill build (abilities, talents, Attribute Bonus) and item build planner with live computed stats, using OpenDota/dotaconstants hero & item data plus item-popularity stats; builds save locally
+- **Last Hit Trainer tab** — a playable lane for practising last hits and denies in the browser, with Dota controls and stats pulled from live game files
 
 Everything runs in the browser. No backend, no API keys. Match history, accounts, and hero builds are cached locally in your browser (IndexedDB) for performance and offline reuse.
 
@@ -36,6 +37,39 @@ python -m http.server 8080
 ```
 
 Then open `http://localhost:8080`.
+
+## Last Hit Trainer
+
+A browser lane for practising last hitting and denying when you cannot launch
+the game. Two creep waves fight, you play a level 1 Anti-Mage with no items, and
+two invulnerable tier 1 towers keep the wave from marching into a spawn.
+
+Controls follow the game rather than simplifying it:
+
+| Input | Action |
+| --- | --- |
+| Right-click a creep | Attack it — an enemy creep, or an allied creep below half health to deny |
+| Right-click the ground | Move |
+| `A` then left-click | Attack-move (picks up enemies only, never auto-denies) |
+| `S` | Stop — cancels the swing windup and the backswing |
+
+Damage lands at the attack point, and the attack cooldown starts there too, so a
+windup cancelled early costs nothing and switching targets mid-swing is free.
+That, and reading a health bar without knowing the exact damage roll, is what
+the drill trains.
+
+Two modes: a **10 wave drill** on the real 30-second creep cadence, scored only
+once the last enemy creep is dead, and an **endless** mode. Drill scores are
+saved to IndexedDB and charted over time. Nothing leaves the browser.
+
+Creep, tower and hero stats come from `data/creeps.json`, bundled from live Dota
+game files at deploy time by `scripts/bundle-creep-data.mjs`, so the numbers
+track the current patch. On a bare local checkout that file is absent and the
+trainer falls back to the equivalent table in `js/lasthit/constants.js`.
+
+Flagbearer and siege creeps are deliberately excluded, as are hero levelling,
+items, gold, creep upgrades and creep aggro on the hero — the drill is scoped to
+last hit timing and denies.
 
 ## Wilson confidence intervals
 
@@ -66,6 +100,22 @@ Running it locally, without Home Assistant:
 ```bash
 D2PS_OPTIONS=./dev-options.json D2PS_DATA=./.devdata D2PS_EXPORT_DIR=./.devshare node addon/dota2-stats/app/main.mjs
 # then open http://localhost:8099
+```
+
+## Tests
+
+Node scripts under `scripts/`, no test runner or dependencies:
+
+```bash
+for f in scripts/test-*.mjs; do node "$f"; done
+```
+
+The `*-browser.mjs` tests additionally need Playwright and skip cleanly without
+it:
+
+```bash
+npm install --no-save playwright && npx playwright install chromium
+node scripts/test-lasthit-browser.mjs
 ```
 
 ## Contributing

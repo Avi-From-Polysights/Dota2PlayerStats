@@ -1,0 +1,314 @@
+/* Last Hit Trainer tab */
+
+.lasthit-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.lasthit-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem;
+  padding-bottom: 0.25rem;
+}
+
+.lasthit-modes {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.lasthit-mode {
+  position: relative;
+  display: inline-flex;
+}
+
+.lasthit-mode input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.lasthit-mode span {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.4rem 0.85rem;
+  border: 1px solid var(--border-input);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--muted-foreground);
+  font-size: 0.8125rem;
+  cursor: pointer;
+  transition:
+    color var(--motion-fast) ease,
+    background var(--motion-fast) ease,
+    border-color var(--motion-fast) ease;
+}
+
+.lasthit-mode span:hover {
+  background: var(--hover);
+  color: var(--foreground);
+}
+
+.lasthit-mode input:checked + span {
+  border-color: rgba(66, 214, 140, 0.5);
+  background: var(--primary-dim);
+  color: var(--primary);
+}
+
+.lasthit-mode input:focus-visible + span {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.lasthit-toolbar__spacer {
+  flex: 1 1 auto;
+}
+
+.lasthit-source {
+  color: var(--tertiary);
+  font-size: 0.75rem;
+}
+
+/* --- Stage ---------------------------------------------------------------- */
+
+.lasthit-stage {
+  position: relative;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: #101512;
+}
+
+.lasthit-canvas {
+  display: block;
+  width: 100%;
+  height: clamp(320px, 46vh, 560px);
+  cursor: default;
+  touch-action: none;
+}
+
+.lasthit-canvas--attack-move {
+  cursor: crosshair;
+}
+
+.lasthit-hud {
+  position: absolute;
+  inset: 0.75rem 0.75rem auto 0.75rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  pointer-events: none;
+}
+
+.lasthit-hud__item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 84px;
+  padding: 0.4rem 0.65rem;
+  border-radius: var(--radius-sm);
+  background: rgba(10, 12, 11, 0.78);
+  border: 1px solid var(--border);
+}
+
+.lasthit-hud__value {
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+  line-height: 1.1;
+  color: var(--foreground);
+}
+
+.lasthit-hud__label {
+  font-size: 0.65rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+}
+
+.lasthit-hud__item--lh .lasthit-hud__value {
+  color: var(--primary);
+}
+
+.lasthit-hud__item--deny .lasthit-hud__value {
+  color: var(--destructive);
+}
+
+.lasthit-attack-move {
+  position: absolute;
+  left: 50%;
+  bottom: 0.85rem;
+  transform: translateX(-50%);
+  padding: 0.3rem 0.7rem;
+  border-radius: var(--radius-sm);
+  background: var(--accent-dim);
+  border: 1px solid rgba(21, 93, 252, 0.45);
+  color: #8fb4ff;
+  font-size: 0.75rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  pointer-events: none;
+}
+
+/* --- Overlay -------------------------------------------------------------- */
+
+.lasthit-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(8, 10, 9, 0.86);
+  backdrop-filter: blur(3px);
+}
+
+.lasthit-overlay[hidden] {
+  display: none;
+}
+
+.lasthit-overlay__body {
+  width: min(520px, 100%);
+  max-height: 100%;
+  overflow-y: auto;
+  text-align: center;
+}
+
+.lasthit-overlay__title {
+  margin: 0 0 0.5rem;
+  font-family: var(--font-display);
+  font-size: 1.35rem;
+  color: var(--foreground);
+}
+
+.lasthit-overlay__note {
+  margin: 0.5rem 0 0;
+  color: var(--tertiary);
+  font-size: 0.8125rem;
+}
+
+.lasthit-overlay__score {
+  display: flex;
+  justify-content: center;
+  gap: 2rem;
+  margin-top: 0.75rem;
+}
+
+.lasthit-keys {
+  display: inline-block;
+  margin: 0.9rem 0 0;
+  padding: 0;
+  list-style: none;
+  text-align: left;
+  color: var(--tertiary);
+  font-size: 0.8125rem;
+}
+
+.lasthit-keys li + li {
+  margin-top: 0.3rem;
+}
+
+.lasthit-keys kbd {
+  display: inline-block;
+  min-width: 1.4rem;
+  padding: 0.05rem 0.35rem;
+  border: 1px solid var(--border-input);
+  border-radius: var(--radius-sm);
+  background: var(--hover-strong);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  font-size: 0.75rem;
+  text-align: center;
+}
+
+.lasthit-overlay__waves {
+  margin-top: 1rem;
+  max-height: 190px;
+  overflow-y: auto;
+}
+
+.lasthit-wave-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.78rem;
+}
+
+.lasthit-wave-table th,
+.lasthit-wave-table td {
+  padding: 0.28rem 0.5rem;
+  text-align: right;
+  border-bottom: 1px solid var(--border);
+}
+
+.lasthit-wave-table th:first-child,
+.lasthit-wave-table td:first-child {
+  text-align: left;
+  color: var(--muted-foreground);
+}
+
+.lasthit-wave-table th {
+  color: var(--muted-foreground);
+  font-weight: var(--weight-body);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-size: 0.68rem;
+}
+
+/* --- Stats + history ------------------------------------------------------ */
+
+.lasthit-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.lasthit-stat__value {
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  line-height: 1.05;
+  color: var(--foreground);
+}
+
+.lasthit-stat__label {
+  font-size: 0.72rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+}
+
+.lasthit-best {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.75rem;
+  margin-top: 0.5rem;
+}
+
+.lasthit-history-chart-wrap {
+  position: relative;
+  height: 240px;
+  margin-top: 0.75rem;
+}
+
+.lasthit-history-chart-wrap canvas[hidden] {
+  display: none;
+}
+
+@media (max-width: 640px) {
+  .lasthit-toolbar {
+    gap: 0.6rem;
+  }
+
+  .lasthit-toolbar__spacer {
+    display: none;
+  }
+
+  .lasthit-hud__item {
+    min-width: 68px;
+    padding: 0.3rem 0.5rem;
+  }
+
+  .lasthit-overlay__score {
+    gap: 1.25rem;
+  }
+}
