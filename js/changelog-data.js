@@ -40,6 +40,32 @@ export const SECTION_ICONS = {
  */
 export const CHANGELOGS = [
   {
+    version: "0.0.61",
+    date: "2026-10-19",
+    title: "Date Filtering",
+    tagline: "Pick a period on the charts and see who gave you trouble back then.",
+    heroImage: DOTA_IMG.heroes.kez,
+    accent: "#42d68c",
+    sections: [
+      {
+        id: "features",
+        title: "Features",
+        icon: SECTION_ICONS.features,
+        items: [
+          {
+            text: "Drag across the win rate charts, or click two points, to select a period. The enemy hero matchup table narrows to the games played in it, and everything outside the selection is dimmed.",
+          },
+          {
+            text: "The matchup table has its own From and To dates, linked to the chart selection both ways: select on a chart and the dates fill in, type dates and the chart selection moves. Clear dates returns every game. A chart selection always covers whole days, so it matches the dates shown.",
+          },
+          {
+            text: "New From date and To date options under Sample & filters limit the analysis to matches played in that window before anything is fetched. Both are blank by default, so nothing changes unless you set them, and they are saved in share links and configs.",
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: "0.0.60",
     date: "2026-09-10",
     title: "Last Hit Trainer",

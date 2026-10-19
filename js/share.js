@@ -25,6 +25,8 @@ export function buildShareUrl(params, { autoRun = false } = {}) {
     url.searchParams.set("conf", params.conf);
   }
   if (params.patch) url.searchParams.set("patch", params.patch);
+  if (params.from) url.searchParams.set("from", params.from);
+  if (params.to) url.searchParams.set("to", params.to);
   if (params.window && params.window !== FORM_DEFAULTS.window) {
     url.searchParams.set("window", params.window);
   }
@@ -95,6 +97,14 @@ export function applyUrlParams(heroes) {
   }
   if (params.has("patch")) {
     document.getElementById("patch-filter").value = params.get("patch");
+    hasParams = true;
+  }
+  if (params.has("from")) {
+    document.getElementById("date-from").value = params.get("from");
+    hasParams = true;
+  }
+  if (params.has("to")) {
+    document.getElementById("date-to").value = params.get("to");
     hasParams = true;
   }
   if (params.has("window")) {

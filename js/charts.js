@@ -8,6 +8,15 @@ const CHART = {
   popover: "#212121",
 };
 
+/** Date-range brush on the time-series charts: neutral so it reads over both the lane and game lines. */
+const SELECTION = {
+  band: "rgba(255, 255, 255, 0.07)",
+  dim: "rgba(11, 11, 11, 0.55)",
+  edge: "rgba(255, 255, 255, 0.5)",
+};
+/** Pointer travel that turns a press into a drag rather than a click. */
+const DRAG_THRESHOLD_PX = 4;
+
 let winrateChart = null;
 let laneChart = null;
 let laneVsGameChart = null;
@@ -77,7 +86,177 @@ function baseTooltip() {
   };
 }
 
-export function renderWinrateChart(canvas, points, overallWinrate) {
+/** The range being dragged out, or the committed one. */
+function shownRange(state) {
+  const drag = state?.drag;
+  if (drag?.moved) {
+    return { start: Math.min(drag.origin, drag.current), end: Math.max(drag.origin, drag.current) };
+  }
+  return state?.range ?? null;
+}
+
+/** Pixel box covering points `start`..`end`, padded half a step so a single point still shows. */
+function rangeBox(chart, range) {
+  const count = chart.data.labels?.length ?? 0;
+  if (!range || !count) return null;
+  const { chartArea: area, scales } = chart;
+  const x = scales.x;
+  const half =
+    count > 1
+      ? Math.abs(x.getPixelForValue(1) - x.getPixelForValue(0)) / 2
+      : (area.right - area.left) / 2;
+  const left = Math.max(area.left, x.getPixelForValue(range.start) - half);
+  const right = Math.min(area.right, x.getPixelForValue(range.end) + half);
+  return right > left ? { left, right } : null;
+}
+
+function strokeVertical(ctx, x, area) {
+  const crisp = Math.round(x) + 0.5;
+  ctx.beginPath();
+  ctx.moveTo(crisp, area.top);
+  ctx.lineTo(crisp, area.bottom);
+  ctx.stroke();
+}
+
+const rangeSelectPlugin = {
+  id: "rangeSelect",
+  beforeDatasetsDraw(chart) {
+    const box = rangeBox(chart, shownRange(chart.$rangeSelect));
+    if (!box) return;
+    const { ctx, chartArea: area } = chart;
+    ctx.save();
+    ctx.fillStyle = SELECTION.band;
+    ctx.fillRect(box.left, area.top, box.right - box.left, area.bottom - area.top);
+    ctx.restore();
+  },
+  afterDatasetsDraw(chart) {
+    const state = chart.$rangeSelect;
+    if (!state) return;
+    const { ctx, chartArea: area } = chart;
+    const box = rangeBox(chart, shownRange(state));
+    ctx.save();
+    ctx.strokeStyle = SELECTION.edge;
+    ctx.lineWidth = 1;
+    if (box) {
+      // Dim either side, over the lines, so the picked period stands out.
+      ctx.fillStyle = SELECTION.dim;
+      ctx.fillRect(area.left, area.top, box.left - area.left, area.bottom - area.top);
+      ctx.fillRect(box.right, area.top, area.right - box.right, area.bottom - area.top);
+      strokeVertical(ctx, box.left, area);
+      strokeVertical(ctx, box.right, area);
+    }
+    if (state.anchor != null && !state.drag?.moved) {
+      // First of two clicks: mark where the range will start.
+      ctx.setLineDash([4, 4]);
+      strokeVertical(ctx, chart.scales.x.getPixelForValue(state.anchor), area);
+    }
+    ctx.restore();
+  },
+  beforeDestroy(chart) {
+    chart.$rangeSelect?.detach?.();
+  },
+};
+
+/** Point index under the pointer; outside the plot area it is null unless `clamp`. */
+function indexAtPointer(chart, event, { clamp = false } = {}) {
+  const count = chart.data.labels?.length ?? 0;
+  if (!count) return null;
+  const rect = chart.canvas.getBoundingClientRect();
+  const x = event.clientX - rect.left;
+  const y = event.clientY - rect.top;
+  const area = chart.chartArea;
+  const inside = x >= area.left && x <= area.right && y >= area.top && y <= area.bottom;
+  if (!inside && !clamp) return null;
+  const index = chart.scales.x.getValueForPixel(Math.min(Math.max(x, area.left), area.right));
+  return Math.min(Math.max(Math.round(index), 0), count - 1);
+}
+
+/**
+ * Let the player pick a range of points by dragging across the plot or by
+ * clicking two points. `onSelect({ start, end })` gets point indices; the
+ * caller decides what range to show and passes it back through
+ * setTimelineSelection.
+ */
+function attachRangeSelect(chart, { selection = null, onSelect = null } = {}) {
+  const state = { range: selection, drag: null, anchor: null, detach: null };
+  chart.$rangeSelect = state;
+  // The constructor may already have drawn without the state.
+  if (selection) chart.draw();
+  if (!onSelect) return;
+
+  const canvas = chart.canvas;
+  const commit = (a, b) => {
+    state.anchor = null;
+    onSelect({ start: Math.min(a, b), end: Math.max(a, b) });
+    chart.draw();
+  };
+
+  const onPointerDown = (event) => {
+    if (event.button !== 0) return;
+    const index = indexAtPointer(chart, event);
+    if (index == null) return;
+    state.drag = { origin: index, current: index, startX: event.clientX, moved: false };
+    canvas.setPointerCapture?.(event.pointerId);
+  };
+  const onPointerMove = (event) => {
+    const drag = state.drag;
+    if (!drag) return;
+    if (Math.abs(event.clientX - drag.startX) > DRAG_THRESHOLD_PX) drag.moved = true;
+    drag.current = indexAtPointer(chart, event, { clamp: true }) ?? drag.current;
+    if (drag.moved) chart.draw();
+  };
+  const onPointerUp = () => {
+    const drag = state.drag;
+    if (!drag) return;
+    state.drag = null;
+    if (drag.moved) {
+      commit(drag.origin, drag.current);
+    } else if (state.anchor == null) {
+      state.anchor = drag.origin;
+      chart.draw();
+    } else {
+      commit(state.anchor, drag.origin);
+    }
+  };
+  const onPointerCancel = () => {
+    state.drag = null;
+    chart.draw();
+  };
+  const onKeyDown = (event) => {
+    if (event.key !== "Escape" || state.anchor == null) return;
+    state.anchor = null;
+    chart.draw();
+  };
+
+  canvas.addEventListener("pointerdown", onPointerDown);
+  canvas.addEventListener("pointermove", onPointerMove);
+  canvas.addEventListener("pointerup", onPointerUp);
+  canvas.addEventListener("pointercancel", onPointerCancel);
+  document.addEventListener("keydown", onKeyDown);
+  state.detach = () => {
+    canvas.removeEventListener("pointerdown", onPointerDown);
+    canvas.removeEventListener("pointermove", onPointerMove);
+    canvas.removeEventListener("pointerup", onPointerUp);
+    canvas.removeEventListener("pointercancel", onPointerCancel);
+    document.removeEventListener("keydown", onKeyDown);
+  };
+}
+
+/**
+ * Show the same range of points on both time-series charts (null clears it).
+ * Both charts plot one point per match of the same timeline, so indices match.
+ */
+export function setTimelineSelection(range) {
+  for (const chart of [winrateChart, laneVsGameChart]) {
+    const state = chart?.$rangeSelect;
+    if (!state) continue;
+    state.range = range;
+    state.anchor = null;
+    chart.draw();
+  }
+}
+
+export function renderWinrateChart(canvas, points, overallWinrate, { selection = null, onSelect = null } = {}) {
   destroyChart(winrateChart);
 
   winrateChart = new Chart(canvas, {
@@ -129,12 +308,20 @@ export function renderWinrateChart(canvas, points, overallWinrate) {
       },
       scales: baseScaleOptions(),
     },
+    plugins: [rangeSelectPlugin],
   });
+  attachRangeSelect(winrateChart, { selection, onSelect });
 
   return winrateChart;
 }
 
-export function renderLaneVsGameChart(canvas, points, overallLane, overallGame) {
+export function renderLaneVsGameChart(
+  canvas,
+  points,
+  overallLane,
+  overallGame,
+  { selection = null, onSelect = null } = {}
+) {
   destroyChart(laneVsGameChart);
 
   laneVsGameChart = new Chart(canvas, {
@@ -207,7 +394,9 @@ export function renderLaneVsGameChart(canvas, points, overallLane, overallGame) 
       },
       scales: baseScaleOptions(),
     },
+    plugins: [rangeSelectPlugin],
   });
+  attachRangeSelect(laneVsGameChart, { selection, onSelect });
 
   return laneVsGameChart;
 }

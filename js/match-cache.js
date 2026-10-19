@@ -16,6 +16,8 @@ export function buildMatchListCacheKey({
   excludeBots = true,
   excludePractice = true,
   standardModesOnly = false,
+  dateFrom = "",
+  dateTo = "",
 }) {
   return [
     accountId,
@@ -28,6 +30,8 @@ export function buildMatchListCacheKey({
     excludeBots ? 1 : 0,
     excludePractice ? 1 : 0,
     standardModesOnly ? 1 : 0,
+    // Only present when set, so lists cached before date filtering keep their keys.
+    ...(dateFrom || dateTo ? [`${dateFrom}~${dateTo}`] : []),
   ].join("|");
 }
 

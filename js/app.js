@@ -32,7 +32,18 @@ import {
   renderLaneChart,
   renderLaneVsGameChart,
   renderWinrateChart,
+  setTimelineSelection,
 } from "./charts.js";
+import {
+  dayRangeBounds,
+  formatDayRange,
+  hasDayRange,
+  indexRangeForBounds,
+  isInvertedDayRange,
+  normalizeDayRange,
+  readDayRangeFromDom,
+  toDayInput,
+} from "./date-range.js";
 import {
   analyzeMatches,
   rollingLaneVsGame,
@@ -110,6 +121,9 @@ const parseParallelEnabledCheckbox = document.getElementById("parse-parallel-ena
 const parseRetryCheckbox = document.getElementById("parse-retry");
 const parseMaxRetriesInput = document.getElementById("parse-max-retries");
 const clearCacheBtn = document.getElementById("clear-cache-btn");
+const matchupDateFrom = document.getElementById("matchup-date-from");
+const matchupDateTo = document.getElementById("matchup-date-to");
+const matchupDateClear = document.getElementById("matchup-date-clear");
 
 const ACCOUNT_ID_HINT =
   "Check your Account ID on OpenDota: search your Steam name, open your profile, and copy the number from the URL (opendota.com/players/123456789). Use that ID, not Steam ID64.";
@@ -128,29 +142,38 @@ function renderAnalysisResults(analysis, meta) {
     heroName,
     rollingWindow,
     selectedPatchLabel,
+    sampleDateRange,
     loadStats,
     laneFilters,
   } = meta;
 
+  lastTimeline = analysis.timeline ?? [];
   const rolling = rollingWinRate(analysis.timeline, rollingWindow);
   const laneVsGameRolling = rollingLaneVsGame(analysis.timeline, rollingWindow);
   const trend = trendDirection(rolling);
+  const chartSelection = {
+    selection: timelineSelection(lastTimeline),
+    onSelect: selectTimelineRange,
+  };
 
-  renderSummary(analysis, heroName, trend, rollingWindow, selectedPatchLabel, loadStats, laneFilters);
+  renderSummary(analysis, heroName, trend, rollingWindow, selectedPatchLabel, loadStats, laneFilters, sampleDateRange);
   renderDataQualityPanel(analysis, loadStats, meta);
   renderParseStatusPanel(loadStats, meta.requestParse);
-  renderMatchupFilterNote(laneFilters);
+  renderMatchupFilterNote(laneFilters, analysis);
+  renderChartSelectionStatus(analysis);
   renderLaneVsGameStats(analysis);
   renderLaneVsGameChart(
     document.getElementById("lane-vs-game-chart"),
     laneVsGameRolling,
     analysis.overallLaneWinrate,
-    analysis.overallWinrate
+    analysis.overallWinrate,
+    chartSelection
   );
   renderWinrateChart(
     document.getElementById("winrate-chart"),
     rolling,
-    analysis.overallWinrate
+    analysis.overallWinrate,
+    chartSelection
   );
   renderLaneChart(document.getElementById("lane-chart"), analysis.laneRows);
   renderLaneTable(analysis.laneRows);
@@ -175,7 +198,21 @@ function renderAnalysisResults(analysis, meta) {
   animateResultsReveal(resultsEl);
   exportBtn.disabled = false;
   if (exportMatchesBtn) exportMatchesBtn.disabled = false;
-  lastTimeline = analysis.timeline ?? [];
+}
+
+/** Re-run the analysis over the fetched matches with the filters currently on screen. */
+function analyzeCachedSession(laneFilters, matchFilters) {
+  const session = cachedAnalysisSession;
+  return analyzeMatches(session.detailsList, session.accountId, session.heroMap, session.confidence, {
+    turboSkippedList: session.turboSkippedList,
+    rankedSkippedList: session.rankedSkippedList,
+    botsSkippedList: session.botsSkippedList,
+    practiceSkippedList: session.practiceSkippedList,
+    modeSkippedList: session.modeSkippedList,
+    ...matchFilters,
+    laneFilters,
+    matchupDateRange: dayRangeBounds(readMatchupDateRange()),
+  });
 }
 
 function refilterCachedAnalysis() {
@@ -185,26 +222,84 @@ function refilterCachedAnalysis() {
   const matchFilters = readMatchFiltersFromDom();
   syncUrlFromForm();
 
-  const analysis = analyzeMatches(
-    cachedAnalysisSession.detailsList,
-    cachedAnalysisSession.accountId,
-    cachedAnalysisSession.heroMap,
-    cachedAnalysisSession.confidence,
-    {
-      turboSkippedList: cachedAnalysisSession.turboSkippedList,
-      rankedSkippedList: cachedAnalysisSession.rankedSkippedList,
-      botsSkippedList: cachedAnalysisSession.botsSkippedList,
-      practiceSkippedList: cachedAnalysisSession.practiceSkippedList,
-      modeSkippedList: cachedAnalysisSession.modeSkippedList,
-      ...matchFilters,
-      laneFilters,
-    }
-  );
-
+  const analysis = analyzeCachedSession(laneFilters, matchFilters);
   renderAnalysisResults(analysis, { ...cachedAnalysisSession, laneFilters, ...matchFilters });
 
   const summary = formatLaneFilterSummary(laneFilters);
   analyzeMultiLog?.info(summary ? `Filters updated — ${summary}` : "Filters cleared — showing all games");
+}
+
+function readMatchupDateRange() {
+  return normalizeDayRange(readDayRangeFromDom("matchup-date-from", "matchup-date-to"));
+}
+
+/** Points on the time-series charts covered by the matchup date range. */
+function timelineSelection(timeline) {
+  return indexRangeForBounds(
+    timeline.map((m) => m.startTime),
+    dayRangeBounds(readMatchupDateRange())
+  );
+}
+
+/**
+ * The matchup date range changed, from the inputs or a chart. Only the table
+ * and the chart band depend on it, so the charts are not rebuilt.
+ */
+function applyMatchupDateRange() {
+  if (!cachedAnalysisSession) return;
+
+  const laneFilters = readLaneFiltersFromDom();
+  const analysis = analyzeCachedSession(laneFilters, readMatchFiltersFromDom());
+  renderMatchupTable(sortRows(analysis.matchupRows, sortState.key, sortState.dir));
+  renderMatchupFilterNote(laneFilters, analysis);
+  renderChartSelectionStatus(analysis);
+  setTimelineSelection(timelineSelection(analysis.timeline));
+
+  const range = readMatchupDateRange();
+  analyzeMultiLog?.info(
+    hasDayRange(range)
+      ? `Matchups narrowed to ${formatDayRange(range)} — ${analysis.matchupGames} of ${analysis.totalGames} games`
+      : "Matchup date range cleared — showing all games"
+  );
+}
+
+/** A range picked on a chart widens to whole days, so it always matches the date inputs. */
+function selectTimelineRange({ start, end }) {
+  const first = lastTimeline[start];
+  const last = lastTimeline[end];
+  if (!first || !last) return;
+  matchupDateFrom.value = toDayInput(first.startTime);
+  matchupDateTo.value = toDayInput(last.startTime);
+  applyMatchupDateRange();
+}
+
+function clearMatchupDateRange() {
+  matchupDateFrom.value = "";
+  matchupDateTo.value = "";
+  applyMatchupDateRange();
+}
+
+function renderChartSelectionStatus(analysis) {
+  const range = readMatchupDateRange();
+  const active = hasDayRange(range);
+  const text = active
+    ? `Matchup table: ${formatDayRange(range)} · ${analysis.matchupGames} of ${analysis.totalGames} games`
+    : "";
+  document.querySelectorAll("[data-chart-selection]").forEach((el) => {
+    el.classList.toggle("hidden", !active);
+    const label = el.querySelector("[data-chart-selection-text]");
+    if (label) label.textContent = text;
+  });
+  matchupDateClear.disabled = !active;
+}
+
+function initMatchupDateFilter() {
+  matchupDateFrom.addEventListener("change", applyMatchupDateRange);
+  matchupDateTo.addEventListener("change", applyMatchupDateRange);
+  matchupDateClear.addEventListener("click", clearMatchupDateRange);
+  document.querySelectorAll("[data-chart-selection-clear]").forEach((btn) => {
+    btn.addEventListener("click", clearMatchupDateRange);
+  });
 }
 
 function initLaneFilterListeners() {
@@ -259,7 +354,7 @@ function populatePatches(list) {
   patchFilter.innerHTML = `<option value="">All patches</option>${options}`;
 }
 
-function renderSummary(analysis, heroName, trend, rollingWindow, selectedPatchLabel, loadStats, laneFilters) {
+function renderSummary(analysis, heroName, trend, rollingWindow, selectedPatchLabel, loadStats, laneFilters, sampleDateRange) {
   const trendLabels = {
     improving: "Trending up",
     declining: "Trending down",
@@ -283,6 +378,7 @@ function renderSummary(analysis, heroName, trend, rollingWindow, selectedPatchLa
   const patchNote = selectedPatchLabel
     ? `Filtered to ${selectedPatchLabel}`
     : `${analysis.patchRows.length} patch(es) in sample`;
+  const sampleDateNote = hasDayRange(sampleDateRange) ? ` · ${formatDayRange(sampleDateRange)}` : "";
 
   const loadNote = loadStats ? formatLoadStats(loadStats) : "";
   const laneFilterNote = hasActiveLaneFilters(laneFilters)
@@ -307,7 +403,7 @@ function renderSummary(analysis, heroName, trend, rollingWindow, selectedPatchLa
     <div class="summary-card">
       <div class="summary-card__label">Record</div>
       <div class="summary-card__value">${analysis.totalWins}W / ${analysis.totalLosses}L</div>
-      <div class="summary-card__sub">${analysis.totalGames} matches · ${patchNote}</div>
+      <div class="summary-card__sub">${analysis.totalGames} matches · ${patchNote}${sampleDateNote}</div>
     </div>
     <div class="summary-card">
       <div class="summary-card__label">Hero</div>
@@ -357,15 +453,23 @@ function renderDataQualityPanel(analysis, loadStats, meta) {
   panel.classList.remove("hidden");
 }
 
-function renderMatchupFilterNote(laneFilters) {
+function renderMatchupFilterNote(laneFilters, analysis) {
   const el = document.getElementById("matchup-filter-note");
   if (!el) return;
-  if (!hasActiveLaneFilters(laneFilters)) {
+  const dateRange = readMatchupDateRange();
+  const parts = [];
+  if (hasActiveLaneFilters(laneFilters)) parts.push(formatLaneFilterSummary(laneFilters));
+  if (hasDayRange(dateRange)) {
+    parts.push(
+      `dates: ${formatDayRange(dateRange)} (${analysis.matchupGames} of ${analysis.totalGames} games)`
+    );
+  }
+  if (!parts.length) {
     el.textContent = "";
     el.classList.add("hidden");
     return;
   }
-  el.textContent = `Matchups filtered: ${formatLaneFilterSummary(laneFilters)}. Enemy lane/role filters only affect the table below. Change filters anytime after analysis — no re-fetch needed.`;
+  el.textContent = `Matchups filtered: ${parts.join(" · ")}. Enemy lane/role and date filters only affect the table below. Change filters anytime after analysis — no re-fetch needed.`;
   el.classList.remove("hidden");
 }
 
@@ -382,6 +486,11 @@ function formatLaneWld(row) {
 
 function renderMatchupTable(rows) {
   lastMatchupRows = rows;
+  if (!rows.length) {
+    const colspan = matchupHeaders.length;
+    matchupTableBody.innerHTML = `<tr><td colspan="${colspan}" class="data-table__empty">No games match these filters.</td></tr>`;
+    return;
+  }
   matchupTableBody.innerHTML = rows
     .map(
       (row) => `
@@ -677,9 +786,17 @@ form.addEventListener("submit", async (event) => {
   const selectedPatchLabel = patchId != null ? patchLabel(patches, patchId) : null;
   const laneFilters = readLaneFiltersFromDom();
   const { enabled: useStratzFallback, token: stratzToken } = readStratzSettingsFromDom();
+  const rawSampleDateRange = readDayRangeFromDom("date-from", "date-to");
+  const sampleDateRange = normalizeDayRange(rawSampleDateRange);
+  const sampleBounds = dayRangeBounds(sampleDateRange);
 
   if (!accountId || accountId < 1) {
     showError("Enter a valid account ID.");
+    return;
+  }
+
+  if (isInvertedDayRange(rawSampleDateRange)) {
+    showError("The From date is after the To date. Swap them, or clear one to leave that side open.");
     return;
   }
 
@@ -703,6 +820,9 @@ form.addEventListener("submit", async (event) => {
   syncUrlFromForm();
   persistSessionConfig();
   cachedAnalysisSession = null;
+  // A new sample starts with every matchup shown.
+  matchupDateFrom.value = "";
+  matchupDateTo.value = "";
   fetchBtn.disabled = true;
   exportBtn.disabled = true;
   if (exportMatchesBtn) exportMatchesBtn.disabled = true;
@@ -735,6 +855,8 @@ form.addEventListener("submit", async (event) => {
       excludeBots,
       excludePractice,
       standardModesOnly,
+      dateFrom: sampleDateRange.from,
+      dateTo: sampleDateRange.to,
     });
 
     let matchList;
@@ -756,7 +878,8 @@ form.addEventListener("submit", async (event) => {
       analyzeMultiLog?.cache(`Match list from cache (${matchList.length} games)`);
       setProgress(true, 2, `Match list loaded from cache (${matchList.length} games)…`);
     } else {
-      analyzeMultiLog?.fetch(`Fetching match list from OpenDota (limit ${limit})`);
+      const dateNote = hasDayRange(sampleDateRange) ? `, ${formatDayRange(sampleDateRange)}` : "";
+      analyzeMultiLog?.fetch(`Fetching match list from OpenDota (limit ${limit}${dateNote})`);
       const result = await loadPlayerMatchesFiltered(
         accountId,
         heroId,
@@ -769,6 +892,8 @@ form.addEventListener("submit", async (event) => {
           excludeBots,
           excludePractice,
           standardModesOnly,
+          sinceUnix: sampleBounds?.fromUnix ?? null,
+          untilUnix: sampleBounds?.toUnix ?? null,
           signal,
           onRateLimitWait,
         }
@@ -791,8 +916,9 @@ form.addEventListener("submit", async (event) => {
 
     if (!matchList.length) {
       const patchMsg = selectedPatchLabel ? ` on ${selectedPatchLabel}` : "";
+      const dateMsg = hasDayRange(sampleDateRange) ? ` (${formatDayRange(sampleDateRange)})` : "";
       showError(
-        `No matches found for that account, hero, and filters${patchMsg}. ${ACCOUNT_ID_HINT}`
+        `No matches found for that account, hero, and filters${patchMsg}${dateMsg}. ${ACCOUNT_ID_HINT}`
       );
       setProgress(false);
       fetchBtn.disabled = false;
@@ -871,21 +997,13 @@ form.addEventListener("submit", async (event) => {
       heroName,
       rollingWindow,
       selectedPatchLabel,
+      sampleDateRange,
       loadStats,
       requestParse,
       useStratzFallback,
     };
 
-    const analysis = analyzeMatches(detailsList, accountId, heroMap, confidence, {
-      turboSkippedList: turboSkipped,
-      rankedSkippedList: rankedSkipped,
-      botsSkippedList: botsSkipped,
-      practiceSkippedList: practiceSkipped,
-      modeSkippedList: modeSkipped,
-      ...matchFilters,
-      laneFilters,
-    });
-
+    const analysis = analyzeCachedSession(laneFilters, matchFilters);
     renderAnalysisResults(analysis, { ...cachedAnalysisSession, laneFilters });
 
     analyzeMultiLog?.info(
@@ -924,6 +1042,7 @@ async function init() {
   initConfigUi();
   populateLaneFilterSelects();
   initLaneFilterListeners();
+  initMatchupDateFilter();
   analyzeMultiLog = initMultiActivityLog("activity-log-panel");
   initTools({
     getAnalyzeAbortSignal: () => analyzeTask.activeSignal(),

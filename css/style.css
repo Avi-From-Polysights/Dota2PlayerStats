@@ -521,6 +521,7 @@ a:hover {
 
 input[type="number"],
 input[type="text"],
+input[type="date"],
 select {
   width: 100%;
   padding: 0.55rem 0.75rem;
@@ -538,6 +539,11 @@ select {
 
 input::placeholder {
   color: var(--muted-foreground);
+}
+
+/* Native date picker and its calendar icon follow the dark theme. */
+input[type="date"] {
+  color-scheme: dark;
 }
 
 input:focus,
@@ -1278,6 +1284,34 @@ input[type="checkbox"] {
   height: min(520px, 70vh);
 }
 
+/* Drag (or click two points) to pick a date range; vertical swipes still scroll. */
+.chart-wrap--selectable canvas {
+  cursor: crosshair;
+  touch-action: pan-y;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.chart-selection {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+  padding: 0.45rem 0.5rem 0.45rem 0.75rem;
+  border: 1px solid var(--border-input);
+  border-radius: var(--radius-sm);
+  background: var(--hover);
+  font-size: 0.75rem;
+  font-weight: var(--weight-body);
+  color: var(--tertiary);
+  line-height: 1.45;
+}
+
+.chart-selection__text {
+  min-width: 0;
+}
+
 .all-heroes-status {
   margin: 0.75rem 0 0;
   font-size: 0.8125rem;
@@ -1697,6 +1731,15 @@ body.modal-open {
   color: var(--foreground);
 }
 
+.lane-filter-group__action {
+  align-self: flex-start;
+}
+
+.data-table__empty {
+  text-align: center;
+  color: var(--muted-foreground);
+}
+
 .matchup-filter-note {
   margin: 0 0 0.75rem;
   padding: 0.55rem 0.75rem;
@@ -1818,6 +1861,7 @@ body.modal-open {
 
   input[type="number"],
   input[type="text"],
+  input[type="date"],
   select {
     font-size: 16px;
     min-height: 2.75rem;

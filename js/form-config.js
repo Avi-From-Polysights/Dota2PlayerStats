@@ -7,6 +7,8 @@ export const FORM_DEFAULTS = {
   window: "20",
   sig: "0",
   patch: "",
+  from: "",
+  to: "",
   turbo: "0",
   ranked: "0",
   bots: "0",
@@ -32,6 +34,8 @@ export function captureFormConfig() {
     sig: document.getElementById("significant-only")?.checked ? "1" : "0",
     conf: document.getElementById("confidence-level")?.value ?? FORM_DEFAULTS.conf,
     patch: document.getElementById("patch-filter")?.value ?? "",
+    from: document.getElementById("date-from")?.value ?? "",
+    to: document.getElementById("date-to")?.value ?? "",
     window: document.getElementById("rolling-window")?.value ?? FORM_DEFAULTS.window,
     turbo: document.getElementById("exclude-turbo")?.checked ? "0" : "1",
     ranked: document.getElementById("ranked-only")?.checked ? "1" : "0",
@@ -76,6 +80,8 @@ export function applyFormConfig(values, { heroes = [], heroPicker = null } = {})
   if (values.delay != null) setValue("request-delay", values.delay);
   if (values.conf != null) setValue("confidence-level", values.conf);
   if (values.patch != null) setValue("patch-filter", values.patch);
+  if (values.from != null) setValue("date-from", values.from);
+  if (values.to != null) setValue("date-to", values.to);
   if (values.window != null) setValue("rolling-window", values.window);
   if (values.parsemax != null) setValue("parse-max", values.parsemax);
   if (values.parseparallelism != null) setValue("parse-parallelism", values.parseparallelism);

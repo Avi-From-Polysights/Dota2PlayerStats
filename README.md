@@ -11,6 +11,7 @@ A static web app that pulls match data from [OpenDota](https://www.opendota.com/
 - **Enemy hero matchups** — games, wins, losses, win %, Wilson CI, avg duration/K/D (same logic as the original Python script)
 - **Lane win %** — win rate broken down by lane assignment (Safe, Mid, Off, Jungle)
 - **Win rate over time** — rolling win-rate chart with overall baseline and recent trend indicator
+- **Date filtering** — limit the sample to a date range before analysis, then drag across the charts (or click two points) to narrow the matchup table to a period; the table's own From/To dates stay linked to the chart selection
 - **CSV export** — download the matchup table
 - **All Heroes tab** — cross-hero win/lane rates aggregated from your locally cached matches
 - **Hero Builder tab** — skill build (abilities, talents, Attribute Bonus) and item build planner with live computed stats, using OpenDota/dotaconstants hero & item data plus item-popularity stats; builds save locally

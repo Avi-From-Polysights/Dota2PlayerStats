@@ -278,6 +278,7 @@ export async function loadPlayerMatches(
 
 /**
  * Fetch up to `limit` matches, applying lobby/mode filters and scanning further back as needed.
+ * `sinceUnix` / `untilUnix` (inclusive, either optional) keep only matches started in that window.
  */
 export async function loadPlayerMatchesFiltered(
   accountId,
@@ -291,12 +292,17 @@ export async function loadPlayerMatchesFiltered(
     excludeBots = true,
     excludePractice = true,
     standardModesOnly = false,
+    sinceUnix = null,
+    untilUnix = null,
     signal,
     onRateLimitWait,
   } = {}
 ) {
   const matches = [];
   let offset = 0;
+  // Matches newer than `untilUnix` are paged past without using up the scan budget.
+  let scanned = 0;
+  let reachedCutoff = false;
   let turboSkipped = 0;
   let rankedSkipped = 0;
   let botsSkipped = 0;
@@ -311,8 +317,8 @@ export async function loadPlayerMatchesFiltered(
   };
   const maxScan = Math.min(Math.max(limit * 6, limit), 99_999);
 
-  while (matches.length < limit && offset < maxScan) {
-    const batchLimit = Math.min(100, maxScan - offset);
+  while (matches.length < limit && scanned < maxScan) {
+    const batchLimit = Math.min(100, maxScan - scanned);
     const params = new URLSearchParams({
       hero_id: String(heroId),
       limit: String(batchLimit),
@@ -332,6 +338,17 @@ export async function loadPlayerMatchesFiltered(
     if (!batch.length) break;
 
     for (const match of batch) {
+      // Match lists come back newest-first: skip anything after the window and
+      // stop at the first match before it.
+      if (typeof match.start_time === "number") {
+        if (untilUnix != null && match.start_time > untilUnix) continue;
+        if (sinceUnix != null && match.start_time < sinceUnix) {
+          reachedCutoff = true;
+          break;
+        }
+      }
+      scanned += 1;
+
       const { keep, reason } = classifyMatchSummary(match, filterOpts);
       if (!keep) {
         if (reason === "turbo") turboSkipped += 1;
@@ -344,6 +361,8 @@ export async function loadPlayerMatchesFiltered(
       matches.push(match);
       if (matches.length >= limit) break;
     }
+
+    if (reachedCutoff) break;
 
     offset += batch.length;
     if (batch.length < batchLimit) break;

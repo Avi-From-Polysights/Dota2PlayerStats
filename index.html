@@ -122,6 +122,28 @@
                     <option value="">All patches</option>
                   </select>
                 </label>
+
+                <label class="field">
+                  <div class="field__label-row">
+                    <span class="field__label">From date</span>
+                    <span class="info-tip">
+                      <button type="button" class="info-tip__btn" aria-label="About From date">i</button>
+                      <span class="info-tip__panel" role="tooltip">Only analyze matches played on or after this day. Leave blank for no start date. Match limit still applies, newest matches first.</span>
+                    </span>
+                  </div>
+                  <input type="date" id="date-from" name="dateFrom" />
+                </label>
+
+                <label class="field">
+                  <div class="field__label-row">
+                    <span class="field__label">To date</span>
+                    <span class="info-tip">
+                      <button type="button" class="info-tip__btn" aria-label="About To date">i</button>
+                      <span class="info-tip__panel" role="tooltip">Only analyze matches played on or before this day. Leave blank to include your latest games.</span>
+                    </span>
+                  </div>
+                  <input type="date" id="date-to" name="dateTo" />
+                </label>
               </div>
 
               <div class="config-section__checks">
@@ -365,11 +387,15 @@
         <article class="card card--highlight lane-vs-game-panel motion-rise">
           <div class="section-head">
             <h2 class="section-title">Lane win % vs game win %</h2>
-            <p class="section-desc">Lane outcome uses gold at 10 minutes vs your lane opponent on parsed replays. See whether winning lane translates into winning the game.</p>
+            <p class="section-desc">Lane outcome uses gold at 10 minutes vs your lane opponent on parsed replays. See whether winning lane translates into winning the game. Drag across the chart, or click two points, to filter enemy matchups to that period.</p>
           </div>
           <div id="lane-vs-game-stats" class="compare-grid"></div>
-          <div class="chart-wrap chart-wrap--mini">
+          <div class="chart-wrap chart-wrap--mini chart-wrap--selectable">
             <canvas id="lane-vs-game-chart"></canvas>
+          </div>
+          <div class="chart-selection hidden" data-chart-selection>
+            <span class="chart-selection__text" data-chart-selection-text></span>
+            <button type="button" class="btn btn--outline btn--sm" data-chart-selection-clear>Clear</button>
           </div>
         </article>
 
@@ -377,10 +403,14 @@
           <article class="card chart-panel motion-rise">
             <div class="section-head section-head--compact">
               <h2 class="section-title">Win rate over time</h2>
-              <p class="section-desc">Rolling win rate by match date. A rising line suggests improvement.</p>
+              <p class="section-desc">Rolling win rate by match date. A rising line suggests improvement. Drag across the chart, or click two points, to filter enemy matchups to that period.</p>
             </div>
-            <div class="chart-wrap">
+            <div class="chart-wrap chart-wrap--selectable">
               <canvas id="winrate-chart"></canvas>
+            </div>
+            <div class="chart-selection hidden" data-chart-selection>
+              <span class="chart-selection__text" data-chart-selection-text></span>
+              <button type="button" class="btn btn--outline btn--sm" data-chart-selection-clear>Clear</button>
             </div>
           </article>
 
@@ -426,8 +456,8 @@
             <p class="section-desc">Sorted by games played. Wilson CI shows statistically plausible win-rate range. Lane win % is vs that hero in lane only (parsed replays).</p>
           </div>
           <div class="lane-filter-block lane-filter-block--matchup">
-            <p class="lane-filter-block__label">Lane &amp; position filters</p>
-            <p class="lane-filter-block__hint">Adjust filters here — results update instantly after analysis. Positions use Dota roles 1–5 (inferred from lane + LH@10). Enable OpenDota parse for lane data.</p>
+            <p class="lane-filter-block__label">Lane, position &amp; date filters</p>
+            <p class="lane-filter-block__hint">Adjust filters here — results update instantly after analysis. Positions use Dota roles 1–5 (inferred from lane + LH@10). Enable OpenDota parse for lane data. The date range is linked to the chart selection above and only narrows this table.</p>
             <div class="lane-filter-grid">
               <fieldset class="lane-filter-group">
                 <legend class="lane-filter-group__legend">Your position</legend>
@@ -450,6 +480,18 @@
                   <span class="field__label">Enemy position</span>
                   <select id="enemy-role-filter" name="enemyRole"></select>
                 </label>
+              </fieldset>
+              <fieldset class="lane-filter-group">
+                <legend class="lane-filter-group__legend">Date range</legend>
+                <label class="field">
+                  <span class="field__label">From</span>
+                  <input type="date" id="matchup-date-from" name="matchupDateFrom" />
+                </label>
+                <label class="field">
+                  <span class="field__label">To</span>
+                  <input type="date" id="matchup-date-to" name="matchupDateTo" />
+                </label>
+                <button type="button" id="matchup-date-clear" class="btn btn--outline btn--sm lane-filter-group__action" disabled>Clear dates</button>
               </fieldset>
             </div>
           </div>
