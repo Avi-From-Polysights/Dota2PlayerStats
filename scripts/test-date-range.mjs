@@ -154,7 +154,7 @@ const localMidnight = (y, m, d) => Math.floor(new Date(y, m - 1, d).getTime() / 
   assert("no window: unchanged behaviour", unfiltered.matches.length === 50);
 }
 
-// --- matchup-only date range ------------------------------------------------
+// --- selected date range ----------------------------------------------------
 {
   const ME = 42;
   const heroNames = new Map([
@@ -186,26 +186,27 @@ const localMidnight = (y, m, d) => Math.floor(new Date(y, m - 1, d).getTime() / 
   const all = analyzeMatches(matches, ME, heroNames, 0.95, opts);
   const narrowed = analyzeMatches(matches, ME, heroNames, 0.95, {
     ...opts,
-    matchupDateRange: dayRangeBounds({ from: "2026-09-10", to: "2026-09-30" }),
+    dateRange: dayRangeBounds({ from: "2026-09-10", to: "2026-09-30" }),
   });
 
-  assert("no range: every match feeds matchups", all.matchupGames === 4 && all.matchupRows.length === 2);
+  assert("no range: every match counts", all.totalGames === 4 && all.dateSkipped === 0);
   assert(
     "range narrows matchup rows",
     narrowed.matchupRows.length === 1 && narrowed.matchupRows[0].hero === "Lina"
   );
-  assert("range counts matchup games", narrowed.matchupGames === 2);
   assert(
-    "range leaves totals alone",
-    narrowed.totalGames === 4 && narrowed.totalWins === all.totalWins && narrowed.processed === 4
+    "range narrows the totals, like the position filter",
+    narrowed.totalGames === 2 && narrowed.totalWins === 2 && narrowed.overallWinrate === 100
   );
-  assert("range leaves the timeline alone", narrowed.timeline.length === 4);
+  assert("range counts what it left out", narrowed.dateSkipped === 2 && narrowed.processed === 2);
+  assert("range narrows the timeline", narrowed.timeline.every((m) => m.startTime >= sept(10)));
+  assert("range narrows the patch rows", narrowed.patchRows.reduce((sum, row) => sum + row.games, 0) === 2);
 
   const empty = analyzeMatches(matches, ME, heroNames, 0.95, {
     ...opts,
-    matchupDateRange: dayRangeBounds({ from: "2027-01-01" }),
+    dateRange: dayRangeBounds({ from: "2027-01-01" }),
   });
-  assert("range with no games empties matchups only", empty.matchupRows.length === 0 && empty.totalGames === 4);
+  assert("range with no games leaves nothing", empty.matchupRows.length === 0 && empty.totalGames === 0);
 }
 
 if (!ok) process.exit(1);

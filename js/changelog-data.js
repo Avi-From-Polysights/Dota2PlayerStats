@@ -40,6 +40,32 @@ export const SECTION_ICONS = {
  */
 export const CHANGELOGS = [
   {
+    version: "0.0.62",
+    date: "2026-10-19",
+    title: "Whole-Page Date Selection",
+    tagline: "A selected period now drives every stat, not just the matchup table.",
+    heroImage: DOTA_IMG.heroes.kez,
+    accent: "#42d68c",
+    sections: [
+      {
+        id: "features",
+        title: "Features",
+        icon: SECTION_ICONS.features,
+        items: [
+          {
+            text: "Selecting dates on the charts, or in the date range inputs, now filters the summary cards, the lane win % vs game win % stats, the lane breakdown, the patch table and the matchup table — the same way the position filter does. The summary notes how many games fall outside the selected dates.",
+          },
+          {
+            text: "The two win rate over time charts keep showing every game, so the selection stays visible and you can drag out a new one without clearing first.",
+          },
+          {
+            text: "Changing the dates keeps however you have sorted the matchup table.",
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: "0.0.61",
     date: "2026-10-19",
     title: "Date Filtering",

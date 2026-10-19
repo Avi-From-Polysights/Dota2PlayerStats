@@ -387,7 +387,7 @@
         <article class="card card--highlight lane-vs-game-panel motion-rise">
           <div class="section-head">
             <h2 class="section-title">Lane win % vs game win %</h2>
-            <p class="section-desc">Lane outcome uses gold at 10 minutes vs your lane opponent on parsed replays. See whether winning lane translates into winning the game. Drag across the chart, or click two points, to filter enemy matchups to that period.</p>
+            <p class="section-desc">Lane outcome uses gold at 10 minutes vs your lane opponent on parsed replays. See whether winning lane translates into winning the game. Drag across the chart, or click two points, to narrow the stats and matchups to that period.</p>
           </div>
           <div id="lane-vs-game-stats" class="compare-grid"></div>
           <div class="chart-wrap chart-wrap--mini chart-wrap--selectable">
@@ -403,7 +403,7 @@
           <article class="card chart-panel motion-rise">
             <div class="section-head section-head--compact">
               <h2 class="section-title">Win rate over time</h2>
-              <p class="section-desc">Rolling win rate by match date. A rising line suggests improvement. Drag across the chart, or click two points, to filter enemy matchups to that period.</p>
+              <p class="section-desc">Rolling win rate by match date. A rising line suggests improvement. Drag across the chart, or click two points, to narrow the stats and matchups to that period.</p>
             </div>
             <div class="chart-wrap chart-wrap--selectable">
               <canvas id="winrate-chart"></canvas>
@@ -457,7 +457,7 @@
           </div>
           <div class="lane-filter-block lane-filter-block--matchup">
             <p class="lane-filter-block__label">Lane, position &amp; date filters</p>
-            <p class="lane-filter-block__hint">Adjust filters here — results update instantly after analysis. Positions use Dota roles 1–5 (inferred from lane + LH@10). Enable OpenDota parse for lane data. The date range is linked to the chart selection above and only narrows this table.</p>
+            <p class="lane-filter-block__hint">Adjust filters here — results update instantly after analysis. Positions use Dota roles 1–5 (inferred from lane + LH@10). Enable OpenDota parse for lane data. The date range is linked to the chart selection above and narrows every stat, like your position does. The win-rate charts keep showing all games so you can move it.</p>
             <div class="lane-filter-grid">
               <fieldset class="lane-filter-group">
                 <legend class="lane-filter-group__legend">Your position</legend>

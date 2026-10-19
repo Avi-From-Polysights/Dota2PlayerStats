@@ -131,13 +131,20 @@ let patches = [];
 let heroes = [];
 let lastMatchupRows = [];
 let lastTimeline = [];
+/** Every game in the sample, one chart point each, even while a date range is selected. */
+let chartTimeline = [];
 let sortState = { key: "games", dir: "desc" };
 const analyzeTask = createAbortableTask();
 let progressContext = { pct: 0, task: "" };
 let analyzeMultiLog = null;
 let cachedAnalysisSession = null;
 
-function renderAnalysisResults(analysis, meta) {
+/**
+ * Everything except the two win-rate-over-time charts. These follow the
+ * selected date range like the position filters do; the charts keep every
+ * game (`timelineAnalysis`) so the range stays visible and can be moved.
+ */
+function renderSampleStats(analysis, meta, timelineAnalysis) {
   const {
     heroName,
     rollingWindow,
@@ -148,33 +155,16 @@ function renderAnalysisResults(analysis, meta) {
   } = meta;
 
   lastTimeline = analysis.timeline ?? [];
-  const rolling = rollingWinRate(analysis.timeline, rollingWindow);
-  const laneVsGameRolling = rollingLaneVsGame(analysis.timeline, rollingWindow);
-  const trend = trendDirection(rolling);
-  const chartSelection = {
-    selection: timelineSelection(lastTimeline),
-    onSelect: selectTimelineRange,
-  };
+  const trend = trendDirection(rollingWinRate(analysis.timeline, rollingWindow));
+  const selectedRange = readSelectedDateRange();
+  const dateRange = hasDayRange(selectedRange) ? selectedRange : sampleDateRange;
 
-  renderSummary(analysis, heroName, trend, rollingWindow, selectedPatchLabel, loadStats, laneFilters, sampleDateRange);
+  renderSummary(analysis, heroName, trend, rollingWindow, selectedPatchLabel, loadStats, laneFilters, dateRange);
   renderDataQualityPanel(analysis, loadStats, meta);
   renderParseStatusPanel(loadStats, meta.requestParse);
-  renderMatchupFilterNote(laneFilters, analysis);
-  renderChartSelectionStatus(analysis);
+  renderMatchupFilterNote(laneFilters, analysis, timelineAnalysis);
+  renderChartSelectionStatus(analysis, timelineAnalysis);
   renderLaneVsGameStats(analysis);
-  renderLaneVsGameChart(
-    document.getElementById("lane-vs-game-chart"),
-    laneVsGameRolling,
-    analysis.overallLaneWinrate,
-    analysis.overallWinrate,
-    chartSelection
-  );
-  renderWinrateChart(
-    document.getElementById("winrate-chart"),
-    rolling,
-    analysis.overallWinrate,
-    chartSelection
-  );
   renderLaneChart(document.getElementById("lane-chart"), analysis.laneRows);
   renderLaneTable(analysis.laneRows);
   renderLaneDataNote(analysis, loadStats);
@@ -185,9 +175,33 @@ function renderAnalysisResults(analysis, meta) {
     renderPatchTable(analysis.patchRows);
   }
 
+  renderMatchupTable(sortRows(analysis.matchupRows, sortState.key, sortState.dir));
+}
+
+function renderAnalysisResults(analysis, meta, timelineAnalysis = analysis) {
+  const { rollingWindow } = meta;
+  chartTimeline = timelineAnalysis.timeline ?? [];
+  const chartSelection = {
+    selection: timelineSelection(chartTimeline),
+    onSelect: selectTimelineRange,
+  };
+
   sortState = { key: "games", dir: "desc" };
   updateSortHeaders();
-  renderMatchupTable(analysis.matchupRows);
+  renderSampleStats(analysis, meta, timelineAnalysis);
+  renderLaneVsGameChart(
+    document.getElementById("lane-vs-game-chart"),
+    rollingLaneVsGame(chartTimeline, rollingWindow),
+    timelineAnalysis.overallLaneWinrate,
+    timelineAnalysis.overallWinrate,
+    chartSelection
+  );
+  renderWinrateChart(
+    document.getElementById("winrate-chart"),
+    rollingWinRate(chartTimeline, rollingWindow),
+    timelineAnalysis.overallWinrate,
+    chartSelection
+  );
 
   resultsEl.classList.remove("hidden");
   resultsEl.querySelectorAll(".motion-rise, .motion-stagger > *").forEach((el) => {
@@ -201,7 +215,7 @@ function renderAnalysisResults(analysis, meta) {
 }
 
 /** Re-run the analysis over the fetched matches with the filters currently on screen. */
-function analyzeCachedSession(laneFilters, matchFilters) {
+function analyzeCachedSession(laneFilters, matchFilters, dateRange = null) {
   const session = cachedAnalysisSession;
   return analyzeMatches(session.detailsList, session.accountId, session.heroMap, session.confidence, {
     turboSkippedList: session.turboSkippedList,
@@ -211,8 +225,21 @@ function analyzeCachedSession(laneFilters, matchFilters) {
     modeSkippedList: session.modeSkippedList,
     ...matchFilters,
     laneFilters,
-    matchupDateRange: dayRangeBounds(readMatchupDateRange()),
+    dateRange,
   });
+}
+
+/**
+ * The analysis for the selected date range, plus the full one the timeline
+ * charts plot. Without a range they are the same analysis.
+ */
+function analyzeWithDateRange(laneFilters, matchFilters) {
+  const timelineAnalysis = analyzeCachedSession(laneFilters, matchFilters);
+  const bounds = dayRangeBounds(readSelectedDateRange());
+  const analysis = bounds
+    ? analyzeCachedSession(laneFilters, matchFilters, bounds)
+    : timelineAnalysis;
+  return { analysis, timelineAnalysis };
 }
 
 function refilterCachedAnalysis() {
@@ -222,68 +249,67 @@ function refilterCachedAnalysis() {
   const matchFilters = readMatchFiltersFromDom();
   syncUrlFromForm();
 
-  const analysis = analyzeCachedSession(laneFilters, matchFilters);
-  renderAnalysisResults(analysis, { ...cachedAnalysisSession, laneFilters, ...matchFilters });
+  const { analysis, timelineAnalysis } = analyzeWithDateRange(laneFilters, matchFilters);
+  renderAnalysisResults(analysis, { ...cachedAnalysisSession, laneFilters, ...matchFilters }, timelineAnalysis);
 
   const summary = formatLaneFilterSummary(laneFilters);
   analyzeMultiLog?.info(summary ? `Filters updated — ${summary}` : "Filters cleared — showing all games");
 }
 
-function readMatchupDateRange() {
+function readSelectedDateRange() {
   return normalizeDayRange(readDayRangeFromDom("matchup-date-from", "matchup-date-to"));
 }
 
-/** Points on the time-series charts covered by the matchup date range. */
+/** Points on the time-series charts covered by the selected date range. */
 function timelineSelection(timeline) {
   return indexRangeForBounds(
     timeline.map((m) => m.startTime),
-    dayRangeBounds(readMatchupDateRange())
+    dayRangeBounds(readSelectedDateRange())
   );
 }
 
 /**
- * The matchup date range changed, from the inputs or a chart. Only the table
- * and the chart band depend on it, so the charts are not rebuilt.
+ * The selected date range changed, from the inputs or a chart. The timeline
+ * charts always plot every game, so they only need the band moved.
  */
-function applyMatchupDateRange() {
+function applySelectedDateRange() {
   if (!cachedAnalysisSession) return;
 
   const laneFilters = readLaneFiltersFromDom();
-  const analysis = analyzeCachedSession(laneFilters, readMatchFiltersFromDom());
-  renderMatchupTable(sortRows(analysis.matchupRows, sortState.key, sortState.dir));
-  renderMatchupFilterNote(laneFilters, analysis);
-  renderChartSelectionStatus(analysis);
-  setTimelineSelection(timelineSelection(analysis.timeline));
+  const matchFilters = readMatchFiltersFromDom();
+  const { analysis, timelineAnalysis } = analyzeWithDateRange(laneFilters, matchFilters);
+  renderSampleStats(analysis, { ...cachedAnalysisSession, laneFilters, ...matchFilters }, timelineAnalysis);
+  setTimelineSelection(timelineSelection(timelineAnalysis.timeline));
 
-  const range = readMatchupDateRange();
+  const range = readSelectedDateRange();
   analyzeMultiLog?.info(
     hasDayRange(range)
-      ? `Matchups narrowed to ${formatDayRange(range)} — ${analysis.matchupGames} of ${analysis.totalGames} games`
-      : "Matchup date range cleared — showing all games"
+      ? `Stats narrowed to ${formatDayRange(range)} — ${analysis.totalGames} of ${timelineAnalysis.totalGames} games`
+      : "Date range cleared — showing all games"
   );
 }
 
 /** A range picked on a chart widens to whole days, so it always matches the date inputs. */
 function selectTimelineRange({ start, end }) {
-  const first = lastTimeline[start];
-  const last = lastTimeline[end];
+  const first = chartTimeline[start];
+  const last = chartTimeline[end];
   if (!first || !last) return;
   matchupDateFrom.value = toDayInput(first.startTime);
   matchupDateTo.value = toDayInput(last.startTime);
-  applyMatchupDateRange();
+  applySelectedDateRange();
 }
 
-function clearMatchupDateRange() {
+function clearSelectedDateRange() {
   matchupDateFrom.value = "";
   matchupDateTo.value = "";
-  applyMatchupDateRange();
+  applySelectedDateRange();
 }
 
-function renderChartSelectionStatus(analysis) {
-  const range = readMatchupDateRange();
+function renderChartSelectionStatus(analysis, timelineAnalysis) {
+  const range = readSelectedDateRange();
   const active = hasDayRange(range);
   const text = active
-    ? `Matchup table: ${formatDayRange(range)} · ${analysis.matchupGames} of ${analysis.totalGames} games`
+    ? `Showing ${formatDayRange(range)} · ${analysis.totalGames} of ${timelineAnalysis.totalGames} games`
     : "";
   document.querySelectorAll("[data-chart-selection]").forEach((el) => {
     el.classList.toggle("hidden", !active);
@@ -293,12 +319,12 @@ function renderChartSelectionStatus(analysis) {
   matchupDateClear.disabled = !active;
 }
 
-function initMatchupDateFilter() {
-  matchupDateFrom.addEventListener("change", applyMatchupDateRange);
-  matchupDateTo.addEventListener("change", applyMatchupDateRange);
-  matchupDateClear.addEventListener("click", clearMatchupDateRange);
+function initSelectedDateFilter() {
+  matchupDateFrom.addEventListener("change", applySelectedDateRange);
+  matchupDateTo.addEventListener("change", applySelectedDateRange);
+  matchupDateClear.addEventListener("click", clearSelectedDateRange);
   document.querySelectorAll("[data-chart-selection-clear]").forEach((btn) => {
-    btn.addEventListener("click", clearMatchupDateRange);
+    btn.addEventListener("click", clearSelectedDateRange);
   });
 }
 
@@ -354,7 +380,7 @@ function populatePatches(list) {
   patchFilter.innerHTML = `<option value="">All patches</option>${options}`;
 }
 
-function renderSummary(analysis, heroName, trend, rollingWindow, selectedPatchLabel, loadStats, laneFilters, sampleDateRange) {
+function renderSummary(analysis, heroName, trend, rollingWindow, selectedPatchLabel, loadStats, laneFilters, dateRange) {
   const trendLabels = {
     improving: "Trending up",
     declining: "Trending down",
@@ -378,7 +404,7 @@ function renderSummary(analysis, heroName, trend, rollingWindow, selectedPatchLa
   const patchNote = selectedPatchLabel
     ? `Filtered to ${selectedPatchLabel}`
     : `${analysis.patchRows.length} patch(es) in sample`;
-  const sampleDateNote = hasDayRange(sampleDateRange) ? ` · ${formatDayRange(sampleDateRange)}` : "";
+  const dateNote = hasDayRange(dateRange) ? ` · ${formatDayRange(dateRange)}` : "";
 
   const loadNote = loadStats ? formatLoadStats(loadStats) : "";
   const laneFilterNote = hasActiveLaneFilters(laneFilters)
@@ -388,6 +414,8 @@ function renderSummary(analysis, heroName, trend, rollingWindow, selectedPatchLa
     analysis.laneFilterSkipped > 0
       ? `${analysis.laneFilterSkipped} excluded by lane/role filter`
       : "";
+  const dateSkipNote =
+    analysis.dateSkipped > 0 ? `${analysis.dateSkipped} outside selected dates` : "";
 
   summaryCards.innerHTML = `
     <div class="summary-card">
@@ -403,12 +431,12 @@ function renderSummary(analysis, heroName, trend, rollingWindow, selectedPatchLa
     <div class="summary-card">
       <div class="summary-card__label">Record</div>
       <div class="summary-card__value">${analysis.totalWins}W / ${analysis.totalLosses}L</div>
-      <div class="summary-card__sub">${analysis.totalGames} matches · ${patchNote}${sampleDateNote}</div>
+      <div class="summary-card__sub">${analysis.totalGames} matches · ${patchNote}${dateNote}</div>
     </div>
     <div class="summary-card">
       <div class="summary-card__label">Hero</div>
       <div class="summary-card__value" style="font-size:1.35rem">${heroName}</div>
-      <div class="summary-card__sub">${analysis.processed} processed · ${analysis.skipped} skipped${analysis.turboSkipped ? ` · ${analysis.turboSkipped} turbo excluded` : ""}${analysis.rankedSkipped ? ` · ${analysis.rankedSkipped} non-ranked excluded` : ""}${analysis.botsSkipped ? ` · ${analysis.botsSkipped} bots excluded` : ""}${analysis.practiceSkipped ? ` · ${analysis.practiceSkipped} practice excluded` : ""}${analysis.modeSkipped ? ` · ${analysis.modeSkipped} non-standard modes excluded` : ""}${laneSkipNote ? ` · ${laneSkipNote}` : ""}${laneFilterNote ? ` · ${laneFilterNote}` : ""}${loadNote ? ` · ${loadNote}` : ""}</div>
+      <div class="summary-card__sub">${analysis.processed} processed · ${analysis.skipped} skipped${analysis.turboSkipped ? ` · ${analysis.turboSkipped} turbo excluded` : ""}${analysis.rankedSkipped ? ` · ${analysis.rankedSkipped} non-ranked excluded` : ""}${analysis.botsSkipped ? ` · ${analysis.botsSkipped} bots excluded` : ""}${analysis.practiceSkipped ? ` · ${analysis.practiceSkipped} practice excluded` : ""}${analysis.modeSkipped ? ` · ${analysis.modeSkipped} non-standard modes excluded` : ""}${dateSkipNote ? ` · ${dateSkipNote}` : ""}${laneSkipNote ? ` · ${laneSkipNote}` : ""}${laneFilterNote ? ` · ${laneFilterNote}` : ""}${loadNote ? ` · ${loadNote}` : ""}</div>
     </div>
     <div class="summary-card">
       <div class="summary-card__label">Recent trend</div>
@@ -453,15 +481,15 @@ function renderDataQualityPanel(analysis, loadStats, meta) {
   panel.classList.remove("hidden");
 }
 
-function renderMatchupFilterNote(laneFilters, analysis) {
+function renderMatchupFilterNote(laneFilters, analysis, timelineAnalysis) {
   const el = document.getElementById("matchup-filter-note");
   if (!el) return;
-  const dateRange = readMatchupDateRange();
+  const dateRange = readSelectedDateRange();
   const parts = [];
   if (hasActiveLaneFilters(laneFilters)) parts.push(formatLaneFilterSummary(laneFilters));
   if (hasDayRange(dateRange)) {
     parts.push(
-      `dates: ${formatDayRange(dateRange)} (${analysis.matchupGames} of ${analysis.totalGames} games)`
+      `dates: ${formatDayRange(dateRange)} (${analysis.totalGames} of ${timelineAnalysis.totalGames} games)`
     );
   }
   if (!parts.length) {
@@ -469,7 +497,7 @@ function renderMatchupFilterNote(laneFilters, analysis) {
     el.classList.add("hidden");
     return;
   }
-  el.textContent = `Matchups filtered: ${parts.join(" · ")}. Enemy lane/role and date filters only affect the table below. Change filters anytime after analysis — no re-fetch needed.`;
+  el.textContent = `Matchups filtered: ${parts.join(" · ")}. Enemy lane/role filters only affect the table below. Change filters anytime after analysis — no re-fetch needed.`;
   el.classList.remove("hidden");
 }
 
@@ -1042,7 +1070,7 @@ async function init() {
   initConfigUi();
   populateLaneFilterSelects();
   initLaneFilterListeners();
-  initMatchupDateFilter();
+  initSelectedDateFilter();
   analyzeMultiLog = initMultiActivityLog("activity-log-panel");
   initTools({
     getAnalyzeAbortSignal: () => analyzeTask.activeSignal(),

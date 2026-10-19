@@ -264,15 +264,34 @@ async function main() {
     assert("drag fills the To date", (await page.inputValue("#matchup-date-to")) === dayInput(0));
     const recentHeroes = await matchupHeroes(page);
     assert("recent range drops the older era", recentHeroes.includes("Lina") && !recentHeroes.includes("Axe"));
+    const selectedGames = dragRange.end - dragRange.start + 1;
     const lina = await page.$eval("#matchup-table tbody", (tbody) => {
       const row = [...tbody.rows].find((r) => r.cells[0].textContent.trim() === "Lina");
       return Number(row.cells[1].textContent);
     });
-    assert("matchup games match the selected points", lina === dragRange.end - dragRange.start + 1);
+    assert("matchup games match the selected points", lina === selectedGames);
     const status = page.locator("[data-chart-selection]").first();
     assert("selection status shown under the chart", await status.isVisible());
-    assert("selection status counts games", /\d+ of 40 games/.test(await status.textContent()));
-    assert("summary still covers every game", /40 matches/.test(await page.locator("#summary-cards").textContent()));
+    assert(
+      "selection status counts games",
+      (await status.textContent()).includes(`${selectedGames} of 40 games`)
+    );
+
+    // The rest of the page follows the selection, like the position filter.
+    const selectedSummary = await page.locator("#summary-cards").textContent();
+    assert("summary covers the selected games", selectedSummary.includes(`${selectedGames} matches`));
+    const [, wins, losses] = selectedSummary.match(/(\d+)W \/ (\d+)L/) ?? [];
+    assert("summary record adds up to the selection", Number(wins) + Number(losses) === selectedGames);
+    assert(
+      "summary notes games outside the dates",
+      selectedSummary.includes(`${40 - selectedGames} outside selected dates`)
+    );
+    const laneVsGame = await page.locator("#lane-vs-game-stats").textContent();
+    assert("lane vs game stats follow the selection", laneVsGame.includes(`${wins}W · ${losses}L`));
+    assert(
+      "timeline charts keep every game",
+      (await page.evaluate(() => Chart.getChart(document.getElementById("winrate-chart")).data.labels.length)) === 40
+    );
     assert("matchup note mentions dates", /dates:/.test(await page.locator("#matchup-filter-note").textContent()));
     assert("clear dates enabled", await page.locator("#matchup-date-clear").isEnabled());
 
@@ -305,7 +324,8 @@ async function main() {
     const oldHeroes = await matchupHeroes(page);
     assert("old range drops the newer era", oldHeroes.includes("Axe") && !oldHeroes.includes("Lina"));
 
-    // Typing dates moves the band.
+    // Typing dates moves the band, and a sorted table stays sorted.
+    await page.locator('#matchup-table th[data-sort="hero"]').click();
     await page.fill("#matchup-date-from", dayInput(5));
     await page.fill("#matchup-date-to", dayInput(3));
     await page.locator("#matchup-date-to").dispatchEvent("change");
@@ -313,6 +333,12 @@ async function main() {
     assert(
       "typed dates move the chart band",
       typedRange?.start === DAYS - 1 - 5 && typedRange?.end === DAYS - 1 - 3
+    );
+    assert("typed dates narrow the summary", (await page.locator("#summary-cards").textContent()).includes("3 matches"));
+    const sortedHeroes = await matchupHeroes(page);
+    assert(
+      "date change keeps the table sort",
+      JSON.stringify(sortedHeroes) === JSON.stringify([...sortedHeroes].sort((a, b) => a.localeCompare(b)))
     );
 
     // A range with no games empties the table but keeps the charts.
@@ -326,6 +352,7 @@ async function main() {
     await page.locator("[data-chart-selection-clear]").first().click();
     assert("clear empties the inputs", (await page.inputValue("#matchup-date-from")) === "");
     assert("clear restores every matchup", (await matchupHeroes(page)).length === allHeroes.length);
+    assert("clear restores the summary", (await page.locator("#summary-cards").textContent()).includes("40 matches"));
     assert("clear hides the status", await page.locator("[data-chart-selection]").first().isHidden());
 
     // --- pre-analysis date range -----------------------------------------

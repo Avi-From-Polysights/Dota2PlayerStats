@@ -60,8 +60,8 @@ export function analyzeMatches(
     excludePractice = true,
     standardModesOnly = false,
     laneFilters = {},
-    // { fromUnix, toUnix } — narrows only the enemy matchup rows, not the rest of the analysis.
-    matchupDateRange = null,
+    // { fromUnix, toUnix } — matches outside are left out of every stat, like the position filter.
+    dateRange = null,
   } = {}
 ) {
   const filterMyPosition = Boolean(laneFilters.myLane || laneFilters.myRole);
@@ -99,7 +99,7 @@ export function analyzeMatches(
   let gameWinsWhenLaneLost = 0;
   let gameWinsWhenLaneDraw = 0;
   let laneFilterSkipped = 0;
-  let matchupGames = 0;
+  let dateSkipped = 0;
 
   for (const details of matches) {
     if (!details) {
@@ -112,6 +112,12 @@ export function analyzeMatches(
 
     if (!me) {
       skipped += 1;
+      continue;
+    }
+
+    if (!isWithinBounds(details.start_time, dateRange)) {
+      skipped += 1;
+      dateSkipped += 1;
       continue;
     }
 
@@ -211,11 +217,6 @@ export function analyzeMatches(
       enemyHeroes: enemyHeroes.join("; "),
     });
 
-    processed += 1;
-
-    if (!isWithinBounds(details.start_time, matchupDateRange)) continue;
-    matchupGames += 1;
-
     for (const p of players) {
       if (isRadiant(p.player_slot) === mySideRadiant) continue;
       if (filterEnemyPosition && !matchEnemyLaneFilter(p, laneFilters, players)) continue;
@@ -239,6 +240,8 @@ export function analyzeMatches(
 
       matchups.set(enemyName, bucket);
     }
+
+    processed += 1;
   }
 
   const matchupRows = [...matchups.entries()]
@@ -351,7 +354,7 @@ export function analyzeMatches(
     patchRows,
     timeline,
     laneFilterSkipped,
-    matchupGames,
+    dateSkipped,
   };
 }
 
