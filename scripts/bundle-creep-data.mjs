@@ -82,13 +82,16 @@ function combatStats(chain) {
 }
 
 export async function bundleCreepData({ outDir } = {}) {
-  const [unitsText, heroesText] = await Promise.all([
+  // Each hero lives in its own file under heroes/; npc_heroes.txt only lists
+  // them as #base includes.
+  const [unitsText, heroBaseText, heroText] = await Promise.all([
     fetchText(`${VPK_BASE}/npc_units.txt`),
-    fetchText(`${VPK_BASE}/npc_heroes.txt`),
+    fetchText(`${VPK_BASE}/heroes/${HERO_BASE_UNIT}.txt`),
+    fetchText(`${VPK_BASE}/heroes/${HERO_UNIT}.txt`),
   ]);
 
   const unitBlocks = parseKvBlocks(unitsText);
-  const heroBlocks = parseKvBlocks(heroesText);
+  const heroBlocks = new Map([...parseKvBlocks(heroBaseText), ...parseKvBlocks(heroText)]);
 
   const creeps = {};
   for (const [key, unitName] of Object.entries(CREEP_UNITS)) {
